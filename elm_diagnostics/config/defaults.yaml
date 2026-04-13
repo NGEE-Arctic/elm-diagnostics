@@ -1,0 +1,62 @@
+# elm-diagnostics default configuration
+# Variable names verified against E3SM ELM source (Phase 0 reconnaissance)
+
+report:
+  title_template: "ELM diagnostics — {casename}"
+  output_formats: [png, netcdf]
+
+plots:
+  style:
+    figsize: [8, 5]
+    dpi: 150
+    palette: "tab10"
+  climatology:
+    envelope: "minmax"  # or "p10_p90", "std"
+
+time:
+  water_year_start_month: 10
+  cumulative_years: "all"  # or list of ints, or "each"
+
+balances:
+  water:
+    storages: [SOILLIQ, SOILICE, H2OSNO, H2OCAN, H2OSFC]
+    inputs: [RAIN, SNOW]
+    outputs: [QFLX_EVAP_TOT, QOVER, QDRAI, QDRAI_PERCH, QFLX_SUB_SNOW, QSNOMELT]
+    # Decomposition panel shows ET components separately:
+    et_components: [QFLX_EVAP_VEG, QFLX_EVAP_GRND, QFLX_SUB_SNOW]
+    residual_against: "dS/dt"
+    frame: "water_year"
+
+  carbon:
+    mode: "auto"  # auto-detect BGC vs SP
+    pools: [LEAFC, LIVESTEMC, DEADSTEMC, FROOTC, LIVECROOTC, DEADCROOTC,
+            TOTSOMC, TOTLITC, CWDC]
+    fluxes: [GPP, AR, HR, ER, NEE, TOTFIRE, WOOD_HARVESTC]
+    ch4:
+      aerenchyma: [CH4_SURF_AERE_SAT, CH4_SURF_AERE_UNSAT]
+      diffusion: [CH4_SURF_DIFF_SAT, CH4_SURF_DIFF_UNSAT]
+      ebullition: [CH4_SURF_EBUL_SAT, CH4_SURF_EBUL_UNSAT]
+    residual_against: "TOTECOSYSC"
+    frame: "calendar"
+
+  energy:
+    radiation: [FSDS, FSR, FLDS, FIRE, FSA, FIRA]
+    turbulent: [FSH, EFLX_LH_TOT]
+    ground: [FGR]
+    # Storage term available but not plotted by default (fluxes only)
+    storage: [hc_soisno]
+    frame: "calendar"
+    cumulative: false
+
+variables:
+  groups:
+    hydrology: [H2OSOI, QRUNOFF, QDRAI, SNOWDP, H2OSNO, H2OSFC,
+                SOILLIQ, SOILICE, QOVER, QINFL, QSNOMELT]
+    carbon_pools: [LEAFC, LIVESTEMC, DEADSTEMC, FROOTC, LIVECROOTC,
+                   DEADCROOTC, TOTSOMC, TOTLITC, CWDC, TOTECOSYSC, TOTCOLC]
+    carbon_fluxes: [GPP, AR, HR, ER, NEE, NBP, TOTFIRE, WOOD_HARVESTC,
+                    LITHR, SOMHR]
+    energy: [FSDS, FSR, FLDS, FIRE, FSA, FIRA, FSH, EFLX_LH_TOT, FGR,
+             SABV, SABG]
+    soil_state: [TSOI, SOILLIQ, SOILICE]
+    vegetation: [TLAI, TSAI, HTOP, GPP, TOTVEGC]

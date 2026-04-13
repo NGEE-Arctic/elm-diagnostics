@@ -1,0 +1,132 @@
+"""Abstract base class for budget balances."""
+
+from __future__ import annotations
+
+from abc import ABC, abstractmethod
+from pathlib import Path
+from typing import Any
+
+import cftime
+import matplotlib.pyplot as plt
+import numpy as np
+import xarray as xr
+
+from elm_diagnostics.config.schema import Config, load_config
+from elm_diagnostics.io.run import Run
+from elm_diagnostics.time.calendars import (
+    add_water_year_coord,
+    get_available_years,
+    select_year,
+)
+from elm_diagnostics.time.integration import (
+    cumulative_integral,
+    get_time_deltas,
+    storage_change,
+)
+
+
+def _plot_time(da: xr.DataArray):
+    """Return time values suitable for matplotlib plotting.
+
+    Converts cftime dates to Python datetime objects since matplotlib
+    cannot handle cftime types natively without nc_time_axis.
+    """
+    times = da.time.values
+    if len(times) > 0 and isinstance(times[0], cftime.datetime):
+        return [t._to_real_datetime() for t in times]
+    return times
+
+
+class Balance(ABC):
+    """Abstract base for water, carbon, and energy budget balances.
+
+    Subclasses define which YAML config section to read and how to
+    assemble the balance equation.
+    """
+
+    def __init__(
+        self,
+        run: Run,
+        year: int | None = None,
+        config: Config | str | Path | None = None,
+    ):
+        self.run = run
+        self.year = year
+
+        if config is None or isinstance(config, (str, Path)):
+            self.config = load_config(config)
+        else:
+            self.config = config
+
+        self._balance_config = self._get_balance_config()
+
+    @abstractmethod
+    def _get_balance_config(self) -> Any:
+        """Return the relevant sub-config for this balance type."""
+
+    @property
+    def frame(self) -> str:
+        return self._balance_config.frame
+
+    def _get_var(self, varname: str) -> xr.DataArray:
+        """Retrieve a variable from the run, squeezing spatial singletons."""
+        da = self.run.get(varname)
+        # Squeeze singleton spatial dims for single-point data
+        for dim in ("lat", "lon"):
+            if dim in da.dims and da.sizes[dim] == 1:
+                da = da.squeeze(dim, drop=True)
+        return da
+
+    def _select_year(self, ds_or_da):
+        """Subset to the requested year if set."""
+        if self.year is None:
+            return ds_or_da
+
+        start_month = self.config.time.water_year_start_month
+        if isinstance(ds_or_da, xr.Dataset):
+            return select_year(ds_or_da, self.year, self.frame, start_month)
+
+        # For DataArray: wrap in dataset, select, extract
+        tmp = ds_or_da.to_dataset(name="__tmp")
+        tmp = select_year(tmp, self.year, self.frame, start_month)
+        return tmp["__tmp"]
+
+    @abstractmethod
+    def components(self) -> dict[str, xr.DataArray]:
+        """Return unit-normalized, time-aligned balance components."""
+
+    @abstractmethod
+    def residual(self) -> xr.DataArray:
+        """Return the closure residual."""
+
+    @abstractmethod
+    def plot(self) -> tuple[plt.Figure, plt.Figure]:
+        """Generate balance plots.
+
+        Returns (cumulative_panel, decomposition_panel).
+        """
+
+    def to_netcdf(self, path: str | Path) -> None:
+        """Save balance components to NetCDF."""
+        comps = self.components()
+        ds = xr.Dataset(comps)
+        ds["residual"] = self.residual()
+        ds.to_netcdf(path)
+
+    def plot_all_years(self):
+        """Iterate over all available years, yielding plot tuples."""
+        # Get a representative dataset for year discovery
+        first_var = next(iter(self._get_variable_names()))
+        da = self._get_var(first_var)
+        ds = da.to_dataset(name=first_var)
+
+        start_month = self.config.time.water_year_start_month
+        years = get_available_years(ds, self.frame, start_month)
+
+        for yr in years:
+            self.year = yr
+            yield self.plot()
+
+    @abstractmethod
+    def _get_variable_names(self) -> list[str]:
+        """Return all variable names used by this balance."""

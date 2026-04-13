@@ -1,0 +1,308 @@
+"""Run and Comparison classes for loading ELM history-file streams."""
+
+from __future__ import annotations
+
+import re
+from pathlib import Path
+from typing import Literal
+
+import cftime
+import numpy as np
+import pandas as pd
+import xarray as xr
+
+
+def _discover_streams(path: Path) -> dict[str, list[Path]]:
+    """Auto-discover ELM history streams from a directory.
+
+    Groups files by history tape number (h0, h1, ...).
+    """
+    pattern = re.compile(r"\.elm\.(h\d+)\.")
+    streams: dict[str, list[Path]] = {}
+    for f in sorted(path.glob("*.elm.h*.nc")):
+        m = pattern.search(f.name)
+        if m:
+            tape = m.group(1)
+            streams.setdefault(tape, []).append(f)
+    return streams
+
+
+def _infer_cadence(ds: xr.Dataset) -> str | pd.Timedelta:
+    """Infer temporal cadence from time_bounds.
+
+    Returns 'monthly', 'annual', or a pd.Timedelta for uniform sub-monthly.
+    """
+    if "time_bounds" in ds:
+        bounds_var = "time_bounds"
+    elif "time_bnds" in ds:
+        bounds_var = "time_bnds"
+    else:
+        # Fall back to diff of time coordinate
+        times = ds["time"].values
+        if len(times) < 2:
+            return "monthly"
+        if isinstance(times[0], cftime.datetime):
+            diffs = []
+            for i in range(min(len(times) - 1, 12)):
+                dt = times[i + 1] - times[i]
+                diffs.append(dt.days)
+            median_days = np.median(diffs)
+        else:
+            td = np.diff(times[:13])
+            median_days = np.median(td / np.timedelta64(1, "D"))
+        if 28 <= median_days <= 31:
+            return "monthly"
+        if 360 <= median_days <= 366:
+            return "annual"
+        return pd.Timedelta(days=float(median_days))
+
+    bounds = ds[bounds_var]
+    # Compute dt from bounds
+    if len(bounds.dims) == 2:
+        dts = bounds[:, 1] - bounds[:, 0]
+    else:
+        return "monthly"
+
+    # Sample first few time steps
+    sample = min(len(dts), 12)
+    first_val = dts.values.flat[0]
+
+    import datetime
+
+    day_diffs = []
+    for i in range(sample):
+        val = dts.values[i]
+        if isinstance(val, datetime.timedelta):
+            day_diffs.append(val.days + val.seconds / 86400.0)
+        elif isinstance(val, np.timedelta64):
+            day_diffs.append(val / np.timedelta64(1, "D"))
+        elif hasattr(val, "days"):
+            day_diffs.append(val.days)
+        elif isinstance(val, (int, float, np.integer, np.floating)):
+            day_diffs.append(float(val))
+        else:
+            day_diffs.append(float(val) / 86400.0)
+
+    median_days = float(np.median(day_diffs))
+
+    if 28 <= median_days <= 31:
+        return "monthly"
+    if 360 <= median_days <= 366:
+        return "annual"
+    return pd.Timedelta(days=float(median_days))
+
+
+def _extract_casename(path: Path) -> str:
+    """Extract ELM case name from the first history file found."""
+    for f in sorted(path.glob("*.elm.h*.nc")):
+        parts = f.name.split(".elm.")
+        if parts:
+            return parts[0]
+    return path.name
+
+
+class Run:
+    """Atomic unit of analysis: one ELM case's history-file streams.
+
+    Parameters
+    ----------
+    path : str or Path
+        Directory containing ``*.elm.h*.nc`` files, or a glob pattern.
+    name : str, optional
+        Display name. Defaults to the case name extracted from filenames.
+    streams : dict, optional
+        Explicit stream mapping, e.g. ``{"h0": "*.elm.h0.*.nc"}``.
+        If None, streams are auto-discovered.
+    chunks : dict, optional
+        Passed to ``xr.open_mfdataset`` for dask-backed lazy loading.
+    """
+
+    def __init__(
+        self,
+        path: str | Path,
+        name: str | None = None,
+        streams: dict[str, str] | None = None,
+        chunks: dict | None = None,
+    ):
+        self.path = Path(path)
+        self.name = name or _extract_casename(self.path)
+        self._chunks = chunks
+        self._datasets: dict[str, xr.Dataset] = {}
+        self._cadence: dict[str, str | pd.Timedelta] = {}
+
+        if streams is not None:
+            self._stream_files: dict[str, list[Path]] = {}
+            for tape, pattern in streams.items():
+                self._stream_files[tape] = sorted(self.path.glob(pattern))
+        else:
+            self._stream_files = _discover_streams(self.path)
+
+        if not self._stream_files:
+            raise FileNotFoundError(
+                f"No ELM history files found in {self.path}. "
+                "Expected files matching *.elm.h*.nc"
+            )
+
+        # Sort tapes by name for deterministic ordering
+        self._tape_order = sorted(self._stream_files.keys())
+
+    def _open_stream(self, tape: str) -> xr.Dataset:
+        """Lazily open a stream's files as a single dataset."""
+        if tape not in self._datasets:
+            files = self._stream_files[tape]
+            if not files:
+                raise FileNotFoundError(f"No files for stream {tape}")
+            kwargs: dict = dict(
+                combine="by_coords",
+            )
+            # Use CFDatetimeCoder for cftime decoding (xarray >= 2024)
+            try:
+                coder = xr.coders.CFDatetimeCoder(use_cftime=True)
+                kwargs["decode_times"] = coder
+            except AttributeError:
+                kwargs["decode_times"] = True
+                kwargs["use_cftime"] = True
+            if self._chunks is not None:
+                kwargs["chunks"] = self._chunks
+            else:
+                # Avoid requiring dask when not explicitly requested
+                kwargs["chunks"] = None
+            self._datasets[tape] = xr.open_mfdataset(files, **kwargs)
+            self._cadence[tape] = _infer_cadence(self._datasets[tape])
+        return self._datasets[tape]
+
+    @property
+    def streams(self) -> dict[str, xr.Dataset]:
+        """All streams as open datasets, keyed by tape name."""
+        return {tape: self._open_stream(tape) for tape in self._tape_order}
+
+    @property
+    def cadence(self) -> dict[str, str | pd.Timedelta]:
+        """Cadence per stream (inferred from time_bounds)."""
+        # Ensure all streams are opened to populate cadence
+        for tape in self._tape_order:
+            self._open_stream(tape)
+        return dict(self._cadence)
+
+    @property
+    def tape_priority(self) -> list[str]:
+        """Tapes ordered by cadence (finest first)."""
+
+        def _cadence_key(tape: str) -> float:
+            self._open_stream(tape)
+            c = self._cadence[tape]
+            if isinstance(c, pd.Timedelta):
+                return c.total_seconds()
+            if c == "monthly":
+                return 30 * 86400
+            if c == "annual":
+                return 365 * 86400
+            return 30 * 86400
+
+        return sorted(self._tape_order, key=_cadence_key)
+
+    def get(self, varname: str, tape: str | None = None) -> xr.DataArray:
+        """Retrieve a variable, searching tapes in priority order.
+
+        Parameters
+        ----------
+        varname : str
+            History field name (e.g. ``"GPP"``, ``"SOILLIQ"``).
+        tape : str, optional
+            Specific tape to search. If None, searches all tapes
+            in cadence-priority order (finest first).
+
+        Returns
+        -------
+        xr.DataArray
+
+        Raises
+        ------
+        KeyError
+            If the variable is not found in any tape.
+        """
+        if tape is not None:
+            ds = self._open_stream(tape)
+            if varname in ds:
+                return ds[varname]
+            raise KeyError(f"{varname!r} not found in stream {tape}")
+
+        for t in self.tape_priority:
+            ds = self._open_stream(t)
+            if varname in ds:
+                return ds[varname]
+
+        available_tapes = ", ".join(self._tape_order)
+        raise KeyError(
+            f"{varname!r} not found in any stream. "
+            f"Searched tapes: {available_tapes}"
+        )
+
+    def has(self, varname: str) -> bool:
+        """Check whether a variable exists in any tape."""
+        for t in self._tape_order:
+            ds = self._open_stream(t)
+            if varname in ds:
+                return True
+        return False
+
+    def close(self) -> None:
+        """Close all open datasets."""
+        for ds in self._datasets.values():
+            ds.close()
+        self._datasets.clear()
+
+    def __repr__(self) -> str:
+        tapes = ", ".join(self._tape_order)
+        return f"Run(name={self.name!r}, tapes=[{tapes}])"
+
+
+class Comparison:
+    """Pair of runs for side-by-side diagnostics.
+
+    Parameters
+    ----------
+    base : Run
+        Reference / control run.
+    experiment : Run
+        Experiment / perturbation run.
+    align : {'intersect', 'union'}
+        How to align time axes. ``'intersect'`` keeps only overlapping
+        times; ``'union'`` fills missing times with NaN.
+    """
+
+    def __init__(
+        self,
+        base: Run,
+        experiment: Run,
+        align: Literal["intersect", "union"] = "intersect",
+    ):
+        self.base = base
+        self.experiment = experiment
+        self.align = align
+
+    def get(
+        self, varname: str, tape: str | None = None
+    ) -> tuple[xr.DataArray, xr.DataArray]:
+        """Retrieve a variable from both runs, time-aligned.
+
+        Returns
+        -------
+        tuple of (base_da, experiment_da)
+        """
+        da_base = self.base.get(varname, tape=tape)
+        da_exp = self.experiment.get(varname, tape=tape)
+
+        if self.align == "intersect":
+            common = xr.align(da_base, da_exp, join="inner")
+        else:
+            common = xr.align(da_base, da_exp, join="outer")
+
+        return common  # type: ignore[return-value]
+
+    def __repr__(self) -> str:
+        return (
+            f"Comparison(base={self.base.name!r}, "
+            f"experiment={self.experiment.name!r}, "
+            f"align={self.align!r})"
+        )
