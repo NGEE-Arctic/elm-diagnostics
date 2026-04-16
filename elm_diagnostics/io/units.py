@@ -142,3 +142,68 @@ def convert_flux_to_cumulative_units(
 
     # Already cumulative
     return (norm, 1.0)
+
+
+def convert_water_to_mm(da: xr.DataArray) -> xr.DataArray:
+    """Convert water storage variable to mm units.
+    
+    Water mass per unit area (kg/m²) and water depth (mm) are numerically
+    equivalent for liquid water: 1 kg/m² = 1 mm H2O (assuming density = 1000 kg/m³).
+    
+    This function standardizes the units attribute to "mm" without changing values.
+    Variables already in mm are returned unchanged.
+    
+    Parameters
+    ----------
+    da : xr.DataArray
+        Water storage variable with units in kg/m², mm, or variants.
+    
+    Returns
+    -------
+    xr.DataArray
+        Variable with units standardized to "mm". Values are unchanged.
+    
+    Raises
+    ------
+    ValueError
+        If units cannot be converted to mm (e.g., temperature, pressure).
+    
+    Examples
+    --------
+    >>> soilliq = xr.DataArray([100.0, 150.0], attrs={"units": "kg/m2"})
+    >>> result = convert_water_to_mm(soilliq)
+    >>> result.attrs["units"]
+    'mm'
+    >>> result.values
+    array([100., 150.])
+    """
+    units_str = da.attrs.get("units", "")
+    if not units_str:
+        raise ValueError("DataArray has no 'units' attribute")
+    
+    normalized = normalize_unit_string(units_str)
+    
+    # Already in mm - return as-is
+    if normalized == "mm":
+        return da
+    
+    # kg/m² variants → mm (numerically equivalent for water)
+    kg_m2_variants = ["kg/m**2", "kg/m^2", "kg/m2"]
+    if normalized in kg_m2_variants:
+        result = da.copy(deep=False)  # Shallow copy - share data, copy attrs
+        result.attrs = dict(da.attrs)
+        result.attrs["units"] = "mm"
+        return result
+    
+    # mm H2O variant → mm
+    if normalized == "mm/s":
+        raise ValueError(
+            f"Cannot convert flux units '{units_str}' to mm. "
+            "Use cumulative_integral() to integrate fluxes first."
+        )
+    
+    # Unknown/incompatible units
+    raise ValueError(
+        f"Cannot convert units '{units_str}' to mm. "
+        f"Expected kg/m² or mm variants, got normalized: '{normalized}'"
+    )

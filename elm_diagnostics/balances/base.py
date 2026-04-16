@@ -13,6 +13,7 @@ import xarray as xr
 
 from elm_diagnostics.config.schema import Config, load_config
 from elm_diagnostics.io.run import Run
+from elm_diagnostics.io.subgrid import SubgridLevel
 from elm_diagnostics.time.calendars import (
     add_water_year_coord,
     get_available_years,
@@ -48,10 +49,12 @@ class Balance(ABC):
         self,
         run: Run,
         year: int | None = None,
+        by: SubgridLevel | None = None,
         config: Config | str | Path | None = None,
     ):
         self.run = run
         self.year = year
+        self.by = by
 
         if config is None or isinstance(config, (str, Path)):
             self.config = load_config(config)
@@ -59,6 +62,13 @@ class Balance(ABC):
             self.config = config
 
         self._balance_config = self._get_balance_config()
+        
+        # Validate sub-gridcell dimension if requested
+        if by is not None:
+            from elm_diagnostics.io.subgrid import validate_by_keyword
+            # Get first stream to check
+            first_stream = self.run._open_stream(self.run._tape_order[0])
+            validate_by_keyword(first_stream, by)
 
     @abstractmethod
     def _get_balance_config(self) -> Any:
@@ -69,10 +79,14 @@ class Balance(ABC):
         return self._balance_config.frame
 
     def _get_var(self, varname: str) -> xr.DataArray:
-        """Retrieve a variable from the run, squeezing spatial singletons."""
+        """Retrieve a variable from the run, squeezing spatial singletons.
+        
+        Preserves the sub-gridcell dimension specified by self.by if set.
+        """
         da = self.run.get(varname)
         # Squeeze singleton spatial dims for single-point data
-        for dim in ("lat", "lon"):
+        # But preserve the sub-gridcell dimension if specified
+        for dim in ("lat", "lon", "lndgrid", "gridcell"):
             if dim in da.dims and da.sizes[dim] == 1:
                 da = da.squeeze(dim, drop=True)
         return da

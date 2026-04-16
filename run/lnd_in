@@ -1,0 +1,119 @@
+&elm_inparm
+ aero_file = '/home/amanzi_user/compass/inputdata/atm/cam/chem/trop_mozart_aero/aero/aerosoldep_monthly_1850_mean_1.9x2.5_c090421.nc'
+ albice = 0.60,0.40
+ co2_file = '/home/amanzi_user/compass/inputdata/atm/datm7/CO2/fco2_datm_1765-2007_c100614.nc'
+ co2_ppmv = 379.0
+ co2_type = 'constant'
+ create_crop_landunit = .false.
+ do_budgets = .true.
+ dtime = 1800
+ fatmlndfrc = '/home/amanzi_user/compass/inputdata/share/domains/domain.clm/domain.lnd.1x1pt_Oakharbor-GRID_navy.nc'
+ finidat = ' '
+ fsnowaging = '/home/amanzi_user/compass/inputdata/lnd/clm2/snicardata/snicar_drdt_bst_fit_60_c070416.nc'
+ fsnowoptics = '/home/amanzi_user/compass/inputdata/lnd/clm2/snicardata/snicar_optics_5bnd_mam_c160322.nc'
+ fsoilordercon = '/home/amanzi_user/compass/inputdata/lnd/clm2/paramdata/CNP_parameters_c180529.nc'
+ fsurdat = '/home/amanzi_user/compass/inputdata/lnd/clm2/surfdata_map/surfdata_1x1pt_Oakharbor-GRID_simyr1850_c360x720_c20230522.nc'
+ hist_fincl2 = 'TBOT','PBOT','RH','RAIN','SNOW','TLAI','ZWT','SMP','SOILLIQ','SOILICE'
+ hist_mfilt(2) = 365
+ hist_nhtfrq(2) = -24
+ maxpatch_glcmec = 0
+ maxpatch_pft = 17
+ metdata_bypass = '/home/amanzi_user/compass/inputdata/atm/datm7/atm_forcing.datm7.GSWP3.0.5d.v2.c180716_Oakharbor-Grid/cpl_bypass_full'
+ metdata_type = 'gswp3'
+ more_vertlayers = .false.
+ nsegspc = 20
+ nu_com = 'RD'
+ nyears_ad_carbon_only = 0
+ paramfile = '/home/amanzi_user/compass/inputdata/lnd/clm2/paramdata/clm_params_c211124.nc'
+ spinup_mortality_factor = 10
+ spinup_state = 0
+ suplnitro = 'NONE'
+ suplphos = 'NONE'
+ tw_irr = .false.
+ urban_hac = 'ON'
+ urban_traffic = .false.
+ use_atm_downscaling_to_topunit = .false.
+ use_ats = .true.
+ use_century_decomp = .false.
+ use_cn = .true.
+ use_crop = .false.
+ use_dynroot = .false.
+ use_fates = .false.
+ use_hydrstress = .false.
+ use_lch4 = .true.
+ use_nofire = .true.
+ use_snicar_ad = .true.
+ use_top_solar_rad = .false.
+ use_vertsoilc = .true.
+/
+&ndepdyn_nml
+ model_year_align_ndep = 1850
+ ndepmapalgo = 'bilinear'
+ stream_fldfilename_ndep = '/home/amanzi_user/compass/inputdata/lnd/clm2/ndepdata/fndep_elm_cbgc_exp_simyr1849-2101_1.9x2.5_c190103.nc'
+ stream_year_first_ndep = 1850
+ stream_year_last_ndep = 2005
+/
+&pdepdyn_nml
+ model_year_align_pdep = 2000
+ pdepmapalgo = 'bilinear'
+ stream_fldfilename_pdep = '/home/amanzi_user/compass/inputdata/lnd/clm2/pdepdata/fpdep_clm_hist_simyr2000_1.9x2.5_c150929.nc'
+ stream_year_first_pdep = 2000
+ stream_year_last_pdep = 2000
+/
+&popd_streams
+ model_year_align_popdens = 1850
+ popdensmapalgo = 'bilinear'
+ stream_fldfilename_popdens = '/home/amanzi_user/compass/inputdata/lnd/clm2/firedata/clmforc.Li_2012_hdm_0.5x0.5_AVHRR_simyr1850-2010_c130401.nc'
+ stream_year_first_popdens = 1850
+ stream_year_last_popdens = 2010
+/
+&light_streams
+ lightngmapalgo = 'bilinear'
+ stream_fldfilename_lightng = '/home/amanzi_user/compass/inputdata/atm/datm7/NASA_LIS/clmforc.Li_2012_climo1995-2011.T62.lnfm_Total_c140423.nc'
+ stream_year_first_lightng = 0001
+ stream_year_last_lightng = 0001
+/
+&lai_streams
+/
+&elm_canopyhydrology_inparm
+/
+&elm_soilhydrology_inparm
+/
+&dynamic_subgrid
+ do_harvest = .false.
+ do_transient_pfts = .false.
+ flanduse_timeseries = ''
+/
+&finidat_consistency_checks
+ check_finidat_fsurdat_consistency = .false.
+ check_finidat_year_consistency = .false.
+/
+&dynpft_consistency_checks
+/
+&elmu_inparm
+/
+&elm_soilstate_inparm
+/
+&elm_pflotran_inparm
+/
+&betr_inparm
+/
+&elm_mosart
+ lnd_rof_coupling_nstep = 6
+/
+&ch4par_in
+ fin_use_fsat = .true.
+ use_aereoxid_prog = .true.
+/
+&elm_humanindex_inparm
+/
+&elm_ats_inparm
+ ats_inputdir = '/home/amanzi_user/work/cases/oakharbor_column.elm-ats'
+ ats_inputfile = 'oakharbor_column.xml'
+/
+!#--------------------------------------------------------------------------------------------------------------------------
+!# lnd_in:: Comment:
+!# This namelist was created using the following command-line:
+!#     /home/amanzi_user/compass/E3SM/components/elm/bld/CLM build-namelist -infile /home/amanzi_user/work/cases/oakharbor_column.elm-ats/Buildconf/elmconf/namelist -csmdata /home/amanzi_user/compass/inputdata -inputdata /home/amanzi_user/work/cases/oakharbor_column.elm-ats/Buildconf/elm.input_data_list -ignore_ic_year -namelist  &elm_inparm  start_ymd=20000715  / -use_case 20thC_transient -res 1x1pt_Oakharbor -clm_usr_name 1x1pt_Oakharbor -clm_start_type default -envxml_dir /home/amanzi_user/work/cases/oakharbor_column.elm-ats -l_ncpl 48 -r_ncpl 8 -lnd_frac /home/amanzi_user/compass/inputdata/share/domains/domain.clm/domain.lnd.1x1pt_Oakharbor-GRID_navy.nc -glc_nec 0 -co2_ppmv 379.0 -co2_type constant -ncpl_base_period day -config /home/amanzi_user/work/cases/oakharbor_column.elm-ats/Buildconf/elmconf/config_cache.xml -bgc bgc -nutrient cnp -nutrient_comp_pathway rd -soil_decomp ctc -methane
+!# For help on options use: /home/amanzi_user/compass/E3SM/components/elm/bld/CLM build-namelist -help
+!#--------------------------------------------------------------------------------------------------------------------------

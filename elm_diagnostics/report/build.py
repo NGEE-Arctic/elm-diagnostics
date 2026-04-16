@@ -3,10 +3,15 @@
 from __future__ import annotations
 
 import re
+import traceback
+from datetime import datetime
 from pathlib import Path
+from typing import Any
 
 import matplotlib
 import matplotlib.pyplot as plt
+import numpy as np
+import xarray as xr
 from jinja2 import Environment, FileSystemLoader
 
 from elm_diagnostics.balances.carbon import CarbonBalance
@@ -14,7 +19,13 @@ from elm_diagnostics.balances.energy import EnergyBalance
 from elm_diagnostics.balances.water import WaterBalance
 from elm_diagnostics.config.schema import Config, load_config
 from elm_diagnostics.io.run import Comparison, Run
-from elm_diagnostics.plots import plot_anomaly, plot_histogram, plot_seasonal, plot_timeseries
+from elm_diagnostics.plots import (
+    plot_anomaly,
+    plot_diurnal,
+    plot_histogram,
+    plot_seasonal,
+    plot_timeseries,
+)
 
 _TEMPLATE_DIR = Path(__file__).parent / "templates"
 _ASSETS_DIR = Path(__file__).parent / "assets"
@@ -28,9 +39,32 @@ class _Section:
         self.id = re.sub(r"[^a-z0-9]+", "-", title.lower()).strip("-")
         self.description = description
         self.figures: list[dict[str, str]] = []
+        self.statistics: dict[str, Any] = {}
 
-    def add_figure(self, path: str, caption: str) -> None:
-        self.figures.append({"path": path, "caption": caption})
+    def add_figure(self, path: str, thumb_path: str, caption: str, plot_type: str = "") -> None:
+        """Add a figure to the section.
+        
+        Parameters
+        ----------
+        path : str
+            Relative path to full-size image.
+        thumb_path : str
+            Relative path to thumbnail image.
+        caption : str
+            Figure caption.
+        plot_type : str, optional
+            Type of plot (timeseries, seasonal, etc.).
+        """
+        self.figures.append({
+            "path": path,
+            "thumb_path": thumb_path,
+            "caption": caption,
+            "plot_type": plot_type,
+        })
+
+    def add_statistics(self, stats: dict[str, Any]) -> None:
+        """Add statistics table data to section."""
+        self.statistics = stats
 
 
 class Report:
@@ -52,6 +86,9 @@ class Report:
     ):
         self.source = source
         self.year = year
+        self._errors: list[dict[str, str]] = []
+        self._warnings: list[str] = []
+        self._generation_time = datetime.now()
 
         if config is None or isinstance(config, (str, Path)):
             self.config = load_config(config)
@@ -67,6 +104,53 @@ class Report:
     @property
     def _casename(self) -> str:
         return self._run.name
+    
+    @property
+    def _is_comparison(self) -> bool:
+        """Check if this is a comparison report."""
+        return isinstance(self.source, Comparison)
+
+    def _save_figure(
+        self, fig: plt.Figure, figdir: Path, basename: str
+    ) -> tuple[str, str]:
+        """Save figure at full resolution and thumbnail.
+        
+        Returns
+        -------
+        tuple[str, str]
+            Relative paths (full, thumbnail) for HTML.
+        """
+        full_path = figdir / f"{basename}.png"
+        thumb_path = figdir / f"{basename}_thumb.png"
+        
+        # Save full resolution
+        fig.savefig(full_path, bbox_inches="tight", dpi=self.config.plots.style.dpi)
+        
+        # Save thumbnail if enabled
+        if self.config.report.thumbnails.enabled:
+            fig.savefig(
+                thumb_path,
+                bbox_inches="tight",
+                dpi=self.config.report.thumbnails.dpi,
+            )
+        else:
+            # If thumbnails disabled, use same file for both
+            thumb_path = full_path
+        
+        return f"figures/{basename}.png", f"figures/{basename}_thumb.png"
+
+    def _record_error(self, section: str, error: Exception) -> None:
+        """Record an error that occurred during report generation."""
+        self._errors.append({
+            "section": section,
+            "error": str(error),
+            "type": type(error).__name__,
+            "traceback": traceback.format_exc(),
+        })
+
+    def _add_warning(self, message: str) -> None:
+        """Add a warning message."""
+        self._warnings.append(message)
 
     def build(self, outdir: str | Path) -> Path:
         """Generate the full report.
@@ -82,18 +166,28 @@ class Report:
         """
         outdir = Path(outdir)
         figdir = outdir / "figures"
+        datadir = outdir / "data"
         figdir.mkdir(parents=True, exist_ok=True)
+        datadir.mkdir(parents=True, exist_ok=True)
 
         prev_backend = matplotlib.get_backend()
         matplotlib.use("Agg")
 
         sections: list[_Section] = []
 
+        # --- Metadata section ---
+        if self.config.report.metadata.show_run_info:
+            sections.append(self._build_metadata_section())
+
         # --- Balance sections ---
-        sections.extend(self._build_balance_sections(figdir))
+        sections.extend(self._build_balance_sections(figdir, datadir))
 
         # --- Variable group sections ---
         sections.extend(self._build_variable_sections(figdir))
+
+        # --- Error diagnostics section ---
+        if self._errors or self._warnings:
+            sections.append(self._build_diagnostics_section())
 
         matplotlib.use(prev_backend)
         plt.close("all")
@@ -102,80 +196,318 @@ class Report:
         html_path = self._render_html(outdir, sections)
         return html_path
 
-    def _build_balance_sections(self, figdir: Path) -> list[_Section]:
+    def _build_metadata_section(self) -> _Section:
+        """Build metadata section with run information."""
+        sec = _Section("Run Information", "Metadata about the ELM simulation(s).")
+        
+        run = self._run
+        
+        # Collect metadata
+        metadata = {}
+        metadata["Case Name"] = run.name
+        
+        # Get time range from first stream
+        if run.streams:
+            first_stream = list(run.streams.values())[0]
+            time = first_stream.time
+            metadata["Time Range"] = f"{time[0].values} to {time[-1].values}"
+            metadata["Number of Time Steps"] = len(time)
+        
+        # List available streams
+        if run.streams:
+            metadata["History Streams"] = ", ".join(run.streams.keys())
+        
+        # Add comparison info if applicable
+        if self._is_comparison:
+            comp = self.source
+            metadata["Comparison Mode"] = "Base vs. Experiment"
+            metadata["Base Case"] = comp.base.name
+            metadata["Experiment Case"] = comp.experiment.name
+        
+        # Generation info
+        if self.config.report.metadata.show_generation_timestamp:
+            metadata["Report Generated"] = self._generation_time.strftime("%Y-%m-%d %H:%M:%S")
+        
+        sec.add_statistics(metadata)
+        return sec
+
+    def _build_balance_sections(self, figdir: Path, datadir: Path) -> list[_Section]:
         sections = []
         run = self._run
 
-        # Water
+        # Water Balance
         try:
             wb = WaterBalance(run, year=self.year, config=self.config)
             sec = _Section("Water Balance", "Column water budget closure.")
+            
+            # Generate plots
             fig1, fig2 = wb.plot()
-            p1 = figdir / "water_cumulative.png"
-            p2 = figdir / "water_decomposition.png"
-            fig1.savefig(p1, bbox_inches="tight")
-            fig2.savefig(p2, bbox_inches="tight")
-            sec.add_figure(f"figures/water_cumulative.png", "Cumulative water balance")
-            sec.add_figure(f"figures/water_decomposition.png", "Water output decomposition")
+            p1, t1 = self._save_figure(fig1, figdir, "water_cumulative")
+            p2, t2 = self._save_figure(fig2, figdir, "water_decomposition")
+            sec.add_figure(p1, t1, "Cumulative water balance", "balance")
+            sec.add_figure(p2, t2, "Water output decomposition", "balance")
+            plt.close(fig1)
+            plt.close(fig2)
+            
+            # Add statistics if enabled
+            if self.config.report.balance_sections.show_statistics_table:
+                stats = self._compute_water_balance_stats(wb)
+                sec.add_statistics(stats)
+            
+            # Save NetCDF data
+            if "netcdf" in self.config.report.output_formats:
+                nc_file = datadir / f"water_balance{'_' + str(self.year) if self.year else ''}.nc"
+                wb.to_netcdf(nc_file)
+            
             sections.append(sec)
-            wb.to_netcdf(figdir.parent / "data" / "water_balance.nc")
-        except Exception:
-            pass
+        except Exception as e:
+            self._record_error("Water Balance", e)
 
-        # Energy
+        # Energy Balance
         try:
             eb = EnergyBalance(run, year=self.year, config=self.config)
             sec = _Section("Energy Balance", "Surface energy budget closure.")
+            
             fig1, fig2 = eb.plot()
-            p1 = figdir / "energy_fluxes.png"
-            p2 = figdir / "energy_residual.png"
-            fig1.savefig(p1, bbox_inches="tight")
-            fig2.savefig(p2, bbox_inches="tight")
-            sec.add_figure(f"figures/energy_fluxes.png", "Surface energy fluxes")
-            sec.add_figure(f"figures/energy_residual.png", "Energy balance residual")
+            p1, t1 = self._save_figure(fig1, figdir, "energy_fluxes")
+            p2, t2 = self._save_figure(fig2, figdir, "energy_residual")
+            sec.add_figure(p1, t1, "Surface energy fluxes", "balance")
+            sec.add_figure(p2, t2, "Energy balance residual", "balance")
+            plt.close(fig1)
+            plt.close(fig2)
+            
+            # Add statistics if enabled
+            if self.config.report.balance_sections.show_statistics_table:
+                stats = self._compute_energy_balance_stats(eb)
+                sec.add_statistics(stats)
+            
+            # Save NetCDF data
+            if "netcdf" in self.config.report.output_formats:
+                nc_file = datadir / f"energy_balance{'_' + str(self.year) if self.year else ''}.nc"
+                # Energy balance doesn't have to_netcdf yet, save components directly
+                try:
+                    components_ds = xr.Dataset({k: v for k, v in eb.components().items()})
+                    components_ds.to_netcdf(nc_file)
+                except Exception:
+                    pass  # Skip if can't save
+            
             sections.append(sec)
-        except Exception:
-            pass
+        except Exception as e:
+            self._record_error("Energy Balance", e)
 
-        # Carbon
+        # Carbon Balance
         try:
             cb = CarbonBalance(run, year=self.year, config=self.config)
             sec = _Section("Carbon Balance", "Ecosystem carbon budget closure.")
+            
             fig1, fig2 = cb.plot()
-            p1 = figdir / "carbon_cumulative.png"
-            p2 = figdir / "carbon_pools.png"
-            fig1.savefig(p1, bbox_inches="tight")
-            fig2.savefig(p2, bbox_inches="tight")
-            sec.add_figure(f"figures/carbon_cumulative.png", "Cumulative carbon balance")
-            sec.add_figure(f"figures/carbon_pools.png", "Carbon pools")
+            p1, t1 = self._save_figure(fig1, figdir, "carbon_cumulative")
+            p2, t2 = self._save_figure(fig2, figdir, "carbon_pools")
+            sec.add_figure(p1, t1, "Cumulative carbon balance", "balance")
+            sec.add_figure(p2, t2, "Carbon pools", "balance")
+            plt.close(fig1)
+            plt.close(fig2)
+            
+            # Add statistics if enabled
+            if self.config.report.balance_sections.show_statistics_table:
+                stats = self._compute_carbon_balance_stats(cb)
+                sec.add_statistics(stats)
+            
+            # Save NetCDF data
+            if "netcdf" in self.config.report.output_formats:
+                nc_file = datadir / f"carbon_balance{'_' + str(self.year) if self.year else ''}.nc"
+                # Carbon balance doesn't have to_netcdf yet, save components directly
+                try:
+                    components_ds = xr.Dataset({k: v for k, v in cb.components().items()})
+                    components_ds.to_netcdf(nc_file)
+                except Exception:
+                    pass  # Skip if can't save
+            
             sections.append(sec)
-        except Exception:
-            pass
+        except Exception as e:
+            self._record_error("Carbon Balance", e)
 
         return sections
+
+    def _compute_water_balance_stats(self, wb: WaterBalance) -> dict[str, Any]:
+        """Compute statistics for water balance section."""
+        stats = {}
+        try:
+            components = wb.components()
+            residual = wb.residual()
+            
+            # Get final cumulative values
+            for name, da in components.items():
+                if len(da.dims) > 1:
+                    # Spatial mean if needed
+                    da = da.mean(dim=[d for d in da.dims if d != "time"])
+                final_val = float(da.isel(time=-1).values)
+                stats[name] = f"{final_val:.2f} mm"
+            
+            # Add residual info
+            if len(residual.dims) > 1:
+                residual = residual.mean(dim=[d for d in residual.dims if d != "time"])
+            final_residual = float(residual.isel(time=-1).values)
+            stats["Residual"] = f"{final_residual:.2f} mm"
+            
+            # Calculate percentage if requested
+            if self.config.report.balance_sections.show_residual_percentage:
+                # Compute as percentage of inputs
+                total_input = 0
+                for key in ["RAIN", "SNOW"]:
+                    if key in components:
+                        val = components[key]
+                        if len(val.dims) > 1:
+                            val = val.mean(dim=[d for d in val.dims if d != "time"])
+                        total_input += abs(float(val.isel(time=-1).values))
+                if total_input > 0:
+                    pct = (abs(final_residual) / total_input) * 100
+                    stats["Residual (%)"] = f"{pct:.2f}%"
+        except Exception as e:
+            stats["Error"] = str(e)
+        
+        return stats
+
+    def _compute_energy_balance_stats(self, eb: EnergyBalance) -> dict[str, Any]:
+        """Compute statistics for energy balance section."""
+        stats = {}
+        try:
+            components = eb.components()
+            
+            # Get mean flux values
+            for name, da in components.items():
+                if len(da.dims) > 1:
+                    da = da.mean(dim=[d for d in da.dims if d != "time"])
+                mean_val = float(da.mean().values)
+                stats[name] = f"{mean_val:.2f} W/m²"
+        except Exception as e:
+            stats["Error"] = str(e)
+        
+        return stats
+
+    def _compute_carbon_balance_stats(self, cb: CarbonBalance) -> dict[str, Any]:
+        """Compute statistics for carbon balance section."""
+        stats = {}
+        try:
+            components = cb.components()
+            
+            # Get final cumulative or mean values
+            for name, da in components.items():
+                if len(da.dims) > 1:
+                    da = da.mean(dim=[d for d in da.dims if d != "time"])
+                if "cumulative" in name.lower() or name in ["GPP", "NEE", "HR"]:
+                    final_val = float(da.isel(time=-1).values)
+                    stats[name] = f"{final_val:.2f} gC/m²"
+                else:
+                    mean_val = float(da.mean().values)
+                    stats[name] = f"{mean_val:.2f} gC/m²"
+        except Exception as e:
+            stats["Error"] = str(e)
+        
+        return stats
 
     def _build_variable_sections(self, figdir: Path) -> list[_Section]:
         sections = []
         groups = self.config.variables.groups
         run = self._run
+        plot_types = self.config.report.plot_types.include
+        max_vars = self.config.report.variable_sections.max_variables_per_group
 
         for group_name, varnames in groups.items():
             sec = _Section(group_name.replace("_", " ").title())
-            for varname in varnames:
+            
+            # Limit number of variables if configured
+            varnames_to_plot = varnames[:max_vars]
+            if len(varnames) > max_vars:
+                self._add_warning(
+                    f"Group '{group_name}': showing {max_vars}/{len(varnames)} variables"
+                )
+            
+            for varname in varnames_to_plot:
                 if not run.has(varname):
                     continue
-                try:
-                    fname = f"{group_name}_{varname}_ts.png"
-                    fig = plot_timeseries(self.source, varname, config=self.config)
-                    fig.savefig(figdir / fname, bbox_inches="tight")
-                    sec.add_figure(f"figures/{fname}", f"{varname} time series")
-                    plt.close(fig)
-                except Exception:
-                    pass
+                
+                # Try each plot type
+                for plot_type in plot_types:
+                    try:
+                        fig = self._create_plot(plot_type, varname)
+                        if fig is not None:
+                            basename = f"{group_name}_{varname}_{plot_type}"
+                            full_path, thumb_path = self._save_figure(fig, figdir, basename)
+                            caption = f"{varname} ({plot_type})"
+                            sec.add_figure(full_path, thumb_path, caption, plot_type)
+                            plt.close(fig)
+                    except Exception as e:
+                        # Silently skip individual plot failures
+                        # (e.g., diurnal for monthly data, seasonal for insufficient data)
+                        pass
+            
             if sec.figures:
                 sections.append(sec)
 
         return sections
+
+    def _create_plot(self, plot_type: str, varname: str) -> plt.Figure | None:
+        """Create a specific type of plot for a variable.
+        
+        Returns
+        -------
+        Figure or None if plot type should be skipped.
+        """
+        if plot_type == "timeseries":
+            return plot_timeseries(self.source, varname, config=self.config)
+        elif plot_type == "seasonal":
+            # Check if we have enough data
+            run = self._run
+            var = run.get(varname)
+            if len(var.time) < 12:
+                return None
+            return plot_seasonal(self.source, varname, config=self.config)
+        elif plot_type == "anomaly":
+            # Check if we have enough data (need at least 2 years)
+            run = self._run
+            var = run.get(varname)
+            if len(var.time) < 24:  # Rough approximation
+                return None
+            return plot_anomaly(self.source, varname, config=self.config)
+        elif plot_type == "histogram":
+            return plot_histogram(self.source, varname, config=self.config)
+        elif plot_type == "diurnal":
+            # Check if data is sub-daily
+            run = self._run
+            var = run.get(varname)
+            if len(var.time) < 24:
+                return None
+            # Check time resolution
+            time_diff = np.diff(var.time.values).astype('timedelta64[h]').astype(int)
+            median_hours = np.median(time_diff)
+            if median_hours >= 24:
+                return None  # Not sub-daily
+            return plot_diurnal(self.source, varname, config=self.config)
+        else:
+            return None
+
+    def _build_diagnostics_section(self) -> _Section:
+        """Build diagnostics section showing errors and warnings."""
+        sec = _Section(
+            "Diagnostics",
+            "Errors and warnings encountered during report generation."
+        )
+        
+        # Format errors and warnings for display
+        diagnostics = {}
+        
+        if self._errors:
+            diagnostics["Errors"] = [
+                f"{err['section']}: {err['type']} - {err['error']}"
+                for err in self._errors
+            ]
+        
+        if self._warnings:
+            diagnostics["Warnings"] = self._warnings
+        
+        sec.add_statistics(diagnostics)
+        return sec
 
     def _render_html(self, outdir: Path, sections: list[_Section]) -> Path:
         env = Environment(
@@ -184,21 +516,59 @@ class Report:
         )
         template = env.get_template("single_page.html.j2")
 
+        # Load CSS
         css_path = _ASSETS_DIR / "style.css"
         css = css_path.read_text()
+        
+        # Load JavaScript for lightbox
+        js_path = _ASSETS_DIR / "lightbox.js"
+        if js_path.exists():
+            js = js_path.read_text()
+        else:
+            js = ""  # Will be created next
 
         title = self.config.report.title_template.format(casename=self._casename)
+        
+        # Generate summary statistics
+        total_figures = sum(len(s.figures) for s in sections)
+        total_errors = len(self._errors)
+        total_warnings = len(self._warnings)
+        
+        # Determine status
+        if total_errors > 5:
+            status = "error"
+            status_message = f"{total_errors} errors encountered"
+        elif total_errors > 0:
+            status = "warning"
+            status_message = f"{total_errors} errors, report partially complete"
+        elif total_warnings > 0:
+            status = "warning"
+            status_message = f"{total_warnings} warnings"
+        else:
+            status = "success"
+            status_message = "All sections generated successfully"
 
         html = template.render(
             title=title,
             casename=self._casename,
             css=css,
+            js=js,
+            thumbnails_enabled=self.config.report.thumbnails.enabled,
+            summary={
+                "total_sections": len(sections),
+                "total_figures": total_figures,
+                "total_errors": total_errors,
+                "total_warnings": total_warnings,
+                "status": status,
+                "status_message": status_message,
+            },
             sections=[
                 {
                     "id": s.id,
                     "title": s.title,
                     "description": s.description,
                     "figures": s.figures,
+                    "statistics": s.statistics,
                 }
                 for s in sections
             ],

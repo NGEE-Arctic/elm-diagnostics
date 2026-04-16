@@ -1,0 +1,13 @@
+&modelio
+  diri = "/home/amanzi_user/work/output/oakharbor_column.elm-ats/bld/cpl"
+  diro = "/home/amanzi_user/work/output/oakharbor_column.elm-ats/run"
+  logfile = "cpl.log.260320-211907"
+/
+&pio_inparm
+  pio_netcdf_format = "64bit_data"
+  pio_numiotasks = -99
+  pio_rearranger = 1
+  pio_root = 0
+  pio_stride = 4
+  pio_typename = "netcdf"
+/

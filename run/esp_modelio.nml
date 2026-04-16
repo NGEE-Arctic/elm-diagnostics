@@ -1,0 +1,13 @@
+&modelio
+  diri = "/home/amanzi_user/work/output/oakharbor_column.elm-ats/bld/esp"
+  diro = "/home/amanzi_user/work/output/oakharbor_column.elm-ats/run"
+  logfile = "esp.log.260320-211907"
+/
+&pio_inparm
+  pio_netcdf_format = "64bit_data"
+  pio_numiotasks = -99
+  pio_rearranger = -99
+  pio_root = -99
+  pio_stride = -99
+  pio_typename = "nothing"
+/

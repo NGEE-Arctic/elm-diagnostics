@@ -134,6 +134,9 @@ def cumulative_integral(
     old_units = da.attrs.get("units", "")
     if "/s" in old_units:
         new_units = old_units.replace("/s", "").strip()
+        # Normalize to standard mm for water fluxes (not "mm H2O")
+        if "mm" in new_units.lower() or new_units == "mm":
+            new_units = "mm"
     elif "W" in old_units:
         new_units = old_units.replace("W", "J")
     else:

@@ -154,6 +154,7 @@ class Run:
                 raise FileNotFoundError(f"No files for stream {tape}")
             kwargs: dict = dict(
                 combine="by_coords",
+                data_vars="all",
             )
             # Use CFDatetimeCoder for cftime decoding (xarray >= 2024)
             try:
@@ -204,6 +205,9 @@ class Run:
     def get(self, varname: str, tape: str | None = None) -> xr.DataArray:
         """Retrieve a variable, searching tapes in priority order.
 
+        If the variable is not found, attempts to derive it from available
+        components (e.g., compute QFLX_EVAP_TOT from QSOIL + QVEGE + QVEGT).
+
         Parameters
         ----------
         varname : str
@@ -219,7 +223,7 @@ class Run:
         Raises
         ------
         KeyError
-            If the variable is not found in any tape.
+            If the variable is not found in any tape and cannot be derived.
         """
         if tape is not None:
             ds = self._open_stream(tape)
@@ -232,10 +236,23 @@ class Run:
             if varname in ds:
                 return ds[varname]
 
+        # Try to derive the variable if it's not directly available
+        from elm_diagnostics.io.derived import can_derive, derive_variable
+
+        if can_derive(varname):
+            try:
+                return derive_variable(self, varname)
+            except (ValueError, KeyError) as e:
+                # Derivation failed - fall through to original error
+                available_tapes = ", ".join(self._tape_order)
+                raise KeyError(
+                    f"{varname!r} not found in any stream and derivation failed: {e}. "
+                    f"Searched tapes: {available_tapes}"
+                ) from e
+
         available_tapes = ", ".join(self._tape_order)
         raise KeyError(
-            f"{varname!r} not found in any stream. "
-            f"Searched tapes: {available_tapes}"
+            f"{varname!r} not found in any stream. Searched tapes: {available_tapes}"
         )
 
     def has(self, varname: str) -> bool:

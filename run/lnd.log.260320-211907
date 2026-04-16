@@ -1,0 +1,2613 @@
+(lnd_init_mct) :ELM land model initialization
+ 4c9b6c38c4
+
+ Attempting to initialize the land model .....
+
+ Attempting to initialize run control settings .....
+ Read in elm_inparm namelist from: lnd_in
+ Read in elm_mosart namelist from: lnd_in
+ Read in elm_canopyhydrology_inparm  namelist
+ (OPNFIL): Successfully opened file lnd_in on unit=           97
+ Read in elm-ats namelist
+
+ elm-ats namelist:
+   ats_inputdir : /home/amanzi_user/work/cases/oakharbor_column.elm-ats
+
+   ats_inputfile  : oakharbor_column.xml
+
+ Successfully initialized run control settings
+
+ define run:
+    source                = E3SM Land Model
+    model_version         = 4c9b6c38c4
+    run type              = initial
+    case title            = UNSET
+    username              = amanzi_user
+    hostname              = docker-ats
+ process control parameters:
+     use_nofire =  T
+     use_lch4 =  T
+     use_vertsoilc =  T
+     use_var_soil_thick =  F
+     use_lake_wat_storage =  F
+     use_extralakelayers =  F
+     use_extrasnowlayers =  F
+     use_firn_percolation_and_compaction =  F
+     use_T_rho_dependent_snowthk =  F
+     use_vichydro =  F
+     use_century_decomp =  F
+     use_cn =  T
+     use_crop =  F
+     irrigate =  F
+     two-way irrigation =  F
+     use_snicar_frc =  F
+     use_snicar_ad =  T
+     snow_shape = hexagonal_plate                                                                                                                                                                                                                                                 
+     snicar_atm_type = default                                                                                                                                                                                                                                                         
+     use_dust_snow_internal_mixing =  F
+     use_vancouver =  F
+     use_mexicocity =  F
+     use_noio =  F
+     use_betr =  F
+     use_IM2_hillslope_hydrology =  F
+     use_atm_downscaling_to_topunit =  F
+     precip_downscaling_method = ERMM                                                                            
+ input data files:
+    PFT physiology and parameters file = /home/amanzi_user/compass/inputdata/lnd/clm2/paramdata/clm_params_c211124.nc
+    Soil order dependent parameters file = /home/amanzi_user/compass/inputdata/lnd/clm2/paramdata/CNP_parameters_c180529.nc
+    surface data   = /home/amanzi_user/compass/inputdata/lnd/clm2/surfdata_map/surfdata_1x1pt_Oakharbor-GRID_simyr1850_c360x720_c20230522.nc
+    land frac data = /home/amanzi_user/compass/inputdata/share/domains/domain.clm/domain.lnd.1x1pt_Oakharbor-GRID_navy.nc
+    flndtopo not set
+    fatmtopo not set
+    use_top_solar_rad is False, so do not run TOP solar radiation parameterization
+    nfix_timeconst, timescale for smoothing npp in N fixation term:   -1.2344999999999999     
+    spinup_state, (0 = normal mode; 1 = AD spinup)         :            0
+    model is currently NOT in AD spinup mode.
+    override_bgc_restart_mismatch_dump                     :  F
+    som_adv_flux, the advection term in soil mixing (m/s) :    0.0000000000000000     
+    max_depth_cryoturb (m)                                :    3.0000000000000000     
+    exponential_rooting_profile                           :  T
+    rootprof_exp                                          :    3.0000000000000000     
+    surfprof_exp                                          :    10.000000000000000     
+    pftspecific_rootingprofile                            :  T
+    dynamic roots                                         :  F
+    no_frozen_nitrif_denitrif                             :  F
+   use_c13                                                :  F
+   use_c14                                                :  F
+   use_c14_bombspike                                      :  F
+   atm_c14_filename                                       :                                                                                                                                                                                                                                                                 
+    snow optical properties file = /home/amanzi_user/compass/inputdata/lnd/clm2/snicardata/snicar_optics_5bnd_mam_c160322.nc
+    snow aging parameters file = /home/amanzi_user/compass/inputdata/lnd/clm2/snicardata/snicar_drdt_bst_fit_60_c070416.nc
+    initial data created by model
+    atmospheric forcing data is from cesm atm model
+ Restart parameters:
+    restart pointer file directory     = .
+    restart pointer file name          = rpointer.lnd
+ model physics parameters:
+    CO2 volume mixing ratio   (umol/mol)   =    379.00000000000000     
+    constant historical climate during transient simulation =  F
+    land-ice albedos      (unitless 0-1)   =   0.59999999999999998       0.40000000000000002     
+    urban air conditioning/heating and wasteheat   = ON              
+    urban traffic flux   =  F
+    implicit_stress   =  F
+    atm_gustiness   =  F
+    force_land_gustiness   =  F
+    more vertical layers =  F
+    Sub-grid topographic effects on solar radiation   =  F
+    maxpatch_pft         =           17
+    nsegspc              =           20
+  perchroot (plant water stress based on unfrozen layers only) =  F
+  perchroot (plant water stress based on time-integrated active layer only) =  F
+  anoxia (applied to soil decomposition)             =  T
+  anoxia_wtsat (weight anoxia by inundated fraction) =  F
+
+ Lake Model Namelists:
+ Increased mixing relative to Hostetler wind-driven eddy expression will be used for deep lakes exceeding depth    25.000000000000000       by a factor of    10.000000000000000      .
+ Albedo over melting lakes will approach values (visible, NIR):  0.10000000000000001       0.10000000000000001      as compared with 0.60, 0.40 for cold frozen lakes with no snow.
+     use_fates =  F
+     use_lnd_rof_two_way    =  F
+     lnd_rof_coupling_nstep =            6
+     mpi_sync_nstep_freq    =            0
+     use_modified_infil =  F
+     use_fan                =  F
+     use_polygonal_tundra    = F
+  
+ dynamic_subgrid settings:
+&DYNAMIC_SUBGRID
+ FLANDUSE_TIMESERIES="                                                                                                                                                                                                                                                                ",
+ DO_TRANSIENT_PFTS=F,
+ DO_TRANSIENT_CROPS=F,
+ DO_HARVEST=F,
+ FOR_TESTING_ALLOW_NON_ANNUAL_CHANGES=F,
+ FOR_TESTING_ZERO_DYNBAL_FLUXES=F,
+ /
+  
+ Attempting to read global land mask from /home/amanzi_user/compass/inputdata/share/domains/domain.clm/domain.lnd.1x1pt_Oakharbor-GRID_navy.nc
+ (GETFIL): attempting to find local file domain.lnd.1x1pt_Oakharbor-GRID_navy.nc
+ (GETFIL): using /home/amanzi_user/compass/inputdata/share/domains/domain.clm/domain.lnd.1x1pt_Oakharbor-GRID_navy.nc
+ Opened existing file /home/amanzi_user/compass/inputdata/share/domains/domain.clm/domain.lnd.1x1pt_Oakharbor-GRID_navy.nc          16
+ lat/lon grid flag (isgrid2d) is  F
+ ncd_inqvid: variable LANDMASK is not on dataset
+  decomp precompute numg,nclumps,seglen1,avg_seglen,nsegspc=           1           1 T   1.00000000       1.00000000    
+  Surface Grid Characteristics
+    longitude points               =            1
+    latitude points                =            1
+    total number of land gridcells =            1
+  Decomposition Characteristics
+    clumps per process             =            1
+  gsMap Characteristics
+   lnd gsmap glo num of segs      =            1
+
+ Attempting to read ldomain from /home/amanzi_user/compass/inputdata/share/domains/domain.clm/domain.lnd.1x1pt_Oakharbor-GRID_navy.nc
+ (GETFIL): attempting to find local file domain.lnd.1x1pt_Oakharbor-GRID_navy.nc
+ (GETFIL): using /home/amanzi_user/compass/inputdata/share/domains/domain.clm/domain.lnd.1x1pt_Oakharbor-GRID_navy.nc
+ Opened existing file /home/amanzi_user/compass/inputdata/share/domains/domain.clm/domain.lnd.1x1pt_Oakharbor-GRID_navy.nc          17
+ domain_init:            1           1
+ check_var: variable LONGXY is not on dataset
+ ncd_inqvid: variable LANDMASK is not on dataset
+ ncd_inqvid: variable LANDFRAC is not on dataset
+ check_var: variable xCell is not on dataset
+ check_var: variable yCell is not on dataset
+   domain_check set       =  T
+   domain_check decomped  =  F
+   domain_check ns        =            1
+   domain_check ni,nj     =            1           1
+   domain_check elmlevel  = NOdomain_unsetNO
+   domain_check nbeg,nend =            1           1
+   domain_check lonc      =    276.75000000000000        276.75000000000000     
+   domain_check latc      =    41.750000000000000        41.750000000000000     
+   domain_check mask      =            1           1
+   domain_check frac      =    1.0000000000000000        1.0000000000000000     
+   domain_check topo      =    0.0000000000000000        0.0000000000000000     
+   domain_check num_tunits_per_grd      =        -9999       -9999
+   domain_check area      =    2306.2736562985201        2306.2736562985201     
+   domain_check pftm      =        -9999       -9999
+   domain_check glcmask   =            0           0
+   domain_check stdev_elev     =    0.0000000000000000        0.0000000000000000     
+   domain_check sky_view       =    1.0000000000000000        1.0000000000000000     
+   domain_check terrain_config =    0.0000000000000000        0.0000000000000000     
+   domain_check sinsl_cosas    =    0.0000000000000000        0.0000000000000000     
+   domain_check sinsl_sinas    =    0.0000000000000000        0.0000000000000000     
+  
+ Attempting to read topounit information from surface data .....
+ (GETFIL): attempting to find local file surfdata_1x1pt_Oakharbor-GRID_simyr1850_c360x720_c20230522.nc
+ (GETFIL): using /home/amanzi_user/compass/inputdata/lnd/clm2/surfdata_map/surfdata_1x1pt_Oakharbor-GRID_simyr1850_c360x720_c20230522.nc
+ Opened existing file /home/amanzi_user/compass/inputdata/lnd/clm2/surfdata_map/surfdata_1x1pt_Oakharbor-GRID_simyr1850_c360x720_c20230522.nc          18
+ Surface dataset has no topounit dimention; max_topounits is set to 1
+  Reading in urban input data from fsurdat file ...
+ (GETFIL): attempting to find local file surfdata_1x1pt_Oakharbor-GRID_simyr1850_c360x720_c20230522.nc
+ (GETFIL): using /home/amanzi_user/compass/inputdata/lnd/clm2/surfdata_map/surfdata_1x1pt_Oakharbor-GRID_simyr1850_c360x720_c20230522.nc
+ Opened existing file /home/amanzi_user/compass/inputdata/lnd/clm2/surfdata_map/surfdata_1x1pt_Oakharbor-GRID_simyr1850_c360x720_c20230522.nc          19
+ UrbanInput                      /home/amanzi_user/compass/inputdata/lnd/clm2/surfdata_map/surfdata_1x1pt_Oakharbor-GRID_simyr1850_c360x720_c20230522.nc
+  Sucessfully read urban input data
+
+ Attempting to read PFT physiological data .....
+ (GETFIL): attempting to find local file clm_params_c211124.nc
+ (GETFIL): using /home/amanzi_user/compass/inputdata/lnd/clm2/paramdata/clm_params_c211124.nc
+ Opened existing file /home/amanzi_user/compass/inputdata/lnd/clm2/paramdata/clm_params_c211124.nc          20
+ ncd_inqvid: variable manunitro is not on dataset
+ pftconrd WARNING: manunitro  NOT in parameter file. Try to use fertnitro instead.
+ ncd_inqvid: variable percrop is not on dataset
+ ncd_inqvid: variable gcbc_p is not on dataset
+ ncd_inqvid: variable gcbc_q is not on dataset
+ ncd_inqvid: variable gcbr_p is not on dataset
+ ncd_inqvid: variable gcbr_q is not on dataset
+ ncd_inqvid: variable mergetoclmpft is not on dataset
+ ncd_inqvid: variable mergetoelmpft is not on dataset
+ ncd_inqvid: variable bendresist is not on dataset
+ ncd_inqvid: variable vegshape is not on dataset
+ ncd_inqvid: variable stocking is not on dataset
+ ncd_inqvid: variable taper is not on dataset
+ ncd_inqvid: variable needleleaf is not on dataset
+ ncd_inqvid: variable climatezone is not on dataset
+ ncd_inqvid: variable nfixer is not on dataset
+ ncd_inqvid: variable nonvascular is not on dataset
+ ncd_inqvid: variable graminoid is not on dataset
+ ncd_inqvid: variable iscft is not on dataset
+
+ Using PFT physiological parameters from: /home/amanzi_user/compass/inputdata/lnd/clm2/paramdata/clm_params_c211124.nc                                                                                                                                                                                    
+         -- index -- name                                 -- climate zone --    -- woody --     -- needleleaf --    -- evergreen --    -- stress_decid --    -- season_decid --    -- graminoid--    -- iscft --   -- crop --    -- perennial crop --    -- nfixer --
+           0 not_vegetated                                      0           0           0           0           0           0           0           0           0           0           0
+           1 needleleaf_evergreen_temperate_tree                2           1           1           1           0           0           0           0           0           0           0
+           2 needleleaf_evergreen_boreal_tree                   3           1           1           1           0           0           0           0           0           0           0
+           3 needleleaf_deciduous_boreal_tree                   3           1           1           0           0           1           0           0           0           0           0
+           4 broadleaf_evergreen_tropical_tree                  1           1           0           1           0           0           0           0           0           0           0
+           5 broadleaf_evergreen_temperate_tree                 2           1           0           1           0           0           0           0           0           0           0
+           6 broadleaf_deciduous_tropical_tree                  1           1           0           0           1           0           0           0           0           0           0
+           7 broadleaf_deciduous_temperate_tree                 2           1           0           0           0           1           0           0           0           0           0
+           8 broadleaf_deciduous_boreal_tree                    3           1           0           0           0           1           0           0           0           0           0
+           9 broadleaf_evergreen_shrub                          0           2           0           1           0           0           0           0           0           0           0
+          10 broadleaf_deciduous_temperate_shrub                2           2           0           0           1           0           0           0           0           0           0
+          11 broadleaf_deciduous_boreal_shrub                   3           2           0           0           0           1           0           0           0           0           0
+          12 c3_arctic_grass                                    4           0           0           0           0           1           1           0           0           0           0
+          13 c3_non-arctic_grass                                0           0           0           0           1           0           1           0           0           0           0
+          14 c4_grass                                           0           0           0           0           1           0           1           0           0           0           0
+          15 c3_crop                                            0           0           0           0           1           0           0           0           1           0           0
+          16 c3_irrigated                                       0           0           0           0           1           0           0           0           1           0           0
+          17 corn                                               0           0           0           0           0           0           0           0           1           0           0
+          18 irrigated_corn                                     0           0           0           0           0           0           0           0           1           0           0
+          19 spring_temperate_cereal                            0           0           0           0           0           0           0           0           1           0           0
+          20 irrigated_spring_temperate_cereal                  0           0           0           0           0           0           0           0           1           0           0
+          21 winter_temperate_cereal                            0           0           0           0           0           0           0           0           1           0           0
+          22 irrigated_winter_temperate_cereal                  0           0           0           0           0           0           0           0           1           0           0
+          23 soybean                                            0           0           0           0           0           0           0           0           1           0           1
+          24 irrigated_soybean                                  0           0           0           0           0           0           0           0           1           0           1
+
+ Successfully read PFT physiological data
+
+ Attempting to read soil order dependent parameters .....
+ (GETFIL): attempting to find local file CNP_parameters_c180529.nc
+ (GETFIL): using /home/amanzi_user/compass/inputdata/lnd/clm2/paramdata/CNP_parameters_c180529.nc
+ Opened existing file /home/amanzi_user/compass/inputdata/lnd/clm2/paramdata/CNP_parameters_c180529.nc          21
+ Successfully read soil order dependent parameters
+
+ Attempting to read surface boundary data .....
+ (GETFIL): attempting to find local file surfdata_1x1pt_Oakharbor-GRID_simyr1850_c360x720_c20230522.nc
+ (GETFIL): using /home/amanzi_user/compass/inputdata/lnd/clm2/surfdata_map/surfdata_1x1pt_Oakharbor-GRID_simyr1850_c360x720_c20230522.nc
+ Opened existing file /home/amanzi_user/compass/inputdata/lnd/clm2/surfdata_map/surfdata_1x1pt_Oakharbor-GRID_simyr1850_c360x720_c20230522.nc          22
+ check_var: variable xc is not on dataset
+ surfrd_get_data lon_var = LONGXY lat_var =LATIXY
+ domain_init:            1           1
+ domain_clean: cleaning            1           1
+ WARNING: The PFT format is an unsupported format that will be removed in the future!
+ ncd_inqvid: variable NFERT is not on dataset
+ ncd_inqvid: variable PFERT is not on dataset
+ Successfully read surface boundary data
+
+ Number of External Models =            0
+   Is BeTR present?      F
+   Is FATES present?     F
+   Is PFLOTRAN present?  F
+   Is PTM present?       F
+   Is Stub EM present?   F
+   Is VSFM present?      F
+  
+ ---elm_ptrs_check:
+    elm_ptrs_check: t index ranges - OK
+    elm_ptrs_check: t index ranges - OK
+    elm_ptrs_check: l index ranges - OK
+    elm_ptrs_check: c index ranges - OK
+    elm_ptrs_check: p index ranges - OK
+    elm_ptrs_check: l mono increasing - OK
+    elm_ptrs_check: c mono increasing - OK
+    elm_ptrs_check: p mono increasing - OK
+    elm_ptrs_check: tree consistent - OK
+  
+  Surface Grid Characteristics
+    longitude points          =            1
+    latitude points           =            1
+    total number of gridcells =            1
+    total number of topounits =            1
+    total number of landunits =            4
+    total number of columns   =           16
+    total number of pfts      =           32
+    total number of cohorts   =            0
+  Decomposition Characteristics
+    clumps per process        =            1
+  gsMap Characteristics
+   lnd gsmap glo num of segs =            1
+   gce gsmap glo num of segs =            1
+   top gsmap glo num of segs =            1
+   lun gsmap glo num of segs =            1
+   col gsmap glo num of segs =            1
+   pft gsmap glo num of segs =            1
+   coh gsmap glo num of segs =            0
+
+
+ proc=            0  beg gridcell=            1  end gridcell=            1  total gridcells per proc=            1
+ proc=            0  beg topounit=            1  end topounit=            1  total topounits per proc=            1
+ proc=            0  beg landunit=            1  end landunit=            4  total landunits per proc=            4
+ proc=            0  beg column  =            1  end column  =           16  total columns per proc  =           16
+ proc=            0  beg pft     =            1  end pft     =           32  total pfts per proc     =           32
+ proc=            0  beg coh     =            1  end coh     =            0  total coh per proc     =            0
+ proc=            0  lnd ngseg   =            1  lnd nlseg   =            1
+ proc=            0  gce ngseg   =            1  gce nlseg   =            1
+ proc=            0  top ngseg   =            1  top nlseg   =            1
+ proc=            0  lun ngseg   =            1  lun nlseg   =            1
+ proc=            0  col ngseg   =            1  col nlseg   =            1
+ proc=            0  pft ngseg   =            1  pft nlseg   =            1
+ proc=            0  coh ngseg   =            0  coh nlseg   =            0
+ proc=            0  nclumps =            1
+ proc=            0  clump no =            1  clump id=            1  beg gridcell=            1  end gridcell=            1  total gridcells per clump=            1
+ proc=            0  clump no =            1  clump id=            1  beg topounit=            1  end topounit=            1  total topounits per clump =            1
+ proc=            0  clump no =            1  clump id=            1  beg landunit=            1  end landunit=            4  total landunits per clump =            4
+ proc=            0  clump no =            1  clump id=            1  beg column  =            1  end column  =           16  total columns per clump  =           16
+ proc=            0  clump no =            1  clump id=            1  beg pft     =            1  end pft     =           32  total pfts per clump     =           32
+ proc=            0  clump no =            1  clump id=            1  beg cohort     =            1  end cohort     =            0  total cohorts per clump     =            0
+ Attempting to read CH4 parameters .....
+ Read in ch4par_in namelist from: lnd_in
+ Successfully read CH4 namelist
+  
+ allowlakeprod =  F
+ usephfact =  F
+ replenishlakec =  T
+ fin_use_fsat =  T
+ usefrootc =  F
+ ch4offline =  T
+ CH4 Model will be running offline and not affect fluxes to atmosphere
+ use_aereoxid_prog =  T
+ Lake production has been disabled.   Lakes will not factor into CH4 BGC.  "Sat" history fields will not average  over lakes except for concentrations, which will average zero from lakes.
+ Successfully initialized CH4 parameters from namelist.
+
+ readParamsMod.F90::CNParamsSharedReadFile :: reading CN and BGC parameter file
+ (GETFIL): attempting to find local file clm_params_c211124.nc
+ (GETFIL): using /home/amanzi_user/compass/inputdata/lnd/clm2/paramdata/clm_params_c211124.nc
+ Opened existing file /home/amanzi_user/compass/inputdata/lnd/clm2/paramdata/clm_params_c211124.nc          23
+  ******** CLM Time Manager Configuration ********
+   Calendar type:            NO_LEAP
+   Timestep size (seconds):          1800
+   Start date (yr mon day tod):             2000           7          15           0
+   Stop date (yr mon day tod):              2002           7          15           0
+   Reference date (yr mon day tod):         2000           7          15           0
+   Current step number:                 0
+   Ending step number:         -999999999
+   Current date (yr mon day tod):           2000           7          15           0
+  ************************************************
+ Attempting to initialize time invariant variables for lakes
+ Successfully initialized time invariant variables for lakes
+ (GETFIL): attempting to find local file surfdata_1x1pt_Oakharbor-GRID_simyr1850_c360x720_c20230522.nc
+ (GETFIL): using /home/amanzi_user/compass/inputdata/lnd/clm2/surfdata_map/surfdata_1x1pt_Oakharbor-GRID_simyr1850_c360x720_c20230522.nc
+ Opened existing file /home/amanzi_user/compass/inputdata/lnd/clm2/surfdata_map/surfdata_1x1pt_Oakharbor-GRID_simyr1850_c360x720_c20230522.nc          24
+ Attempting to read soil colo data .....
+ (GETFIL): attempting to find local file surfdata_1x1pt_Oakharbor-GRID_simyr1850_c360x720_c20230522.nc
+ (GETFIL): using /home/amanzi_user/compass/inputdata/lnd/clm2/surfdata_map/surfdata_1x1pt_Oakharbor-GRID_simyr1850_c360x720_c20230522.nc
+ Opened existing file /home/amanzi_user/compass/inputdata/lnd/clm2/surfdata_map/surfdata_1x1pt_Oakharbor-GRID_simyr1850_c360x720_c20230522.nc          25
+ ncd_inqvid: variable ZSOI is not on dataset
+ zsoi   7.1006354171935350E-003   2.7925000415316870E-002   6.2258573936546040E-002  0.11886506690014327       0.21219339590896316       0.36606579710470433       0.61975849792982662        1.0380270500015696        1.7276353086671965        2.8646071131796917        4.7391567114657498        7.8297665071423559        12.925320616708550        21.326469063153791        35.177621205117390     
+ zisoi:    0.0000000000000000        1.7512817916255204E-002   4.5091787175931458E-002   9.0561820418344652E-002  0.16552923140455322       0.28912959650683373       0.49291214751726548       0.82889277396569816        1.3828311793343830        2.2961212109234443        3.8018819123227208        6.2844616093040528        10.377543561925453        17.125894839931171        28.252045134135592        42.103197276099188     
+ dzsoi:    1.7512817916255204E-002   2.7578969259676251E-002   4.5470033242413201E-002   7.4967410986208557E-002  0.12360036510228053       0.20378255101043175       0.33598062644843263       0.55393840536868488       0.91329003158906108        1.5057607013992766        2.4825796969813321        4.0930819526214002        6.7483512780057175        11.126150294204420        13.851152141963599     
+ dzsoi_decomp   1.7512817916255204E-002   2.7578969259676251E-002   4.5470033242413201E-002   7.4967410986208557E-002  0.12360036510228053       0.20378255101043175       0.33598062644843263       0.55393840536868488       0.91329003158906108        1.5057607013992766        2.4825796969813321        4.0930819526214002        6.7483512780057175        11.126150294204420        13.851152141963599     
+ Attempting to read soil color, sand and clay boundary data .....
+ (GETFIL): attempting to find local file surfdata_1x1pt_Oakharbor-GRID_simyr1850_c360x720_c20230522.nc
+ (GETFIL): using /home/amanzi_user/compass/inputdata/lnd/clm2/surfdata_map/surfdata_1x1pt_Oakharbor-GRID_simyr1850_c360x720_c20230522.nc
+ Opened existing file /home/amanzi_user/compass/inputdata/lnd/clm2/surfdata_map/surfdata_1x1pt_Oakharbor-GRID_simyr1850_c360x720_c20230522.nc          26
+ ncd_inqvid: variable ZSOI is not on dataset
+ Attempting to read organic matter data .....
+ organicrd                       /home/amanzi_user/compass/inputdata/lnd/clm2/surfdata_map/surfdata_1x1pt_Oakharbor-GRID_simyr1850_c360x720_c20230522.nc
+ (GETFIL): attempting to find local file surfdata_1x1pt_Oakharbor-GRID_simyr1850_c360x720_c20230522.nc
+ (GETFIL): using /home/amanzi_user/compass/inputdata/lnd/clm2/surfdata_map/surfdata_1x1pt_Oakharbor-GRID_simyr1850_c360x720_c20230522.nc
+ Opened existing file /home/amanzi_user/compass/inputdata/lnd/clm2/surfdata_map/surfdata_1x1pt_Oakharbor-GRID_simyr1850_c360x720_c20230522.nc          27
+ Successfully read organic matter data
+
+ (GETFIL): attempting to find local file surfdata_1x1pt_Oakharbor-GRID_simyr1850_c360x720_c20230522.nc
+ (GETFIL): using /home/amanzi_user/compass/inputdata/lnd/clm2/surfdata_map/surfdata_1x1pt_Oakharbor-GRID_simyr1850_c360x720_c20230522.nc
+ Opened existing file /home/amanzi_user/compass/inputdata/lnd/clm2/surfdata_map/surfdata_1x1pt_Oakharbor-GRID_simyr1850_c360x720_c20230522.nc          28
+ ncd_inqvid: variable ETALAKE is not on dataset
+ WARNING:: ETALAKE not found on surface data set. All lake columns will have eta set equal to default value as a function of depth.
+ ncd_inqvid: variable LAKEFETCH is not on dataset
+ WARNING:: LAKEFETCH not found on surface data set. All lake columns will have fetch set equal to default value as a function of depth.
+ Read in elm_soilhydrology_inparm  namelist
+ (OPNFIL): Successfully opened file lnd_in on unit=           97
+ (GETFIL): attempting to find local file surfdata_1x1pt_Oakharbor-GRID_simyr1850_c360x720_c20230522.nc
+ (GETFIL): using /home/amanzi_user/compass/inputdata/lnd/clm2/surfdata_map/surfdata_1x1pt_Oakharbor-GRID_simyr1850_c360x720_c20230522.nc
+ Opened existing file /home/amanzi_user/compass/inputdata/lnd/clm2/surfdata_map/surfdata_1x1pt_Oakharbor-GRID_simyr1850_c360x720_c20230522.nc          29
+ ncd_inqvid: variable fdrain is not on dataset
+ (GETFIL): attempting to find local file surfdata_1x1pt_Oakharbor-GRID_simyr1850_c360x720_c20230522.nc
+ (GETFIL): using /home/amanzi_user/compass/inputdata/lnd/clm2/surfdata_map/surfdata_1x1pt_Oakharbor-GRID_simyr1850_c360x720_c20230522.nc
+ Opened existing file /home/amanzi_user/compass/inputdata/lnd/clm2/surfdata_map/surfdata_1x1pt_Oakharbor-GRID_simyr1850_c360x720_c20230522.nc          30
+ ncd_inqvid: variable fover is not on dataset
+ (GETFIL): attempting to find local file surfdata_1x1pt_Oakharbor-GRID_simyr1850_c360x720_c20230522.nc
+ (GETFIL): using /home/amanzi_user/compass/inputdata/lnd/clm2/surfdata_map/surfdata_1x1pt_Oakharbor-GRID_simyr1850_c360x720_c20230522.nc
+ Opened existing file /home/amanzi_user/compass/inputdata/lnd/clm2/surfdata_map/surfdata_1x1pt_Oakharbor-GRID_simyr1850_c360x720_c20230522.nc          31
+ ncd_inqvid: variable pc is not on dataset
+ elm, DUSTMod.F90, Init: dust_emis_scheme =            1
+ Setting initial data to non-spun up values for CH4 Mod
+ Attempting to read soil color, sand and clay boundary data .....
+ (GETFIL): attempting to find local file surfdata_1x1pt_Oakharbor-GRID_simyr1850_c360x720_c20230522.nc
+ (GETFIL): using /home/amanzi_user/compass/inputdata/lnd/clm2/surfdata_map/surfdata_1x1pt_Oakharbor-GRID_simyr1850_c360x720_c20230522.nc
+ Opened existing file /home/amanzi_user/compass/inputdata/lnd/clm2/surfdata_map/surfdata_1x1pt_Oakharbor-GRID_simyr1850_c360x720_c20230522.nc          32
+ Successfully read fmax, soil color, sand and clay boundary data
+
+ Attempting to read initial phosphorus pools data .....
+ (GETFIL): attempting to find local file surfdata_1x1pt_Oakharbor-GRID_simyr1850_c360x720_c20230522.nc
+ (GETFIL): using /home/amanzi_user/compass/inputdata/lnd/clm2/surfdata_map/surfdata_1x1pt_Oakharbor-GRID_simyr1850_c360x720_c20230522.nc
+ Opened existing file /home/amanzi_user/compass/inputdata/lnd/clm2/surfdata_map/surfdata_1x1pt_Oakharbor-GRID_simyr1850_c360x720_c20230522.nc          33
+ (GETFIL): attempting to find local file surfdata_1x1pt_Oakharbor-GRID_simyr1850_c360x720_c20230522.nc
+ (GETFIL): using /home/amanzi_user/compass/inputdata/lnd/clm2/surfdata_map/surfdata_1x1pt_Oakharbor-GRID_simyr1850_c360x720_c20230522.nc
+ Opened existing file /home/amanzi_user/compass/inputdata/lnd/clm2/surfdata_map/surfdata_1x1pt_Oakharbor-GRID_simyr1850_c360x720_c20230522.nc          34
+ ncd_inqvid: variable parEro_c1 is not on dataset
+ ncd_inqvid: variable parEro_c2 is not on dataset
+ ncd_inqvid: variable parEro_c3 is not on dataset
+ Attempting to read snow optical properties .....
+ (GETFIL): attempting to find local file snicar_optics_5bnd_mam_c160322.nc
+ (GETFIL): using /home/amanzi_user/compass/inputdata/lnd/clm2/snicardata/snicar_optics_5bnd_mam_c160322.nc
+ Opened existing file /home/amanzi_user/compass/inputdata/lnd/clm2/snicardata/snicar_optics_5bnd_mam_c160322.nc          35
+ SnowOptics_init                 /home/amanzi_user/compass/inputdata/lnd/clm2/snicardata/snicar_optics_5bnd_mam_c160322.nc
+ ncd_inqvid: variable flx_wgt_dir is not on dataset
+ ncd_inqvid: variable flx_wgt_dif is not on dataset
+ Attempting to read optical properties for within-ice BC (modal aerosol treatment) ...
+ Successfully read snow optical properties
+ SNICAR: Mie single scatter albedos for direct-beam ice, rds=100um:   0.99998855464297542       0.99968103719886303       0.99760760567597084       0.98649793425058974       0.86362501115905810     
+ SNICAR: Mie single scatter albedos for diffuse ice, rds=100um:   0.99998868830564358       0.99969570486702131       0.99764126147987453       0.98842452132814818       0.87409591319270097     
+ SNICAR: Excluding OC aerosols from snow radiative transfer calculations
+ SNICAR: Subset of Mie single scatter albedos for BC:   0.26095870407165350       0.37552211329817542       0.16805845111727008        4.4705051746424369E-002  0.50731963682109815       0.50731963682109815     
+ SNICAR: Subset of Mie mass extinction coefficients for BC:    12944.119166930270        12080.139743657750        6433.8546129199049        2271.7178534500517        3083.2457422347347        3083.2457422347347     
+ SNICAR: Subset of Mie asymmetry parameters for BC:   0.28318065771335682       0.44473210970464361       0.20948208873570648        8.6201749709363243E-002  0.77919127924059783       0.77919127924059783     
+ SNICAR: Subset of BC absorption enhancement factors:    2.0108586836654805        2.0624019376316314        1.9309524883025526        2.0413331321078600        1.4400098888837338        4.3414712332434893E-002   4.4708345628608516E-002
+ SNICAR: Mie single scatter albedos for dust species 1:   0.97891105715304971       0.99417591604245092       0.99335758076220670       0.99254575131626566       0.95329155004677202     
+ SNICAR: Mie single scatter albedos for dust species 2:   0.94375224880279296       0.98419166859941920       0.98930906391702478       0.99179394683626376       0.98299959066891252     
+ SNICAR: Mie single scatter albedos for dust species 3:   0.90404453064604895       0.96465162969455487       0.96827580955152159       0.97259841987410656       0.97761241832987633     
+ SNICAR: Mie single scatter albedos for dust species 4:   0.84981819535541647       0.94046032504434285       0.94831630553416912       0.95284117511780686       0.95537952819380212     
+
+ Attempting to read snow aging parameters .....
+ (GETFIL): attempting to find local file snicar_drdt_bst_fit_60_c070416.nc
+ (GETFIL): using /home/amanzi_user/compass/inputdata/lnd/clm2/snicardata/snicar_drdt_bst_fit_60_c070416.nc
+ Opened existing file /home/amanzi_user/compass/inputdata/lnd/clm2/snicardata/snicar_drdt_bst_fit_60_c070416.nc          36
+ SnowOptics_init                 /home/amanzi_user/compass/inputdata/lnd/clm2/snicardata/snicar_drdt_bst_fit_60_c070416.nc
+ Successfully read snow aging properties
+ SNICAR: snowage tau for T=263K, dTdz = 100 K/m, rhos = 150 kg/m3:    6.3205800298267860     
+ SNICAR: snowage kappa for T=263K, dTdz = 100 K/m, rhos = 150 kg/m3:    1.5669689418953008     
+ SNICAR: snowage dr/dt_0 for T=263K, dTdz = 100 K/m, rhos = 150 kg/m3:    5.4872755027422642     
+ readParamsMod.F90::readPrivateParameters :: reading CN and BGC parameter file
+ (GETFIL): attempting to find local file clm_params_c211124.nc
+ (GETFIL): using /home/amanzi_user/compass/inputdata/lnd/clm2/paramdata/clm_params_c211124.nc
+ Opened existing file /home/amanzi_user/compass/inputdata/lnd/clm2/paramdata/clm_params_c211124.nc          37
+ ELM_hist_printflds : number of master fields =         1444
+  ******* MASTER FIELD LIST *******
+    1 TBOT                             K               
+    2 THBOT                            K               
+    3 PBOT                             Pa              
+    4 QBOT                             kg/kg           
+    5 RH                               %               
+    6 WIND                             m/s             
+    7 ZBOT                             m               
+    8 PCO2                             Pa              
+    9 PCH4                             Pa              
+   10 RAIN                             mm/s            
+   11 SNOW                             mm/s            
+   12 FSDS                             W/m^2           
+   13 FLDS                             W/m^2           
+   14 DAYL                             s               
+   15 PREV_DAYL                        s               
+   16 SNO_Z                            m               
+   17 ZII                              m               
+   18 QFLOOD                           mm/s            
+   19 VOLR                             m3              
+   20 VOLRMCH                          m3              
+   21 SUPPLY                           mm/s            
+   22 DEFICIT                          mm/s            
+   23 H2OROF                           mm              
+   24 FRAC_H2OROF                      1               
+   25 Wind                             m/s             
+   26 SWdown                           W/m^2           
+   27 Tair                             K               
+   28 PSurf                            Pa              
+   29 Rainf                            mm/s            
+   30 LWdown                           W/m^2           
+   31 Qair                             kg/kg           
+   32 HDM                              counts/km^2     
+   33 LNFM                             counts/km^2/hr  
+   34 FSI24                            W/m2            
+   35 FSI240                           W/m2            
+   36 FSD24                            W/m2            
+   37 FSD240                           W/m2            
+   38 FSH                              W/m^2           
+   39 QRUNOFF                          mm/s            
+   40 QSNWCPICE                        mm/s            
+   41 FCH4                             kgC/m2/s        
+   42 NEM                              gC/m2/s         
+   43 GC_HEAT1                         J/m^2           
+   44 GC_HEAT2                         J/m^2           
+   45 LIQUID_WATER_TEMP1               K               
+   46 TBUILD                           K               
+   47 SNO_T                            K               
+   48 TSOI                             K               
+   49 TSOI_ICE                         K               
+   50 TH2OSFC                          K               
+   51 TSOI_10CM                        K               
+   52 TG                               K               
+   53 TLAKE                            K               
+   54 TG_R                             K               
+   55 TG_U                             K               
+   56 SNOTTOPL                         K               
+   57 SNOdTdzL                         K/m             
+   58 HCSOI                            MJ/m2           
+   59 HC                               MJ/m2           
+   60 EMG                              proportion      
+   61 TV                               K               
+   62 TSA                              K               
+   63 TSA_R                            K               
+   64 TSA_U                            K               
+   65 T10                              K               
+   66 TREFMNAV                         K               
+   67 TREFMXAV                         K               
+   68 TREFMNAV_R                       K               
+   69 TREFMXAV_R                       K               
+   70 TREFMNAV_U                       K               
+   71 TREFMXAV_U                       K               
+   72 TV24                             K               
+   73 TV240                            K               
+   74 EMV                              proportion      
+   75 ELAI                             m^2/m^2         
+   76 ESAI                             m^2/m^2         
+   77 TLAI                             1               
+   78 TSAI                             1               
+   79 FSUN                             proportion      
+   80 LAISUN                           1               
+   81 LAISHA                           1               
+   82 DEWMX                            mm              
+   83 HTOP                             m               
+   84 HBOT                             m               
+   85 DISPLA                           m               
+   86 ALT                              m               
+   87 ALTMAX                           m               
+   88 ALTMAX_LASTYEAR                  m               
+   89 FSUN24                           K               
+   90 FSUN240                          K               
+   91 LAI240                           m2/m2           
+   92 SMP                              mm              
+   93 bsw                              1               
+   94 ROOTFR                           proportion      
+   95 ROOTR                            proportion      
+   96 ROOTR_COLUMN                     proportion      
+   97 SOILPSI                          MPa             
+   98 SNO_TK                           W/m-K           
+   99 HK                               mm/s            
+  100 SoilAlpha                        1               
+  101 SoilAlpha_U                      1               
+  102 watsat                           m^3/m^3         
+  103 EFF_POROSITY                     proportion      
+  104 watfc                            m^3/m^3         
+  105 SNO_EXISTENCE                    1               
+  106 GC_LIQ1                          mm              
+  107 GC_LIQ2                          mm              
+  108 GC_ICE1                          mm              
+  109 GC_ICE2                          mm              
+  110 TWS                              mm              
+  111 TWS_MONTH_BEGIN                  mm              
+  112 TWS_MONTH_END                    mm              
+  113 SNO_LIQH2O                       kg/m2           
+  114 SNO_ICE                          kg/m2           
+  115 SOILLIQ                          kg/m2           
+  116 SOILLIQ_ICE                      kg/m2           
+  117 SOILICE                          kg/m2           
+  118 SOILICE_ICE                      kg/m2           
+  119 H2OSFC                           mm              
+  120 H2OSOI                           mm3/mm3         
+  121 SNO_BW                           kg/m3           
+  122 SNO_GS                           Microns         
+  123 SNORDSL                          m^-6            
+  124 SNOLIQFL                         fraction        
+  125 SOILWATER_10CM                   kg/m2           
+  126 H2OSNO                           mm              
+  127 H2OSNO_TOP                       kg/m2           
+  128 SNOWICE                          kg/m2           
+  129 SNOWLIQ                          kg/m2           
+  130 INT_SNOW                         mm              
+  131 SNOW_DEPTH                       m               
+  132 SNOWDP                           m               
+  133 FSNO                             1               
+  134 FSNO_EFF                         1               
+  135 FRAC_ICEOLD                      proportion      
+  136 FH2OSFC                          1               
+  137 WF                               proportion      
+  138 ERRH2O                           mm              
+  139 ERRH2OSNO                        mm              
+  140 H2OCAN                           mm              
+  141 Q2M                              kg/kg           
+  142 RH2M                             %               
+  143 RH2M_R                           %               
+  144 RH2M_U                           %               
+  145 RHAF                             fraction        
+  146 FWET                             proportion      
+  147 FDRY                             proportion      
+  148 QFLX_LIQ_DYNBAL                  mm/s            
+  149 QFLX_ICE_DYNBAL                  mm/s            
+  150 QSNOFRZ_LYR                      kg/m2/s         
+  151 QSNWCPICE_NODYNLNDUSE            mm H2O/s        
+  152 DWB                              mm/s            
+  153 QINFL                            mm/s            
+  154 QOVER                            mm/s            
+  155 QDRAI                            mm/s            
+  156 QIRRIG_WM                        mm/s            
+  157 QTOPSOIL                         mm/s            
+  158 QH2OSFC                          mm/s            
+  159 QDRAI_PERCH                      mm/s            
+  160 QSNOMELT                         mm/s            
+  161 QSNOMELT_LYR                     mm/s            
+  162 QRGWL                            mm/s            
+  163 QRUNOFF_NODYNLNDUSE              mm/s            
+  164 QRUNOFF_R                        mm/s            
+  165 QRUNOFF_U                        mm/s            
+  166 QDRAI_XS                         mm/s            
+  167 QSNOFRZ                          kg/m2/s         
+  168 QICE                             mm/s            
+  169 QICE_FRZ                         mm/s            
+  170 QICE_MELT                        mm/s            
+  171 SNOW_SOURCES                     mm/s            
+  172 SNOW_SINKS                       mm/s            
+  173 QIRRIG_ORIG                      mm/s            
+  174 QIRRIG_REAL                      mm/s            
+  175 QIRRIG_SURF                      mm/s            
+  176 QIRRIG_GRND                      mm/s            
+  177 QINTR                            mm/s            
+  178 QWTRGH                           mm/s            
+  179 QWDRIP                           mm/s            
+  180 QDRIP                            mm/s            
+  181 QSOIL                            mm/s            
+  182 QVEGE                            mm/s            
+  183 QVEGT                            mm/s            
+  184 QSNWCPLIQ                        mm H2O/s        
+  185 QFLX_RAIN_GRND                   mm H2O/s        
+  186 QFLX_SNOW_GRND                   mm H2O/s        
+  187 QFLX_EVAP_GRND                   mm H2O/s        
+  188 QFLX_EVAP_VEG                    mm H2O/s        
+  189 QFLX_EVAP_TOT                    mm H2O/s        
+  190 QFLX_DEW_GRND                    mm H2O/s        
+  191 QFLX_SUB_SNOW                    mm H2O/s        
+  192 QFLX_DEW_SNOW                    mm H2O/s        
+  193 BTRAN                            1               
+  194 BTRAN_DAILY_MIN                  unitless        
+  195 RRESIS                           proportion      
+  196 EFLX_DYNBAL                      W/m^2           
+  197 FSM                              W/m^2           
+  198 FSM_R                            W/m^2           
+  199 FSM_U                            W/m^2           
+  200 BUILDHEAT                        W/m^2           
+  201 URBAN_AC                         W/m^2           
+  202 URBAN_HEAT                       W/m^2           
+  203 FGR12                            W/m^2           
+  204 FGR_SOIL_R                       watt/m^2        
+  205 ERRSOI                           W/m^2           
+  206 FIRA                             W/m^2           
+  207 FIRA_R                           W/m^2           
+  208 FIRE                             W/m^2           
+  209 LWup                             W/m^2           
+  210 FIRE_R                           W/m^2           
+  211 FCTR                             W/m^2           
+  212 FCEV                             W/m^2           
+  213 FGEV                             W/m^2           
+  214 FSH_NODYNLNDUSE                  W/m^2           
+  215 FSH_R                            W/m^2           
+  216 Qh                               W/m^2           
+  217 Qle                              W/m^2           
+  218 EFLX_LH_TOT                      W/m^2           
+  219 EFLX_LH_TOT_R                    W/m^2           
+  220 Qstor                            W/m^2           
+  221 FSH_V                            W/m^2           
+  222 FSH_G                            W/m^2           
+  223 FGR                              W/m^2           
+  224 FGR_R                            W/m^2           
+  225 FIRA_U                           W/m^2           
+  226 EFLX_SOIL_GRND                   W/m^2           
+  227 FIRE_U                           W/m^2           
+  228 FSH_U                            W/m^2           
+  229 EFLX_LH_TOT_U                    W/m^2           
+  230 FGR_U                            W/m^2           
+  231 Rnet                             W/m^2           
+  232 DLRAD                            W/m^2           
+  233 ULRAD                            W/m^2           
+  234 CGRND                            W/m^2/K         
+  235 CGRNDL                           W/m^2/K         
+  236 CGRNDS                           W/m^2/K         
+  237 EFLX_GNET                        W/m^2           
+  238 EFLX_GRND_LAKE                   W/m^2           
+  239 DGNETDT                          W/m^2/K         
+  240 TRAFFICFLUX                      W/m^2           
+  241 WASTEHEAT                        W/m^2           
+  242 HEAT_FROM_AC                     W/m^2           
+  243 Qanth                            W/m^2           
+  244 TAUX                             kg/m/s^2        
+  245 TAUY                             kg/m/s^2        
+  246 ERRSEB                           W/m^2           
+  247 ERRSOL                           W/m^2           
+  248 DSTDEP                           kg/m^2/s        
+  249 BCDEP                            kg/m^2/s        
+  250 OCDEP                            kg/m^2/s        
+  251 SNOBCMCL                         kg/m2           
+  252 SNOBCMSL                         kg/m2           
+  253 SNOOCMCL                         kg/m2           
+  254 SNOOCMSL                         kg/m2           
+  255 SNODSTMCL                        kg/m2           
+  256 SNODSTMSL                        kg/m2           
+  257 Z0MG                             m               
+  258 Z0HG                             m               
+  259 Z0QG                             m               
+  260 VA                               m/s             
+  261 U10                              m/s             
+  262 U10WITHGUSTS                     m/s             
+  263 U10_DUST                         m/s             
+  264 RAM1                             s/m             
+  265 FV                               m/s             
+  266 Z0HV                             m               
+  267 Z0M                              m               
+  268 Z0MV                             m               
+  269 Z0QV                             m               
+  270 ITER_LND_EBAL_AVG                count           
+  271 RAH_ABOVE                        s/m             
+  272 RAH_BELOW                        s/m             
+  273 RAW_ABOVE                        s/m             
+  274 RAW_BELOW                        s/m             
+  275 USTAR                            m/s             
+  276 UM                               m/s             
+  277 UAF                              m/s             
+  278 TAF                              K               
+  279 QAF                              kg/kg           
+  280 OBU                              m               
+  281 ZETA                             unitless        
+  282 VPD                              kPa             
+  283 LAKEICEFRAC                      unitless        
+  284 LAKEICETHICK                     m               
+  285 TKE1                             W/(mK)          
+  286 RAM_LAKE                         s/m             
+  287 UST_LAKE                         m/s             
+  288 RH_LEAF                          fraction        
+  289 FPSN                             umol/m2s        
+  290 FPSN_WC                          umol/m2s        
+  291 FPSN_WJ                          umol/m2s        
+  292 FPSN_WP                          umol/m2s        
+  293 PSNSUN                           umolCO2/m^2/s   
+  294 PSNSHA                           umolCO2/m^2/s   
+  295 VCMAX25TOP                       umolCO2/m^2/s   
+  296 RSSUN                            s/m             
+  297 RSSHA                            s/m             
+  298 WA                               mm              
+  299 QCHARGE                          mm/s            
+  300 FCOV                             unitless        
+  301 FSAT                             unitless        
+  302 FROST_TABLE                      m               
+  303 ZWT                              m               
+  304 ZWT_PERCH                        m               
+  305 FSA                              W/m^2           
+  306 FSA_R                            W/m^2           
+  307 FSA_U                            W/m^2           
+  308 FSR                              W/m^2           
+  309 SWup                             W/m^2           
+  310 SNO_ABS                          W/m^2           
+  311 SABV                             W/m^2           
+  312 SABG                             W/m^2           
+  313 SABG_PEN                         watt/m^2        
+  314 FSDSND                           W/m^2           
+  315 FSDSNI                           W/m^2           
+  316 FSDSNDLN                         W/m^2           
+  317 FSRND                            W/m^2           
+  318 FSRNI                            W/m^2           
+  319 FSRNDLN                          W/m^2           
+  320 SNOINTABS                        %               
+  321 COSZEN                           1               
+  322 ALBGRD                           proportion      
+  323 ALBGRI                           proportion      
+  324 ALBD                             proportion      
+  325 ALBI                             proportion      
+  326 FSDSVD                           W/m^2           
+  327 FSDSVI                           W/m^2           
+  328 FSRVD                            W/m^2           
+  329 FSRVI                            W/m^2           
+  330 FSDSVDLN                         W/m^2           
+  331 FSDSVILN                         W/m^2           
+  332 PARVEGLN                         W/m^2           
+  333 FSRVDLN                          W/m^2           
+  334 SNOFSDSVD                        W/m^2           
+  335 SNOFSDSND                        W/m^2           
+  336 SNOFSDSVI                        W/m^2           
+  337 SNOFSDSNI                        W/m^2           
+  338 SNOFSRVD                         W/m^2           
+  339 SNOFSRND                         W/m^2           
+  340 SNOFSRVI                         W/m^2           
+  341 SNOFSRNI                         W/m^2           
+  342 DSTFLXT                          kg/m2/s         
+  343 DPVLTRB1                         m/s             
+  344 DPVLTRB2                         m/s             
+  345 DPVLTRB3                         m/s             
+  346 DPVLTRB4                         m/s             
+  347 LND_FRC_DUST_MBL                 -               
+  348 FINUNDATED                       1               
+  349 FINUNDATED_LAG                   1               
+  350 CH4_SURF_DIFF_SAT                mol/m2/s        
+  351 CH4_SURF_DIFF_UNSAT              mol/m2/s        
+  352 CH4_EBUL_TOTAL_SAT               mol/m2/s        
+  353 CH4_EBUL_TOTAL_UNSAT             mol/m2/s        
+  354 CH4_SURF_EBUL_SAT                mol/m2/s        
+  355 CH4_SURF_EBUL_UNSAT              mol/m2/s        
+  356 CH4_SURF_AERE_SAT                mol/m2/s        
+  357 CH4_SURF_AERE_UNSAT              mol/m2/s        
+  358 TOTCOLCH4                        gC/m2           
+  359 CONC_CH4_SAT                     mol/m3          
+  360 CONC_CH4_UNSAT                   mol/m3          
+  361 o2_decomp_depth_unsat            mol/m3/2        
+  362 CONC_O2_SAT                      mol/m3          
+  363 CONC_O2_UNSAT                    mol/m3          
+  364 FCH4TOCO2                        gC/m2/s         
+  365 CH4PROD                          gC/m2/s         
+  366 FCH4_DFSAT                       kgC/m2/s        
+  367 ZWT_CH4_UNSAT                    m               
+  368 QOVER_LAG                        mm/s            
+  369 WTGQ                             m/s             
+  370 CROOT_PROF                       1/m             
+  371 FROOT_PROF                       1/m             
+  372 LEAF_PROF                        1/m             
+  373 STEM_PROF                        1/m             
+  374 NFIXATION_PROF                   1/m             
+  375 NDEP_PROF                        1/m             
+  376 PDEP_PROF                        1/m             
+  377 SOM_ADV_COEF                     m/s             
+  378 SOM_DIFFUS_COEF                  m^2/s           
+  379 LFC2                             per sec         
+  380 FPI                              proportion      
+  381 FPI_P                            proportion      
+  382 FPI_vr                           proportion      
+  383 FPI_P_vr                         proportion      
+  384 FPG                              proportion      
+  385 FPG_P                            proportion      
+  386 ANNSUM_COUNTER                   s               
+  387 CANNAVG_T2M                      K               
+  388 SCALARAVG_vr                     fraction        
+  389 NFIRE                            counts/km2/sec  
+  390 FAREA_BURNED                     proportion      
+  391 BAF_CROP                         proportion/sec  
+  392 BAF_PEATF                        proportion/sec  
+  393 ANNAVG_T2M                       K               
+  394 TEMPAVG_T2M                      K               
+  395 DORMANT_FLAG                     1               
+  396 DAYS_ACTIVE                      days            
+  397 ONSET_FLAG                       1               
+  398 ONSET_COUNTER                    days            
+  399 ONSET_GDDFLAG                    1               
+  400 ONSET_FDD                        C degree-days   
+  401 ONSET_GDD                        C degree-days   
+  402 ONSET_SWI                        1               
+  403 OFFSET_FLAG                      1               
+  404 OFFSET_COUNTER                   days            
+  405 OFFSET_FDD                       C degree-days   
+  406 OFFSET_SWI                       1               
+  407 LGSF                             proportion      
+  408 BGLFR_LEAF                       1/s             
+  409 BGLFR_FROOT                      1/s             
+  410 BGTR                             1/s             
+  411 ALLOC_PNOW                       proportion      
+  412 C_ALLOMETRY                      1               
+  413 N_ALLOMETRY                      1               
+  414 TEMPSUM_POTENTIAL_GPP            gC/m^2/yr       
+  415 ANNSUM_POTENTIAL_GPP             gN/m^2/yr       
+  416 TEMPMAX_RETRANSN                 gN/m^2          
+  417 ANNMAX_RETRANSN                  gN/m^2          
+  418 DOWNREG                          proportion      
+  419 P_ALLOMETRY                      1               
+  420 TEMPMAX_RETRANSP                 gP/m^2          
+  421 ANNMAX_RETRANSP                  gP/m^2          
+  422 cn_scalar                                        
+  423 cp_scalar                                        
+  424 nlim_m                                           
+  425 plim_m                                           
+  426 water_scalar                                     
+  427 wlim_m                                           
+  428 R_MORT_CAL                       1               
+  429 SED_P_ERO                        kg/m^2/s        
+  430 SED_Q_ERO                        kg/m^2/s        
+  431 SED_ERO                          kg/m^2/s        
+  432 SED_CROP_ERO                     kg/m^2/s        
+  433 SED_YLD                          kg/m^2/s        
+  434 SEEDC_GRC                        gC/m^2          
+  435 TCS_MONTH_BEGIN                  gC/m^2          
+  436 TCS_MONTH_END                    gC/m^2          
+  437 CMASS_BALANCE_ERROR              gC/m^2          
+  438 LITR1C_vr                        gC/m^3          
+  439 LITR1C                           gC/m^2          
+  440 LITR1C_1m                        gC/m^2          
+  441 LITR2C_vr                        gC/m^3          
+  442 LITR2C                           gC/m^2          
+  443 LITR2C_1m                        gC/m^2          
+  444 LITR3C_vr                        gC/m^3          
+  445 LITR3C                           gC/m^2          
+  446 LITR3C_1m                        gC/m^2          
+  447 CWDC_vr                          gC/m^3          
+  448 CWDC                             gC/m^2          
+  449 CWDC_1m                          gC/m^2          
+  450 SOIL1C_vr                        gC/m^3          
+  451 SOIL1C                           gC/m^2          
+  452 SOIL1C_1m                        gC/m^2          
+  453 SOIL2C_vr                        gC/m^3          
+  454 SOIL2C                           gC/m^2          
+  455 SOIL2C_1m                        gC/m^2          
+  456 SOIL3C_vr                        gC/m^3          
+  457 SOIL3C                           gC/m^2          
+  458 SOIL3C_1m                        gC/m^2          
+  459 SOIL4C_vr                        gC/m^3          
+  460 SOIL4C                           gC/m^2          
+  461 SOIL4C_1m                        gC/m^2          
+  462 TOTLITC_1m                       gC/m^2          
+  463 TOTSOMC_1m                       gC/m^2          
+  464 LITTERC                          gC/m^2          
+  465 TOTLITC                          gC/m^2          
+  466 TOTSOMC                          gC/m^2          
+  467 COL_CTRUNC                       gC/m^2          
+  468 SOILC                            gC/m^2          
+  469 TOTECOSYSC                       gC/m^2          
+  470 TOTCOLC                          gC/m^2          
+  471 PROD10C                          gC/m^2          
+  472 PROD100C                         gC/m^2          
+  473 SEEDC                            gC/m^2          
+  474 PROD1C                           gC/m^2          
+  475 TOTPRODC                         gC/m^2          
+  476 FUELC                            gC/m^2          
+  477 DWT_SEEDC_TO_LEAF_GRC            gC/m^2/s        
+  478 DWT_SEEDC_TO_DEADSTEM_GRC        gC/m^2/s        
+  479 DWT_CONV_CFLUX_GRC               gC/m^2/s        
+  480 DWT_CONV_CFLUX_DRIBBLED          gC/m^2/s        
+  481 DWT_PROD10C_GAIN_GRC             gC/m^2/s        
+  482 DWT_PROD100C_GAIN_GRC            gC/m^2/s        
+  483 HRV_DEADSTEM_TO_PROD10C_GRC      gC/m^2/s        
+  484 HRV_DEADSTEM_TO_PROD100C_GRC     gC/m^2/s        
+  485 CWDC_HR                          gC/m^2/s        
+  486 CWDC_LOSS                        gC/m^2/s        
+  487 LITTERC_HR                       gC/m^2/s        
+  488 LITTERC_LOSS                     gC/m^2/s        
+  489 SOILC_HR                         gC/m^2/s        
+  490 SOILC_LOSS                       gC/m^2/s        
+  491 SOMC_FIRE                        gC/m^2/s        
+  492 SOMC_ERO                         gC/m^2/s        
+  493 SOMC_DEP                         gC/m^2/s        
+  494 SOMC_YLD                         gC/m^2/s        
+  495 SOIL1C_ERO                       gC/m^2/s        
+  496 SOIL1C_DEP                       gC/m^2/s        
+  497 SOIL1C_YLD                       gC/m^2/s        
+  498 SOIL2C_ERO                       gC/m^2/s        
+  499 SOIL2C_DEP                       gC/m^2/s        
+  500 SOIL2C_YLD                       gC/m^2/s        
+  501 SOIL3C_ERO                       gC/m^2/s        
+  502 SOIL3C_DEP                       gC/m^2/s        
+  503 SOIL3C_YLD                       gC/m^2/s        
+  504 SOIL4C_ERO                       gC/m^2/s        
+  505 SOIL4C_DEP                       gC/m^2/s        
+  506 SOIL4C_YLD                       gC/m^2/s        
+  507 M_LITR1C_TO_FIRE                 gC/m^2/s        
+  508 M_LITR1C_TO_FIRE_vr              gC/m^3/s        
+  509 K_LITR1                          1/s             
+  510 M_LITR2C_TO_FIRE                 gC/m^2/s        
+  511 M_LITR2C_TO_FIRE_vr              gC/m^3/s        
+  512 K_LITR2                          1/s             
+  513 M_LITR3C_TO_FIRE                 gC/m^2/s        
+  514 M_LITR3C_TO_FIRE_vr              gC/m^3/s        
+  515 K_LITR3                          1/s             
+  516 M_CWDC_TO_FIRE                   gC/m^2/s        
+  517 M_CWDC_TO_FIRE_vr                gC/m^3/s        
+  518 K_CWD                            1/s             
+  519 K_SOIL1                          1/s             
+  520 K_SOIL2                          1/s             
+  521 K_SOIL3                          1/s             
+  522 K_SOIL4                          1/s             
+  523 LITR1_HR                         gC/m^2/s        
+  524 LITR1C_TO_SOIL1C                 gC/m^2/s        
+  525 LITR1_HR_vr                      gC/m^3/s        
+  526 LITR1C_TO_SOIL1C_vr              gC/m^3/s        
+  527 LITR2_HR                         gC/m^2/s        
+  528 LITR2C_TO_SOIL2C                 gC/m^2/s        
+  529 LITR2_HR_vr                      gC/m^3/s        
+  530 LITR2C_TO_SOIL2C_vr              gC/m^3/s        
+  531 LITR3_HR                         gC/m^2/s        
+  532 LITR3C_TO_SOIL3C                 gC/m^2/s        
+  533 LITR3_HR_vr                      gC/m^3/s        
+  534 LITR3C_TO_SOIL3C_vr              gC/m^3/s        
+  535 SOIL1_HR                         gC/m^2/s        
+  536 SOIL1C_TO_SOIL2C                 gC/m^2/s        
+  537 SOIL1_HR_vr                      gC/m^3/s        
+  538 SOIL1C_TO_SOIL2C_vr              gC/m^3/s        
+  539 SOIL2_HR                         gC/m^2/s        
+  540 SOIL2C_TO_SOIL3C                 gC/m^2/s        
+  541 SOIL2_HR_vr                      gC/m^3/s        
+  542 SOIL2C_TO_SOIL3C_vr              gC/m^3/s        
+  543 SOIL3_HR                         gC/m^2/s        
+  544 SOIL3C_TO_SOIL4C                 gC/m^2/s        
+  545 SOIL3_HR_vr                      gC/m^3/s        
+  546 SOIL3C_TO_SOIL4C_vr              gC/m^3/s        
+  547 SOIL4_HR                         gC/m^2/s        
+  548 SOIL4_HR_vr                      gC/m^3/s        
+  549 CWDC_TO_LITR2C                   gC/m^2/s        
+  550 CWDC_TO_LITR2C_vr                gC/m^3/s        
+  551 CWDC_TO_LITR3C                   gC/m^2/s        
+  552 CWDC_TO_LITR3C_vr                gC/m^3/s        
+  553 M_LITR1C_TO_LEACHING             gC/m^2/s        
+  554 LITR1C_TNDNCY_VERT_TRANS         gC/m^3/s        
+  555 M_LITR2C_TO_LEACHING             gC/m^2/s        
+  556 LITR2C_TNDNCY_VERT_TRANS         gC/m^3/s        
+  557 M_LITR3C_TO_LEACHING             gC/m^2/s        
+  558 LITR3C_TNDNCY_VERT_TRANS         gC/m^3/s        
+  559 M_SOIL1C_TO_LEACHING             gC/m^2/s        
+  560 SOIL1C_TNDNCY_VERT_TRANS         gC/m^3/s        
+  561 M_SOIL2C_TO_LEACHING             gC/m^2/s        
+  562 SOIL2C_TNDNCY_VERT_TRANS         gC/m^3/s        
+  563 M_SOIL3C_TO_LEACHING             gC/m^2/s        
+  564 SOIL3C_TNDNCY_VERT_TRANS         gC/m^3/s        
+  565 M_SOIL4C_TO_LEACHING             gC/m^2/s        
+  566 SOIL4C_TNDNCY_VERT_TRANS         gC/m^3/s        
+  567 T_SCALAR                         1               
+  568 W_SCALAR                         1               
+  569 O_SCALAR                         1               
+  570 SOM_C_LEACHED                    gC/m^2/s        
+  571 LITHR                            gC/m^2/s        
+  572 SOMHR                            gC/m^2/s        
+  573 HR_vr                            gC/m^3/s        
+  574 F_CO2_SOIL_vr                    gC/m^3/s        
+  575 HR                               gC/m^2/s        
+  576 F_CO2_SOIL                       gC/m^2/s        
+  577 SR                               gC/m^2/s        
+  578 ER                               gC/m^2/s        
+  579 LITFIRE                          gC/m^2/s        
+  580 SOMFIRE                          gC/m^2/s        
+  581 TOTFIRE                          gC/m^2/s        
+  582 NEP                              gC/m^2/s        
+  583 NBP                              gC/m^2/s        
+  584 NEE                              gC/m^2/s        
+  585 COL_FIRE_CLOSS                   gC/m^2/s        
+  586 DECOMP_FIRE_CLOSS                gC/m^2/s        
+  587 DWT_SLASH_CFLUX                  gC/m^2/s        
+  588 DWT_CONV_CFLUX                   gC/m^2/s        
+  589 DWT_PROD10C_GAIN                 gC/m^2/s        
+  590 PROD10C_LOSS                     gC/m^2/s        
+  591 DWT_PROD100C_GAIN                gC/m^2/s        
+  592 DWT_CROP_PRODUCTC_GAIN           gC/m^2/s        
+  593 PROD100C_LOSS                    gC/m^2/s        
+  594 PROD1C_LOSS                      gC/m^2/s        
+  595 DWT_FROOTC_TO_LITR_MET_C         gC/m^2/s        
+  596 DWT_FROOTC_TO_LITR_CEL_C         gC/m^2/s        
+  597 DWT_FROOTC_TO_LITR_LIG_C         gC/m^2/s        
+  598 DWT_LIVECROOTC_TO_CWDC           gC/m^2/s        
+  599 DWT_DEADCROOTC_TO_CWDC           gC/m^2/s        
+  600 DWT_CLOSS                        gC/m^2/s        
+  601 PRODUCT_CLOSS                    gC/m^2/s        
+  602 LAND_USE_FLUX                    gC/m^2/s        
+  603 LAND_UPTAKE                      gC/m^2/s        
+  604 CANNSUM_NPP                      gC/m^2/s        
+  605 VEGC_TO_CWDC                     gC/m^2/s        
+  606 VEGP_TO_CWDP                     gP/m^2/s        
+  607 BGC_CPOOL_EINPUT_LITR1_v         gC  /m^3        
+  608 BGC_CPOOL_ELOSS_LITR1_vr         gC  /m^3        
+  609 BGC_CPOOL_EINPUT_LITR2_v         gC  /m^3        
+  610 BGC_CPOOL_ELOSS_LITR2_vr         gC  /m^3        
+  611 BGC_CPOOL_EINPUT_LITR3_v         gC  /m^3        
+  612 BGC_CPOOL_ELOSS_LITR3_vr         gC  /m^3        
+  613 BGC_CPOOL_EINPUT_CWD_vr          gC  /m^3        
+  614 BGC_CPOOL_ELOSS_CWD_vr           gC  /m^3        
+  615 BGC_CPOOL_EINPUT_SOIL1_v         gC  /m^3        
+  616 BGC_CPOOL_ELOSS_SOIL1_vr         gC  /m^3        
+  617 BGC_CPOOL_EINPUT_SOIL2_v         gC  /m^3        
+  618 BGC_CPOOL_ELOSS_SOIL2_vr         gC  /m^3        
+  619 BGC_CPOOL_EINPUT_SOIL3_v         gC  /m^3        
+  620 BGC_CPOOL_ELOSS_SOIL3_vr         gC  /m^3        
+  621 BGC_CPOOL_EINPUT_SOIL4_v         gC  /m^3        
+  622 BGC_CPOOL_ELOSS_SOIL4_vr         gC  /m^3        
+  623 SEEDN_GRC                        gN/m^2          
+  624 LITR1N_vr                        gN/m^3          
+  625 LITR1N                           gN/m^2          
+  626 LITR1N_1m                        gN/m^2          
+  627 LITR2N_vr                        gN/m^3          
+  628 LITR2N                           gN/m^2          
+  629 LITR2N_1m                        gN/m^2          
+  630 LITR3N_vr                        gN/m^3          
+  631 LITR3N                           gN/m^2          
+  632 LITR3N_1m                        gN/m^2          
+  633 CWDN_vr                          gN/m^3          
+  634 CWDN                             gN/m^2          
+  635 CWDN_1m                          gN/m^2          
+  636 SOIL1N_vr                        gN/m^3          
+  637 SOIL1N                           gN/m^2          
+  638 SOIL1N_1m                        gN/m^2          
+  639 SOIL2N_vr                        gN/m^3          
+  640 SOIL2N                           gN/m^2          
+  641 SOIL2N_1m                        gN/m^2          
+  642 SOIL3N_vr                        gN/m^3          
+  643 SOIL3N                           gN/m^2          
+  644 SOIL3N_1m                        gN/m^2          
+  645 SOIL4N_vr                        gN/m^3          
+  646 SOIL4N                           gN/m^2          
+  647 SOIL4N_1m                        gN/m^2          
+  648 SMINN                            gN/m^2          
+  649 TOTLITN_1m                       gN/m^2          
+  650 TOTSOMN_1m                       gN/m^2          
+  651 COL_NTRUNC                       gN/m^2          
+  652 SMIN_NO3_vr                      gN/m^3          
+  653 SMIN_NH4_vr                      gN/m^3          
+  654 SMIN_NO3                         gN/m^2          
+  655 SMIN_NH4                         gN/m^2          
+  656 SMINN_vr                         gN/m^3          
+  657 TOTLITN                          gN/m^2          
+  658 TOTSOMN                          gN/m^2          
+  659 TOTECOSYSN                       gN/m^2          
+  660 TOTCOLN                          gN/m^2          
+  661 SEEDN                            gN/m^2          
+  662 PROD10N                          gN/m^2          
+  663 PROD100N                         gN/m^2          
+  664 PROD1N                           gN/m^2          
+  665 TOTPRODN                         gN/m^2          
+  666 FAN_TOTN                         gN/m2           
+  667 DWT_SEEDN_TO_LEAF_GRC            gN/m^2/s        
+  668 DWT_SEEDN_TO_DEADSTEM_GRC        gN/m^2/s        
+  669 DWT_CONV_NFLUX_GRC               gN/m^2/s        
+  670 DWT_SEEDN_TO_NPOOL_GRC           gN/m^2/s        
+  671 DWT_PROD10N_GAIN_GRC             gN/m^2/s        
+  672 DWT_PROD100N_GAIN_GRC            gN/m^2/s        
+  673 NDEP_TO_SMINN                    gN/m^2/s        
+  674 NFIX_TO_ECOSYSN                  gN/m^2/s        
+  675 NFIX_TO_SMINN                    gN/m^2/s        
+  676 VEGN_TO_CWDN                     gN/m^2/s        
+  677 M_LITR1N_TO_FIRE                 gN/m^2          
+  678 M_LITR1N_TO_FIRE_vr              gN/m^3          
+  679 M_LITR2N_TO_FIRE                 gN/m^2          
+  680 M_LITR2N_TO_FIRE_vr              gN/m^3          
+  681 M_LITR3N_TO_FIRE                 gN/m^2          
+  682 M_LITR3N_TO_FIRE_vr              gN/m^3          
+  683 M_CWDN_TO_FIRE                   gN/m^2          
+  684 M_CWDN_TO_FIRE_vr                gN/m^3          
+  685 SMINN_TO_SOIL1N_L1               gN/m^2          
+  686 LITR1N_TO_SOIL1N                 gN/m^2          
+  687 SMINN_TO_SOIL1N_L1_vr            gN/m^3          
+  688 LITR1N_TO_SOIL1N_vr              gN/m^3          
+  689 SMINN_TO_SOIL2N_L2               gN/m^2          
+  690 LITR2N_TO_SOIL2N                 gN/m^2          
+  691 SMINN_TO_SOIL2N_L2_vr            gN/m^3          
+  692 LITR2N_TO_SOIL2N_vr              gN/m^3          
+  693 SMINN_TO_SOIL3N_L3               gN/m^2          
+  694 LITR3N_TO_SOIL3N                 gN/m^2          
+  695 SMINN_TO_SOIL3N_L3_vr            gN/m^3          
+  696 LITR3N_TO_SOIL3N_vr              gN/m^3          
+  697 SMINN_TO_SOIL2N_S1               gN/m^2          
+  698 SOIL1N_TO_SOIL2N                 gN/m^2          
+  699 SMINN_TO_SOIL2N_S1_vr            gN/m^3          
+  700 SOIL1N_TO_SOIL2N_vr              gN/m^3          
+  701 SMINN_TO_SOIL3N_S2               gN/m^2          
+  702 SOIL2N_TO_SOIL3N                 gN/m^2          
+  703 SMINN_TO_SOIL3N_S2_vr            gN/m^3          
+  704 SOIL2N_TO_SOIL3N_vr              gN/m^3          
+  705 SMINN_TO_SOIL4N_S3               gN/m^2          
+  706 SOIL3N_TO_SOIL4N                 gN/m^2          
+  707 SMINN_TO_SOIL4N_S3_vr            gN/m^3          
+  708 SOIL3N_TO_SOIL4N_vr              gN/m^3          
+  709 SOIL4N_TO_SMINN                  gN/m^2          
+  710 SOIL4N_TO_SMINN_vr               gN/m^3          
+  711 CWDN_TO_LITR2N                   gN/m^2          
+  712 CWDN_TO_LITR2N_vr                gN/m^3          
+  713 CWDN_TO_LITR3N                   gN/m^2          
+  714 CWDN_TO_LITR3N_vr                gN/m^3          
+  715 SMINN_NO3_INPUT_vr               gN/m^3/s        
+  716 SMINN_NH4_INPUT_vr               gN/m^3/s        
+  717 BGC_NPOOL_EINPUT_LITR1_v         gN/m^3          
+  718 BGC_NPOOL_ELOSS_LITR1_vr         gN/m^3          
+  719 BGC_NPOOL_EINPUT_LITR2_v         gN/m^3          
+  720 BGC_NPOOL_ELOSS_LITR2_vr         gN/m^3          
+  721 BGC_NPOOL_EINPUT_LITR3_v         gN/m^3          
+  722 BGC_NPOOL_ELOSS_LITR3_vr         gN/m^3          
+  723 BGC_NPOOL_EINPUT_CWD_vr          gN/m^3          
+  724 BGC_NPOOL_ELOSS_CWD_vr           gN/m^3          
+  725 BGC_NPOOL_EINPUT_SOIL1_v         gN/m^3          
+  726 BGC_NPOOL_ELOSS_SOIL1_vr         gN/m^3          
+  727 BGC_NPOOL_EINPUT_SOIL2_v         gN/m^3          
+  728 BGC_NPOOL_ELOSS_SOIL2_vr         gN/m^3          
+  729 BGC_NPOOL_EINPUT_SOIL3_v         gN/m^3          
+  730 BGC_NPOOL_ELOSS_SOIL3_vr         gN/m^3          
+  731 BGC_NPOOL_EINPUT_SOIL4_v         gN/m^3          
+  732 BGC_NPOOL_ELOSS_SOIL4_vr         gN/m^3          
+  733 DENIT                            gN/m^2/s        
+  734 SOM_N_LEACHED                    gN/m^2/s        
+  735 M_LITR1N_TO_LEACHING             gN/m^2/s        
+  736 LITR1N_TNDNCY_VERT_TRANS         gN/m^3/s        
+  737 M_LITR2N_TO_LEACHING             gN/m^2/s        
+  738 LITR2N_TNDNCY_VERT_TRANS         gN/m^3/s        
+  739 M_LITR3N_TO_LEACHING             gN/m^2/s        
+  740 LITR3N_TNDNCY_VERT_TRANS         gN/m^3/s        
+  741 M_SOIL1N_TO_LEACHING             gN/m^2/s        
+  742 SOIL1N_TNDNCY_VERT_TRANS         gN/m^3/s        
+  743 M_SOIL2N_TO_LEACHING             gN/m^2/s        
+  744 SOIL2N_TNDNCY_VERT_TRANS         gN/m^3/s        
+  745 M_SOIL3N_TO_LEACHING             gN/m^2/s        
+  746 SOIL3N_TNDNCY_VERT_TRANS         gN/m^3/s        
+  747 M_SOIL4N_TO_LEACHING             gN/m^2/s        
+  748 SOIL4N_TNDNCY_VERT_TRANS         gN/m^3/s        
+  749 SOMN_ERO                         gN/m^2/s        
+  750 SOMN_DEP                         gN/m^2/s        
+  751 SOMN_YLD                         gN/m^2/s        
+  752 SOIL1N_ERO                       gN/m^2/s        
+  753 SOIL1N_DEP                       gN/m^2/s        
+  754 SOIL1N_YLD                       gN/m^2/s        
+  755 SOIL2N_ERO                       gN/m^2/s        
+  756 SOIL2N_DEP                       gN/m^2/s        
+  757 SOIL2N_YLD                       gN/m^2/s        
+  758 SOIL3N_ERO                       gN/m^2/s        
+  759 SOIL3N_DEP                       gN/m^2/s        
+  760 SOIL3N_YLD                       gN/m^2/s        
+  761 SOIL4N_ERO                       gN/m^2/s        
+  762 SOIL4N_DEP                       gN/m^2/s        
+  763 SOIL4N_YLD                       gN/m^2/s        
+  764 F_NIT                            gN/m^2/s        
+  765 F_DENIT                          gN/m^2/s        
+  766 POT_F_NIT                        gN/m^2/s        
+  767 POT_F_DENIT                      gN/m^2/s        
+  768 SMIN_NO3_LEACHED                 gN/m^2/s        
+  769 SMIN_NO3_RUNOFF                  gN/m^2/s        
+  770 F_NIT_vr                         gN/m^3/s        
+  771 F_DENIT_vr                       gN/m^3/s        
+  772 POT_F_NIT_vr                     gN/m^3/s        
+  773 POT_F_DENIT_vr                   gN/m^3/s        
+  774 SMIN_NO3_LEACHED_vr              gN/m^3/s        
+  775 SMIN_NO3_RUNOFF_vr               gN/m^3/s        
+  776 n2_n2o_ratio_denit               gN/gN           
+  777 ACTUAL_IMMOB_NO3                 gN/m^3/s        
+  778 ACTUAL_IMMOB_NH4                 gN/m^3/s        
+  779 SMIN_NO3_TO_PLANT                gN/m^3/s        
+  780 SMIN_NH4_TO_PLANT                gN/m^3/s        
+  781 SMIN_NO3_MASSDENS                ugN/cm^3 soil   
+  782 K_NITR_T                         unitless        
+  783 K_NITR_PH                        unitless        
+  784 K_NITR_H2O                       unitless        
+  785 K_NITR                           1/s             
+  786 WFPS                             percent         
+  787 FMAX_DENIT_CARBONSUBSTRATE       gN/m^3/s        
+  788 FMAX_DENIT_NITRATE               gN/m^3/s        
+  789 F_DENIT_BASE                     gN/m^3/s        
+  790 diffus                           m^2/s           
+  791 ratio_k1                         none            
+  792 ratio_no3_co2                    ratio           
+  793 soil_co2_prod                    ug C / g soil / 
+  794 fr_WFPS                          fraction        
+  795 soil_bulkdensity                 kg/m3           
+  796 anaerobic_frac                   m3/m3           
+  797 r_psi                            m               
+  798 POTENTIAL_IMMOB_vr               gN/m^3/s        
+  799 ACTUAL_IMMOB_vr                  gN/m^3/s        
+  800 SMINN_TO_PLANT_vr                gN/m^3/s        
+  801 SUPPLEMENT_TO_SMINN_vr           gN/m^3/s        
+  802 GROSS_NMIN_vr                    gN/m^3/s        
+  803 NET_NMIN_vr                      gN/m^3/s        
+  804 POTENTIAL_IMMOB                  gN/m^2/s        
+  805 ACTUAL_IMMOB                     gN/m^2/s        
+  806 SMINN_TO_PLANT                   gN/m^2/s        
+  807 SUPPLEMENT_TO_SMINN              gN/m^2/s        
+  808 GROSS_NMIN                       gN/m^2/s        
+  809 NET_NMIN                         gN/m^2/s        
+  810 F_N2O_NIT                        gN/m^2/s        
+  811 F_N2O_DENIT                      gN/m^2/s        
+  812 COL_FIRE_NLOSS                   gN/m^2/s        
+  813 DECOMP_FIRE_NLOSS                gN/m^2/s        
+  814 DWT_SLASH_NFLUX                  gN/m^2/s        
+  815 DWT_CONV_NFLUX                   gN/m^2/s        
+  816 DWT_CROP_PRODUCTN_GAIN           gN/m^2/s        
+  817 DWT_PROD10N_GAIN                 gN/m^2/s        
+  818 PROD10N_LOSS                     gN/m^2/s        
+  819 DWT_PROD100N_GAIN                gN/m^2/s        
+  820 PROD100N_LOSS                    gN/m^2/s        
+  821 PROD1N_LOSS                      gN/m^2/s        
+  822 PRODUCT_NLOSS                    gN/m^2/s        
+  823 DWT_FROOTN_TO_LITR_MET_N         gN/m^2/s        
+  824 DWT_FROOTN_TO_LITR_CEL_N         gN/m^2/s        
+  825 DWT_FROOTN_TO_LITR_LIG_N         gN/m^2/s        
+  826 DWT_LIVECROOTN_TO_CWDN           gN/m^2/s        
+  827 DWT_DEADCROOTN_TO_CWDN           gN/m^2/s        
+  828 DWT_NLOSS                        gN/m^2/s        
+  829 PLANT_NDEMAND_COL                gN/m^2/s        
+  830 SEEDP_GRC                        gP/m^2          
+  831 LITR1P_vr                        gP/m^3          
+  832 LITR1P                           gP/m^2          
+  833 LITR1P_1m                        gP/m^2          
+  834 LITR2P_vr                        gP/m^3          
+  835 LITR2P                           gP/m^2          
+  836 LITR2P_1m                        gP/m^2          
+  837 LITR3P_vr                        gP/m^3          
+  838 LITR3P                           gP/m^2          
+  839 LITR3P_1m                        gP/m^2          
+  840 CWDP_vr                          gP/m^3          
+  841 CWDP                             gP/m^2          
+  842 CWDP_1m                          gP/m^2          
+  843 SOIL1P_vr                        gP/m^3          
+  844 SOIL1P                           gP/m^2          
+  845 SOIL1P_1m                        gP/m^2          
+  846 SOIL2P_vr                        gP/m^3          
+  847 SOIL2P                           gP/m^2          
+  848 SOIL2P_1m                        gP/m^2          
+  849 SOIL3P_vr                        gP/m^3          
+  850 SOIL3P                           gP/m^2          
+  851 SOIL3P_1m                        gP/m^2          
+  852 SOIL4P_vr                        gP/m^3          
+  853 SOIL4P                           gP/m^2          
+  854 SOIL4P_1m                        gP/m^2          
+  855 SMINP                            gP/m^2          
+  856 TOTLITP_1m                       gP/m^2          
+  857 TOTSOMP_1m                       gP/m^2          
+  858 COL_PTRUNC                       gP/m^2          
+  859 SOLUTIONP_vr                     gp/m^3          
+  860 LABILEP_vr                       gp/m^3          
+  861 SECONDP_vr                       gp/m^3          
+  862 OCCLP_vr                         gp/m^3          
+  863 PRIMP_vr                         gp/m^3          
+  864 SMINP_vr                         gp/m^3          
+  865 SOLUTIONP                        gP/m^2          
+  866 LABILEP                          gP/m^2          
+  867 SECONDP                          gP/m^2          
+  868 OCCLP                            gP/m^2          
+  869 PRIMP                            gP/m^2          
+  870 TOTLITP                          gP/m^2          
+  871 TOTSOMP                          gP/m^2          
+  872 TOTECOSYSP                       gP/m^2          
+  873 TOTCOLP                          gP/m^2          
+  874 SEEDP                            gP/m^2          
+  875 PROD10P                          gP/m^2          
+  876 PROD100P                         gP/m^2          
+  877 PROD1P                           gP/m^2          
+  878 TOTPRODP                         gP/m^2          
+  879 DWT_SEEDP_TO_LEAF_GRC            gP/m^2/s        
+  880 DWT_SEEDP_TO_DEADSTEM_GRC        gP/m^2/s        
+  881 DWT_CONV_PFLUX_GRC               gP/m^2/s        
+  882 DWT_SEEDP_TO_PPOOL_GRC           gP/m^2/s        
+  883 DWT_PROD10P_GAIN_GRC             gP/m^2/s        
+  884 DWT_PROD100P_GAIN_GRC            gP/m^2/s        
+  885 PDEP_TO_SMINP                    gP/m^2/s        
+  886 M_LITR1P_TO_FIRE                 gP/m^2          
+  887 M_LITR1P_TO_FIRE_vr              gP/m^3          
+  888 M_LITR2P_TO_FIRE                 gP/m^2          
+  889 M_LITR2P_TO_FIRE_vr              gP/m^3          
+  890 M_LITR3P_TO_FIRE                 gP/m^2          
+  891 M_LITR3P_TO_FIRE_vr              gP/m^3          
+  892 M_CWDP_TO_FIRE                   gP/m^2          
+  893 M_CWDP_TO_FIRE_vr                gP/m^3          
+  894 BIOCHEM_PMIN_PPOOL5_vr           gP/m^2/s        
+  895 BIOCHEM_PMIN_PPOOL6_vr           gP/m^2/s        
+  896 BIOCHEM_PMIN_PPOOL7_vr           gP/m^2/s        
+  897 BIOCHEM_PMIN_PPOOL8_vr           gP/m^2/s        
+  898 SMINP_TO_SOIL1P_L1               gP/m^2          
+  899 LITR1P_TO_SOIL1P                 gP/m^2          
+  900 SMINP_TO_SOIL1P_L1_vr            gP/m^3          
+  901 LITR1P_TO_SOIL1P_vr              gP/m^3          
+  902 SMINP_TO_SOIL2P_L2               gP/m^2          
+  903 LITR2P_TO_SOIL2P                 gP/m^2          
+  904 SMINP_TO_SOIL2P_L2_vr            gP/m^3          
+  905 LITR2P_TO_SOIL2P_vr              gP/m^3          
+  906 SMINP_TO_SOIL3P_L3               gP/m^2          
+  907 LITR3P_TO_SOIL3P                 gP/m^2          
+  908 SMINP_TO_SOIL3P_L3_vr            gP/m^3          
+  909 LITR3P_TO_SOIL3P_vr              gP/m^3          
+  910 SMINP_TO_SOIL2P_S1               gP/m^2          
+  911 SOIL1P_TO_SOIL2P                 gP/m^2          
+  912 SMINP_TO_SOIL2P_S1_vr            gP/m^3          
+  913 SOIL1P_TO_SOIL2P_vr              gP/m^3          
+  914 SMINP_TO_SOIL3P_S2               gP/m^2          
+  915 SOIL2P_TO_SOIL3P                 gP/m^2          
+  916 SMINP_TO_SOIL3P_S2_vr            gP/m^3          
+  917 SOIL2P_TO_SOIL3P_vr              gP/m^3          
+  918 SMINP_TO_SOIL4P_S3               gP/m^2          
+  919 SOIL3P_TO_SOIL4P                 gP/m^2          
+  920 SMINP_TO_SOIL4P_S3_vr            gP/m^3          
+  921 SOIL3P_TO_SOIL4P_vr              gP/m^3          
+  922 SOIL4P_TO_SMINP                  gP/m^2          
+  923 SOIL4P_TO_SMINP_vr               gP/m^3          
+  924 CWDP_TO_LITR2P                   gP/m^2          
+  925 CWDP_TO_LITR2P_vr                gP/m^3          
+  926 CWDP_TO_LITR3P                   gP/m^2          
+  927 CWDP_TO_LITR3P_vr                gP/m^3          
+  928 SOM_P_LEACHED                    gP/m^2/s        
+  929 M_LITR1P_TO_LEACHING             gP/m^2/s        
+  930 LITR1P_TNDNCY_VERT_TRANS         gP/m^3/s        
+  931 M_LITR2P_TO_LEACHING             gP/m^2/s        
+  932 LITR2P_TNDNCY_VERT_TRANS         gP/m^3/s        
+  933 M_LITR3P_TO_LEACHING             gP/m^2/s        
+  934 LITR3P_TNDNCY_VERT_TRANS         gP/m^3/s        
+  935 M_SOIL1P_TO_LEACHING             gP/m^2/s        
+  936 SOIL1P_TNDNCY_VERT_TRANS         gP/m^3/s        
+  937 M_SOIL2P_TO_LEACHING             gP/m^2/s        
+  938 SOIL2P_TNDNCY_VERT_TRANS         gP/m^3/s        
+  939 M_SOIL3P_TO_LEACHING             gP/m^2/s        
+  940 SOIL3P_TNDNCY_VERT_TRANS         gP/m^3/s        
+  941 M_SOIL4P_TO_LEACHING             gP/m^2/s        
+  942 SOIL4P_TNDNCY_VERT_TRANS         gP/m^3/s        
+  943 SOMP_ERO                         gP/m^2/s        
+  944 SOMP_DEP                         gP/m^2/s        
+  945 SOMP_YLD                         gP/m^2/s        
+  946 SOIL1P_ERO                       gP/m^2/s        
+  947 SOIL1P_DEP                       gP/m^2/s        
+  948 SOIL1P_YLD                       gP/m^2/s        
+  949 SOIL2P_ERO                       gP/m^2/s        
+  950 SOIL2P_DEP                       gP/m^2/s        
+  951 SOIL2P_YLD                       gP/m^2/s        
+  952 SOIL3P_ERO                       gP/m^2/s        
+  953 SOIL3P_DEP                       gP/m^2/s        
+  954 SOIL3P_YLD                       gP/m^2/s        
+  955 SOIL4P_ERO                       gP/m^2/s        
+  956 SOIL4P_DEP                       gP/m^2/s        
+  957 SOIL4P_YLD                       gP/m^2/s        
+  958 PRIMP_TO_LABILEP                 gP/m^2/s        
+  959 PRIMP_TO_LABILEP_vr              gP/m^3/s        
+  960 LABILEP_TO_SECONDP               gP/m^2/s        
+  961 LABILEP_TO_SECONDP_vr            gP/m^3/s        
+  962 SECONDP_TO_LABILEP               gP/m^2/s        
+  963 SECONDP_TO_LABILEP_vr            gP/m^3/s        
+  964 SECONDP_TO_OCCLP                 gP/m^2/s        
+  965 SECONDP_TO_OCCLP_vr              gP/m^3/s        
+  966 SMINP_LEACHED                    gP/m^2/s        
+  967 SMINP_LEACHED_vr                 gP/m^3/s        
+  968 LABILEP_ERO                      gP/m^2/s        
+  969 LABILEP_DEP                      gP/m^2/s        
+  970 LABILEP_YLD                      gP/m^2/s        
+  971 LABILEP_YLD_vr                   gP/m^3/s        
+  972 SECONDP_ERO                      gP/m^2/s        
+  973 SECONDP_DEP                      gP/m^2/s        
+  974 SECONDP_YLD                      gP/m^2/s        
+  975 SECONDP_YLD_vr                   gP/m^3/s        
+  976 OCCLP_ERO                        gP/m^2/s        
+  977 OCCLP_DEP                        gP/m^2/s        
+  978 OCCLP_YLD                        gP/m^2/s        
+  979 OCCLP_YLD_vr                     gP/m^3/s        
+  980 PRIMP_ERO                        gP/m^2/s        
+  981 PRIMP_DEP                        gP/m^2/s        
+  982 PRIMP_YLD                        gP/m^2/s        
+  983 PRIMP_YLD_vr                     gP/m^3/s        
+  984 POTENTIAL_IMMOB_P_vr             gP/m^3/s        
+  985 ACTUAL_IMMOB_P_vr                gP/m^3/s        
+  986 SMINP_TO_PLANT_vr                gP/m^3/s        
+  987 SUPPLEMENT_TO_SMINP_vr           gP/m^3/s        
+  988 GROSS_PMIN_vr                    gP/m^3/s        
+  989 NET_PMIN_vr                      gP/m^3/s        
+  990 BIOCHEM_PMIN_vr                  gP/m^3/s        
+  991 POTENTIAL_IMMOB_P                gP/m^2/s        
+  992 ACTUAL_IMMOB_P                   gP/m^2/s        
+  993 SMINP_TO_PLANT                   gP/m^2/s        
+  994 SUPPLEMENT_TO_SMINP              gP/m^2/s        
+  995 GROSS_PMIN                       gP/m^2/s        
+  996 NET_PMIN                         gP/m^2/s        
+  997 BIOCHEM_PMIN                     gP/m^2/s        
+  998 BIOCHEM_PMIN_TO_PLANT            gP/m^2/s        
+  999 COL_FIRE_PLOSS                   gP/m^2/s        
+ 1000 DECOMP_FIRE_PLOSS                gP/m^2/s        
+ 1001 DWT_SLASH_PFLUX                  gP/m^2/s        
+ 1002 DWT_CONV_PFLUX                   gP/m^2/s        
+ 1003 DWT_CROP_PRODUCTP_GAIN           gP/m^2/s        
+ 1004 DWT_PROD10P_GAIN                 gP/m^2/s        
+ 1005 PROD10P_LOSS                     gP/m^2/s        
+ 1006 DWT_PROD100P_GAIN                gP/m^2/s        
+ 1007 PROD100P_LOSS                    gP/m^2/s        
+ 1008 PROD1P_LOSS                      gP/m^2/s        
+ 1009 PRODUCT_PLOSS                    gP/m^2/s        
+ 1010 DWT_FROOTP_TO_LITR_MET_P         gP/m^2/s        
+ 1011 DWT_FROOTP_TO_LITR_CEL_P         gP/m^2/s        
+ 1012 DWT_FROOTP_TO_LITR_LIG_P         gP/m^2/s        
+ 1013 DWT_LIVECROOTP_TO_CWDP           gP/m^2/s        
+ 1014 DWT_DEADCROOTP_TO_CWDP           gP/m^2/s        
+ 1015 DWT_PLOSS                        gP/m^2/s        
+ 1016 PLANT_PDEMAND_COL                gN/m^2/s        
+ 1017 ADSORBTION_P                     gP/m^2/s        
+ 1018 DESORPTION_P                     gP/m^2/s        
+ 1019 LEAFC                            gC/m^2          
+ 1020 LEAFC_STORAGE                    gC/m^2          
+ 1021 LEAFC_XFER                       gC/m^2          
+ 1022 FROOTC                           gC/m^2          
+ 1023 FROOTC_STORAGE                   gC/m^2          
+ 1024 FROOTC_XFER                      gC/m^2          
+ 1025 LIVESTEMC                        gC/m^2          
+ 1026 LIVESTEMC_STORAGE                gC/m^2          
+ 1027 LIVESTEMC_XFER                   gC/m^2          
+ 1028 DEADSTEMC                        gC/m^2          
+ 1029 DEADSTEMC_STORAGE                gC/m^2          
+ 1030 DEADSTEMC_XFER                   gC/m^2          
+ 1031 LIVECROOTC                       gC/m^2          
+ 1032 LIVECROOTC_STORAGE               gC/m^2          
+ 1033 LIVECROOTC_XFER                  gC/m^2          
+ 1034 DEADCROOTC                       gC/m^2          
+ 1035 DEADCROOTC_STORAGE               gC/m^2          
+ 1036 DEADCROOTC_XFER                  gC/m^2          
+ 1037 GRESP_STORAGE                    gC/m^2          
+ 1038 GRESP_XFER                       gC/m^2          
+ 1039 CPOOL                            gC/m^2          
+ 1040 XSMRPOOL                         gC/m^2          
+ 1041 PFT_CTRUNC                       gC/m^2          
+ 1042 WOODC                            gC/m^2          
+ 1043 DISPVEGC                         gC/m^2          
+ 1044 STORVEGC                         gC/m^2          
+ 1045 TOTVEGC                          gC/m^2          
+ 1046 TOTPFTC                          gC/m^2          
+ 1047 TOTVEGC_ABG                      gC/m^2          
+ 1048 WOODC_ALLOC                      gC/m^2/s        
+ 1049 WOODC_LOSS                       gC/m^2/s        
+ 1050 LEAFC_LOSS                       gC/m^2/s        
+ 1051 LEAFC_ALLOC                      gC/m^2/s        
+ 1052 FROOTC_LOSS                      gC/m^2/s        
+ 1053 FROOTC_ALLOC                     gC/m^2/s        
+ 1054 M_LEAFC_TO_LITTER                gC/m^2/s        
+ 1055 M_FROOTC_TO_LITTER               gC/m^2/s        
+ 1056 M_LEAFC_STORAGE_TO_LITTER        gC/m^2/s        
+ 1057 M_FROOTC_STORAGE_TO_LITTER       gC/m^2/s        
+ 1058 M_LIVESTEMC_STORAGE_TO_LITTER    gC/m^2/s        
+ 1059 M_DEADSTEMC_STORAGE_TO_LITTER    gC/m^2/s        
+ 1060 M_LIVECROOTC_STORAGE_TO_LITTER   gC/m^2/s        
+ 1061 M_DEADCROOTC_STORAGE_TO_LITTER   gC/m^2/s        
+ 1062 M_LEAFC_XFER_TO_LITTER           gC/m^2/s        
+ 1063 M_FROOTC_XFER_TO_LITTER          gC/m^2/s        
+ 1064 M_LIVESTEMC_XFER_TO_LITTER       gC/m^2/s        
+ 1065 M_DEADSTEMC_XFER_TO_LITTER       gC/m^2/s        
+ 1066 M_LIVECROOTC_XFER_TO_LITTER      gC/m^2/s        
+ 1067 M_DEADCROOTC_XFER_TO_LITTER      gC/m^2/s        
+ 1068 M_LIVESTEMC_TO_LITTER            gC/m^2/s        
+ 1069 M_DEADSTEMC_TO_LITTER            gC/m^2/s        
+ 1070 M_LIVECROOTC_TO_LITTER           gC/m^2/s        
+ 1071 M_DEADCROOTC_TO_LITTER           gC/m^2/s        
+ 1072 M_GRESP_STORAGE_TO_LITTER        gC/m^2/s        
+ 1073 M_GRESP_XFER_TO_LITTER           gC/m^2/s        
+ 1074 M_LEAFC_TO_FIRE                  gC/m^2/s        
+ 1075 M_LEAFC_STORAGE_TO_FIRE          gC/m^2/s        
+ 1076 M_LEAFC_XFER_TO_FIRE             gC/m^2/s        
+ 1077 M_LIVESTEMC_TO_FIRE              gC/m^2/s        
+ 1078 M_LIVESTEMC_STORAGE_TO_FIRE      gC/m^2/s        
+ 1079 M_LIVESTEMC_XFER_TO_FIRE         gC/m^2/s        
+ 1080 M_DEADSTEMC_TO_FIRE              gC/m^2/s        
+ 1081 M_DEADSTEMC_STORAGE_TO_FIRE      gC/m^2/s        
+ 1082 M_DEADSTEMC_XFER_TO_FIRE         gC/m^2/s        
+ 1083 M_FROOTC_TO_FIRE                 gC/m^2/s        
+ 1084 M_FROOTC_STORAGE_TO_FIRE         gC/m^2/s        
+ 1085 M_FROOTC_XFER_TO_FIRE            gC/m^2/s        
+ 1086 M_LIVEROOTC_TO_FIRE              gC/m^2/s        
+ 1087 M_LIVEROOTC_STORAGE_TO_FIRE      gC/m^2/s        
+ 1088 M_LIVEROOTC_XFER_TO_FIRE         gC/m^2/s        
+ 1089 M_DEADROOTC_TO_FIRE              gC/m^2/s        
+ 1090 M_DEADROOTC_STORAGE_TO_FIRE      gC/m^2/s        
+ 1091 M_DEADROOTC_XFER_TO_FIRE         gC/m^2/s        
+ 1092 M_GRESP_STORAGE_TO_FIRE          gC/m^2/s        
+ 1093 M_GRESP_XFER_TO_FIRE             gC/m^2/s        
+ 1094 M_CPOOL_TO_FIRE                  gC/m^2/s        
+ 1095 M_LEAFC_TO_LITTER_FIRE           gC/m^2/s        
+ 1096 M_LEAFC_STORAGE_TO_LITTER_FIRE   gC/m^2/s        
+ 1097 M_LEAFC_XFER_TO_LITTER_FIRE      gC/m^2/s        
+ 1098 M_LIVESTEMC_TO_LITTER_FIRE       gC/m^2/s        
+ 1099 M_LIVESTEMC_STORAGE_TO_LITTER_FI gC/m^2/s        
+ 1100 M_LIVESTEMC_XFER_TO_LITTER_FIRE  gC/m^2/s        
+ 1101 M_LIVESTEMC_TO_DEADSTEMC_FIRE    gC/m^2/s        
+ 1102 M_DEADSTEMC_TO_LITTER_FIRE       gC/m^2/s        
+ 1103 M_DEADSTEMC_STORAGE_TO_LITTER_FI gC/m^2/s        
+ 1104 M_DEADSTEMC_XFER_TO_LITTER_FIRE  gC/m^2/s        
+ 1105 M_FROOTC_TO_LITTER_FIRE          gC/m^2/s        
+ 1106 M_FROOTC_STORAGE_TO_LITTER_FIRE  gC/m^2/s        
+ 1107 M_FROOTC_XFER_TO_LITTER_FIRE     gC/m^2/s        
+ 1108 M_LIVEROOTC_TO_LITTER_FIRE       gC/m^2/s        
+ 1109 M_LIVEROOTC_STORAGE_TO_LITTER_FI gC/m^2/s        
+ 1110 M_LIVEROOTC_XFER_TO_LITTER_FIRE  gC/m^2/s        
+ 1111 M_LIVEROOTC_TO_DEADROOTC_FIRE    gC/m^2/s        
+ 1112 M_DEADROOTC_TO_LITTER_FIRE       gC/m^2/s        
+ 1113 M_DEADROOTC_STORAGE_TO_LITTER_FI gC/m^2/s        
+ 1114 M_DEADROOTC_XFER_TO_LITTER_FIRE  gC/m^2/s        
+ 1115 M_LIVECROOTC_STORAGE_TO_LITTER_F gC/m^2/s        
+ 1116 M_DEADCROOTC_STORAGE_TO_LITTER_F gC/m^2/s        
+ 1117 M_GRESP_STORAGE_TO_LITTER_FIRE   gC/m^2/s        
+ 1118 M_GRESP_XFER_TO_LITTER_FIRE      gC/m^2/s        
+ 1119 M_CPOOL_TO_LITTER_FIRE           gC/m^2/s        
+ 1120 M_CPOOL_TO_LITTER                gC/m^2/s        
+ 1121 LEAFC_XFER_TO_LEAFC              gC/m^2/s        
+ 1122 FROOTC_XFER_TO_FROOTC            gC/m^2/s        
+ 1123 LIVESTEMC_XFER_TO_LIVESTEMC      gC/m^2/s        
+ 1124 DEADSTEMC_XFER_TO_DEADSTEMC      gC/m^2/s        
+ 1125 LIVECROOTC_XFER_TO_LIVECROOTC    gC/m^2/s        
+ 1126 DEADCROOTC_XFER_TO_DEADCROOTC    gC/m^2/s        
+ 1127 LEAFC_TO_LITTER                  gC/m^2/s        
+ 1128 FROOTC_TO_LITTER                 gC/m^2/s        
+ 1129 LEAF_MR                          gC/m^2/s        
+ 1130 FROOT_MR                         gC/m^2/s        
+ 1131 LIVESTEM_MR                      gC/m^2/s        
+ 1132 LIVECROOT_MR                     gC/m^2/s        
+ 1133 PSNSUN_TO_CPOOL                  gC/m^2/s        
+ 1134 PSNSHADE_TO_CPOOL                gC/m^2/s        
+ 1135 CPOOL_TO_LEAFC                   gC/m^2/s        
+ 1136 CPOOL_TO_LEAFC_STORAGE           gC/m^2/s        
+ 1137 CPOOL_TO_FROOTC                  gC/m^2/s        
+ 1138 CPOOL_TO_FROOTC_STORAGE          gC/m^2/s        
+ 1139 CPOOL_TO_LIVESTEMC               gC/m^2/s        
+ 1140 CPOOL_TO_LIVESTEMC_STORAGE       gC/m^2/s        
+ 1141 CPOOL_TO_DEADSTEMC               gC/m^2/s        
+ 1142 CPOOL_TO_DEADSTEMC_STORAGE       gC/m^2/s        
+ 1143 CPOOL_TO_LIVECROOTC              gC/m^2/s        
+ 1144 CPOOL_TO_LIVECROOTC_STORAGE      gC/m^2/s        
+ 1145 CPOOL_TO_DEADCROOTC              gC/m^2/s        
+ 1146 CPOOL_TO_DEADCROOTC_STORAGE      gC/m^2/s        
+ 1147 CPOOL_TO_GRESP_STORAGE           gC/m^2/s        
+ 1148 CPOOL_LEAF_GR                    gC/m^2/s        
+ 1149 CPOOL_LEAF_STORAGE_GR            gC/m^2/s        
+ 1150 TRANSFER_LEAF_GR                 gC/m^2/s        
+ 1151 CPOOL_FROOT_GR                   gC/m^2/s        
+ 1152 CPOOL_FROOT_STORAGE_GR           gC/m^2/s        
+ 1153 TRANSFER_FROOT_GR                gC/m^2/s        
+ 1154 CPOOL_LIVESTEM_GR                gC/m^2/s        
+ 1155 CPOOL_LIVESTEM_STORAGE_GR        gC/m^2/s        
+ 1156 TRANSFER_LIVESTEM_GR             gC/m^2/s        
+ 1157 CPOOL_DEADSTEM_GR                gC/m^2/s        
+ 1158 CPOOL_DEADSTEM_STORAGE_GR        gC/m^2/s        
+ 1159 TRANSFER_DEADSTEM_GR             gC/m^2/s        
+ 1160 CPOOL_LIVECROOT_GR               gC/m^2/s        
+ 1161 CPOOL_LIVECROOT_STORAGE_GR       gC/m^2/s        
+ 1162 TRANSFER_LIVECROOT_GR            gC/m^2/s        
+ 1163 CPOOL_DEADCROOT_GR               gC/m^2/s        
+ 1164 CPOOL_DEADCROOT_STORAGE_GR       gC/m^2/s        
+ 1165 TRANSFER_DEADCROOT_GR            gC/m^2/s        
+ 1166 LEAFC_STORAGE_TO_XFER            gC/m^2/s        
+ 1167 FROOTC_STORAGE_TO_XFER           gC/m^2/s        
+ 1168 LIVESTEMC_STORAGE_TO_XFER        gC/m^2/s        
+ 1169 DEADSTEMC_STORAGE_TO_XFER        gC/m^2/s        
+ 1170 LIVECROOTC_STORAGE_TO_XFER       gC/m^2/s        
+ 1171 DEADCROOTC_STORAGE_TO_XFER       gC/m^2/s        
+ 1172 GRESP_STORAGE_TO_XFER            gC/m^2/s        
+ 1173 LIVESTEMC_TO_DEADSTEMC           gC/m^2/s        
+ 1174 LIVECROOTC_TO_DEADCROOTC         gC/m^2/s        
+ 1175 GPP                              gC/m^2/s        
+ 1176 INIT_GPP                         gC/m^2/s        
+ 1177 MR                               gC/m^2/s        
+ 1178 CURRENT_GR                       gC/m^2/s        
+ 1179 TRANSFER_GR                      gC/m^2/s        
+ 1180 STORAGE_GR                       gC/m^2/s        
+ 1181 GR                               gC/m^2/s        
+ 1182 XR                               gC/m^2/s        
+ 1183 AR                               gC/m^2/s        
+ 1184 RR                               gC/m^2/s        
+ 1185 NPP                              gC/m^2/s        
+ 1186 AGNPP                            gC/m^2/s        
+ 1187 BGNPP                            gC/m^2/s        
+ 1188 AGWDNPP                          gC/m^2/s        
+ 1189 LITFALL                          gC/m^2/s        
+ 1190 VEGFIRE                          gC/m^2/s        
+ 1191 WOOD_HARVESTC                    gC/m^2/s        
+ 1192 PFT_FIRE_CLOSS                   gC/m^2/s        
+ 1193 AVAILC                           gC/m^2/s        
+ 1194 PLANT_CALLOC                     gC/m^2/s        
+ 1195 EXCESS_CFLUX                     gC/m^2/s        
+ 1196 PREV_LEAFC_TO_LITTER             gC/m^2/s        
+ 1197 PREV_FROOTC_TO_LITTER            gC/m^2/s        
+ 1198 XSMRPOOL_RECOVER                 gC/m^2/s        
+ 1199 CROP_SEEDC_TO_LEAF               gC/m^2/s        
+ 1200 DWT_SEEDC_TO_LEAF_PATCH          gC/m^2/s        
+ 1201 DWT_SEEDC_TO_DEADSTEM_PATCH      gC/m^2/s        
+ 1202 DWT_CONV_CFLUX_PATCH             gC/m^2/s        
+ 1203 DWT_PROD10C_GAIN_PATCH           gC/m^2/s        
+ 1204 DWT_PROD100C_GAIN_PATCH          gC/m^2/s        
+ 1205 ANNSUM_NPP                       gC/m^2/yr       
+ 1206 LEAFN                            gN/m^2          
+ 1207 LEAFN_STORAGE                    gN/m^2          
+ 1208 LEAFN_XFER                       gN/m^2          
+ 1209 FROOTN                           gN/m^2          
+ 1210 FROOTN_STORAGE                   gN/m^2          
+ 1211 FROOTN_XFER                      gN/m^2          
+ 1212 LIVESTEMN                        gN/m^2          
+ 1213 LIVESTEMN_STORAGE                gN/m^2          
+ 1214 LIVESTEMN_XFER                   gN/m^2          
+ 1215 DEADSTEMN                        gN/m^2          
+ 1216 DEADSTEMN_STORAGE                gN/m^2          
+ 1217 DEADSTEMN_XFER                   gN/m^2          
+ 1218 LIVECROOTN                       gN/m^2          
+ 1219 LIVECROOTN_STORAGE               gN/m^2          
+ 1220 LIVECROOTN_XFER                  gN/m^2          
+ 1221 DEADCROOTN                       gN/m^2          
+ 1222 DEADCROOTN_STORAGE               gN/m^2          
+ 1223 DEADCROOTN_XFER                  gN/m^2          
+ 1224 RETRANSN                         gN/m^2          
+ 1225 NPOOL                            gN/m^2          
+ 1226 PFT_NTRUNC                       gN/m^2          
+ 1227 DISPVEGN                         gN/m^2          
+ 1228 STORVEGN                         gN/m^2          
+ 1229 TOTVEGN                          gN/m^2          
+ 1230 TOTPFTN                          gN/m^2          
+ 1231 leaf_npimbalance                 gN/gP           
+ 1232 PLANTN_BUFFER                    gN/m^2          
+ 1233 M_LEAFN_TO_LITTER                gN/m^2/s        
+ 1234 M_FROOTN_TO_LITTER               gN/m^2/s        
+ 1235 M_LEAFN_STORAGE_TO_LITTER        gN/m^2/s        
+ 1236 M_FROOTN_STORAGE_TO_LITTER       gN/m^2/s        
+ 1237 M_LIVESTEMN_STORAGE_TO_LITTER    gN/m^2/s        
+ 1238 M_DEADSTEMN_STORAGE_TO_LITTER    gN/m^2/s        
+ 1239 M_LIVECROOTN_STORAGE_TO_LITTER   gN/m^2/s        
+ 1240 M_DEADCROOTN_STORAGE_TO_LITTER   gN/m^2/s        
+ 1241 M_LEAFN_XFER_TO_LITTER           gN/m^2/s        
+ 1242 M_FROOTN_XFER_TO_LITTER          gN/m^2/s        
+ 1243 M_LIVESTEMN_XFER_TO_LITTER       gN/m^2/s        
+ 1244 M_DEADSTEMN_XFER_TO_LITTER       gN/m^2/s        
+ 1245 M_LIVECROOTN_XFER_TO_LITTER      gN/m^2/s        
+ 1246 M_DEADCROOTN_XFER_TO_LITTER      gN/m^2/s        
+ 1247 M_LIVESTEMN_TO_LITTER            gN/m^2/s        
+ 1248 M_DEADSTEMN_TO_LITTER            gN/m^2/s        
+ 1249 M_LIVECROOTN_TO_LITTER           gN/m^2/s        
+ 1250 M_DEADCROOTN_TO_LITTER           gN/m^2/s        
+ 1251 M_RETRANSN_TO_LITTER             gN/m^2/s        
+ 1252 M_NPOOL_TO_LITTER_FIRE           gN/m^2/s        
+ 1253 M_NPOOL_TO_LITTER                gN/m^2/s        
+ 1254 M_LEAFN_TO_FIRE                  gN/m^2/s        
+ 1255 M_FROOTN_TO_FIRE                 gN/m^2/s        
+ 1256 M_LEAFN_STORAGE_TO_FIRE          gN/m^2/s        
+ 1257 M_FROOTN_STORAGE_TO_FIRE         gN/m^2/s        
+ 1258 M_LIVESTEMN_STORAGE_TO_FIRE      gN/m^2/s        
+ 1259 M_DEADSTEMN_STORAGE_TO_FIRE      gN/m^2/s        
+ 1260 M_LIVECROOTN_STORAGE_TO_FIRE     gN/m^2/s        
+ 1261 M_DEADCROOTN_STORAGE_TO_FIRE     gN/m^2/s        
+ 1262 M_LEAFN_XFER_TO_FIRE             gN/m^2/s        
+ 1263 M_FROOTN_XFER_TO_FIRE            gN/m^2/s        
+ 1264 M_LIVESTEMN_XFER_TO_FIRE         gN/m^2/s        
+ 1265 M_DEADSTEMN_XFER_TO_FIRE         gN/m^2/s        
+ 1266 M_LIVECROOTN_XFER_TO_FIRE        gN/m^2/s        
+ 1267 M_DEADCROOTN_XFER_TO_FIRE        gN/m^2/s        
+ 1268 M_LIVESTEMN_TO_FIRE              gN/m^2/s        
+ 1269 M_DEADSTEMN_TO_FIRE              gN/m^2/s        
+ 1270 M_DEADSTEMN_TO_LITTER_FIRE       gN/m^2/s        
+ 1271 M_LIVECROOTN_TO_FIRE             gN/m^2/s        
+ 1272 M_DEADCROOTN_TO_FIRE             gN/m^2/s        
+ 1273 M_DEADCROOTN_TO_LITTER_FIRE      gN/m^2/s        
+ 1274 M_RETRANSN_TO_FIRE               gN/m^2/s        
+ 1275 M_NPOOL_TO_FIRE                  gN/m^2/s        
+ 1276 LEAFN_XFER_TO_LEAFN              gN/m^2/s        
+ 1277 FROOTN_XFER_TO_FROOTN            gN/m^2/s        
+ 1278 LIVESTEMN_XFER_TO_LIVESTEMN      gN/m^2/s        
+ 1279 DEADSTEMN_XFER_TO_DEADSTEMN      gN/m^2/s        
+ 1280 LIVECROOTN_XFER_TO_LIVECROOTN    gN/m^2/s        
+ 1281 DEADCROOTN_XFER_TO_DEADCROOTN    gN/m^2/s        
+ 1282 LEAFN_TO_LITTER                  gN/m^2/s        
+ 1283 LEAFN_TO_RETRANSN                gN/m^2/s        
+ 1284 FROOTN_TO_LITTER                 gN/m^2/s        
+ 1285 RETRANSN_TO_NPOOL                gN/m^2/s        
+ 1286 SMINN_TO_NPOOL                   gN/m^2/s        
+ 1287 NPOOL_TO_LEAFN                   gN/m^2/s        
+ 1288 NPOOL_TO_LEAFN_STORAGE           gN/m^2/s        
+ 1289 NPOOL_TO_FROOTN                  gN/m^2/s        
+ 1290 NPOOL_TO_FROOTN_STORAGE          gN/m^2/s        
+ 1291 NPOOL_TO_LIVESTEMN               gN/m^2/s        
+ 1292 NPOOL_TO_LIVESTEMN_STORAGE       gN/m^2/s        
+ 1293 NPOOL_TO_DEADSTEMN               gN/m^2/s        
+ 1294 NPOOL_TO_DEADSTEMN_STORAGE       gN/m^2/s        
+ 1295 NPOOL_TO_LIVECROOTN              gN/m^2/s        
+ 1296 NPOOL_TO_LIVECROOTN_STORAGE      gN/m^2/s        
+ 1297 NPOOL_TO_DEADCROOTN              gN/m^2/s        
+ 1298 NPOOL_TO_DEADCROOTN_STORAGE      gN/m^2/s        
+ 1299 LEAFN_STORAGE_TO_XFER            gN/m^2/s        
+ 1300 FROOTN_STORAGE_TO_XFER           gN/m^2/s        
+ 1301 LIVESTEMN_STORAGE_TO_XFER        gN/m^2/s        
+ 1302 DEADSTEMN_STORAGE_TO_XFER        gN/m^2/s        
+ 1303 LIVECROOTN_STORAGE_TO_XFER       gN/m^2/s        
+ 1304 DEADCROOTN_STORAGE_TO_XFER       gN/m^2/s        
+ 1305 LIVESTEMN_TO_DEADSTEMN           gN/m^2/s        
+ 1306 LIVESTEMN_TO_RETRANSN            gN/m^2/s        
+ 1307 LIVECROOTN_TO_DEADCROOTN         gN/m^2/s        
+ 1308 LIVECROOTN_TO_RETRANSN           gN/m^2/s        
+ 1309 NDEPLOY                          gN/m^2/s        
+ 1310 WOOD_HARVESTN                    gN/m^2/s        
+ 1311 PFT_FIRE_NLOSS                   gN/m^2/s        
+ 1312 CROP_SEEDN_TO_LEAF               gN/m^2/s        
+ 1313 DWT_SEEDN_TO_LEAF_PATCH          gN/m^2/s        
+ 1314 DWT_SEEDN_TO_DEADSTEM_PATCH      gN/m^2/s        
+ 1315 DWT_CONV_NFLUX_PATCH             gN/m^2/s        
+ 1316 DWT_SEEDN_TO_NPOOL_PATCH         gN/m^2/s        
+ 1317 PLANT_NDEMAND                    gN/m^2/s        
+ 1318 AVAIL_RETRANSN                   gN/m^2/s        
+ 1319 PLANT_NALLOC                     gN/m^2/s        
+ 1320 GAP_NLOSS_LITTER                 gN/m^2/s        
+ 1321 FIRE_NLOSS_LITTER                gN/m^2/s        
+ 1322 HRV_NLOSS_LITTER                 gN/m^2/s        
+ 1323 SEN_NLOSS_LITTER                 gN/m^2/s        
+ 1324 DWT_PROD10N_GAIN_PATCH           gN/m^2/s        
+ 1325 DWT_PROD100N_GAIN_PATCH          gN/m^2/s        
+ 1326 LEAFP                            gP/m^2          
+ 1327 LEAFP_STORAGE                    gP/m^2          
+ 1328 LEAFP_XFER                       gP/m^2          
+ 1329 FROOTP                           gP/m^2          
+ 1330 FROOTP_STORAGE                   gP/m^2          
+ 1331 FROOTP_XFER                      gP/m^2          
+ 1332 LIVESTEMP                        gP/m^2          
+ 1333 LIVESTEMP_STORAGE                gP/m^2          
+ 1334 LIVESTEMP_XFER                   gP/m^2          
+ 1335 DEADSTEMP                        gP/m^2          
+ 1336 DEADSTEMP_STORAGE                gP/m^2          
+ 1337 DEADSTEMP_XFER                   gP/m^2          
+ 1338 LIVECROOTP                       gP/m^2          
+ 1339 LIVECROOTP_STORAGE               gP/m^2          
+ 1340 LIVECROOTP_XFER                  gP/m^2          
+ 1341 DEADCROOTP                       gP/m^2          
+ 1342 DEADCROOTP_STORAGE               gP/m^2          
+ 1343 DEADCROOTP_XFER                  gP/m^2          
+ 1344 RETRANSP                         gP/m^2          
+ 1345 PPOOL                            gP/m^2          
+ 1346 PFT_PTRUNC                       gP/m^2          
+ 1347 DISPVEGP                         gP/m^2          
+ 1348 STORVEGP                         gP/m^2          
+ 1349 TOTVEGP                          gP/m^2          
+ 1350 TOTPFTP                          gP/m^2          
+ 1351 PLANTP_BUFFER                    gP/m^2          
+ 1352 M_LEAFP_TO_LITTER                gP/m^2/s        
+ 1353 M_FROOTP_TO_LITTER               gP/m^2/s        
+ 1354 M_LEAFP_STORAGE_TO_LITTER        gP/m^2/s        
+ 1355 M_FROOTP_STORAGE_TO_LITTER       gP/m^2/s        
+ 1356 M_LIVESTEMP_STORAGE_TO_LITTER    gP/m^2/s        
+ 1357 M_DEADSTEMP_STORAGE_TO_LITTER    gP/m^2/s        
+ 1358 M_LIVECROOTP_STORAGE_TO_LITTER   gP/m^2/s        
+ 1359 M_DEADCROOTP_STORAGE_TO_LITTER   gP/m^2/s        
+ 1360 M_LEAFP_XFER_TO_LITTER           gP/m^2/s        
+ 1361 M_FROOTP_XFER_TO_LITTER          gP/m^2/s        
+ 1362 M_LIVESTEMP_XFER_TO_LITTER       gP/m^2/s        
+ 1363 M_DEADSTEMP_XFER_TO_LITTER       gP/m^2/s        
+ 1364 M_LIVECROOTP_XFER_TO_LITTER      gP/m^2/s        
+ 1365 M_DEADCROOTP_XFER_TO_LITTER      gP/m^2/s        
+ 1366 M_LIVESTEMP_TO_LITTER            gP/m^2/s        
+ 1367 M_DEADSTEMP_TO_LITTER            gP/m^2/s        
+ 1368 M_LIVECROOTP_TO_LITTER           gP/m^2/s        
+ 1369 M_DEADCROOTP_TO_LITTER           gP/m^2/s        
+ 1370 M_RETRANSP_TO_LITTER             gP/m^2/s        
+ 1371 M_PPOOL_TO_LITTER_FIRE           gP/m^2/s        
+ 1372 M_PPOOL_TO_LITTER                gP/m^2/s        
+ 1373 M_LEAFP_TO_FIRE                  gP/m^2/s        
+ 1374 M_FROOTP_TO_FIRE                 gP/m^2/s        
+ 1375 M_LEAFP_STORAGE_TO_FIRE          gP/m^2/s        
+ 1376 M_FROOTP_STORAGE_TO_FIRE         gP/m^2/s        
+ 1377 M_LIVESTEMP_STORAGE_TO_FIRE      gP/m^2/s        
+ 1378 M_DEADSTEMP_STORAGE_TO_FIRE      gP/m^2/s        
+ 1379 M_LIVECROOTP_STORAGE_TO_FIRE     gP/m^2/s        
+ 1380 M_DEADCROOTP_STORAGE_TO_FIRE     gP/m^2/s        
+ 1381 M_LEAFP_XFER_TO_FIRE             gP/m^2/s        
+ 1382 M_FROOTP_XFER_TO_FIRE            gP/m^2/s        
+ 1383 M_LIVESTEMP_XFER_TO_FIRE         gP/m^2/s        
+ 1384 M_DEADSTEMP_XFER_TO_FIRE         gP/m^2/s        
+ 1385 M_LIVECROOTP_XFER_TO_FIRE        gP/m^2/s        
+ 1386 M_DEADCROOTP_XFER_TO_FIRE        gP/m^2/s        
+ 1387 M_LIVESTEMP_TO_FIRE              gP/m^2/s        
+ 1388 M_DEADSTEMP_TO_FIRE              gP/m^2/s        
+ 1389 M_DEADSTEMP_TO_LITTER_FIRE       gP/m^2/s        
+ 1390 M_LIVECROOTP_TO_FIRE             gP/m^2/s        
+ 1391 M_DEADCROOTP_TO_FIRE             gP/m^2/s        
+ 1392 M_DEADCROOTP_TO_LITTER_FIRE      gP/m^2/s        
+ 1393 M_RETRANSP_TO_FIRE               gP/m^2/s        
+ 1394 M_PPOOL_TO_FIRE                  gP/m^2/s        
+ 1395 LEAFP_XFER_TO_LEAFP              gP/m^2/s        
+ 1396 FROOTP_XFER_TO_FROOTP            gP/m^2/s        
+ 1397 LIVESTEMP_XFER_TO_LIVESTEMP      gP/m^2/s        
+ 1398 DEADSTEMP_XFER_TO_DEADSTEMP      gP/m^2/s        
+ 1399 LIVECROOTP_XFER_TO_LIVECROOTP    gP/m^2/s        
+ 1400 DEADCROOTP_XFER_TO_DEADCROOTP    gP/m^2/s        
+ 1401 LEAFP_TO_LITTER                  gP/m^2/s        
+ 1402 LEAFP_TO_RETRANSP                gP/m^2/s        
+ 1403 FROOTP_TO_LITTER                 gP/m^2/s        
+ 1404 RETRANSP_TO_PPOOL                gP/m^2/s        
+ 1405 SMINP_TO_PPOOL                   gP/m^2/s        
+ 1406 PPOOL_TO_LEAFP                   gP/m^2/s        
+ 1407 PPOOL_TO_LEAFP_STORAGE           gP/m^2/s        
+ 1408 PPOOL_TO_FROOTP                  gP/m^2/s        
+ 1409 PPOOL_TO_FROOTP_STORAGE          gP/m^2/s        
+ 1410 PPOOL_TO_LIVESTEMP               gP/m^2/s        
+ 1411 PPOOL_TO_LIVESTEMP_STORAGE       gP/m^2/s        
+ 1412 PPOOL_TO_DEADSTEMP               gP/m^2/s        
+ 1413 PPOOL_TO_DEADSTEMP_STORAGE       gP/m^2/s        
+ 1414 PPOOL_TO_LIVECROOTP              gP/m^2/s        
+ 1415 PPOOL_TO_LIVECROOTP_STORAGE      gP/m^2/s        
+ 1416 PPOOL_TO_DEADCROOTP              gP/m^2/s        
+ 1417 PPOOL_TO_DEADCROOTP_STORAGE      gP/m^2/s        
+ 1418 LEAFP_STORAGE_TO_XFER            gP/m^2/s        
+ 1419 FROOTP_STORAGE_TO_XFER           gP/m^2/s        
+ 1420 LIVESTEMP_STORAGE_TO_XFER        gP/m^2/s        
+ 1421 DEADSTEMP_STORAGE_TO_XFER        gP/m^2/s        
+ 1422 LIVECROOTP_STORAGE_TO_XFER       gP/m^2/s        
+ 1423 DEADCROOTP_STORAGE_TO_XFER       gP/m^2/s        
+ 1424 LIVESTEMP_TO_DEADSTEMP           gP/m^2/s        
+ 1425 LIVESTEMP_TO_RETRANSP            gP/m^2/s        
+ 1426 LIVECROOTP_TO_DEADCROOTP         gP/m^2/s        
+ 1427 LIVECROOTP_TO_RETRANSP           gP/m^2/s        
+ 1428 PDEPLOY                          gP/m^2/s        
+ 1429 WOOD_HARVESTP                    gP/m^2/s        
+ 1430 PFT_FIRE_PLOSS                   gP/m^2/s        
+ 1431 GAP_PLOSS_LITTER                 gN/m^2/s        
+ 1432 FIRE_PLOSS_LITTER                gN/m^2/s        
+ 1433 HRV_PLOSS_LITTER                 gN/m^2/s        
+ 1434 SEN_PLOSS_LITTER                 gN/m^2/s        
+ 1435 CROP_SEEDP_TO_LEAF               gP/m^2/s        
+ 1436 DWT_SEEDP_TO_LEAF_PATCH          gP/m^2/s        
+ 1437 DWT_SEEDP_TO_DEADSTEM_PATCH      gP/m^2/s        
+ 1438 DWT_CONV_PFLUX_PATCH             gP/m^2/s        
+ 1439 DWT_PROD10P_GAIN_PATCH           gP/m^2/s        
+ 1440 DWT_PROD100P_GAIN_PATCH          gP/m^2/s        
+ 1441 DWT_SEEDP_TO_PPOOL_PATCH         gP/m^2/s        
+ 1442 PLANT_PDEMAND                    gP/m^2/s        
+ 1443 AVAIL_RETRANSP                   gP/m^2/s        
+ 1444 PLANT_PALLOC                     gP/m^2/s        
+
+ Initializing variables for time accumulation .....
+------------------------------------------------------------
+ Accumulated fields
+ No Name     Units    Type          Period Inival Description
+_______________________________________________________________________
+  1 FSD24    W/m2     runmean       48   0. 24hr average of direct solar radiation  
+  2 FSD240   W/m2     runmean      480   0. 240hr average of direct solar radiation 
+  3 FSI24    W/m2     runmean       48   0. 24hr average of diffuse solar radiation 
+  4 FSI240   W/m2     runmean      480   0. 240hr average of diffuse solar radiation
+  5 PREC10   MM H2O/S runmean      480   0. 10-day running mean of total precipitati
+  6 PREC60   MM H2O/S runmean     2880   0. 60-day running mean of total precipitati
+  7 PREC10D  MM H2O/S runmean      480   0. 10-day running mean of total precipitati
+  8 PREC60D  MM H2O/S runmean     2880   0. 60-day running mean of total precipitati
+  9 FSD24H   W/m2     runmean       48   0. 24hr average of direct solar radiation  
+ 10 FSD240H  W/m2     runmean      480   0. 240hr average of direct solar radiation 
+ 11 FSI24H   W/m2     runmean       48   0. 24hr average of diffuse solar radiation 
+ 12 FSI240H  W/m2     runmean      480   0. 240hr average of diffuse solar radiation
+ 13 T10      K        runmean      480 293. 10-day running mean of 2-m temperature  
+ 14 TREFAV   K        timeavg        2   0. average over an hour of 2-m temperature 
+ 15 TREFAV_U K        timeavg        2   0. average over an hour of urban 2-m temper
+ 16 TREFAV_R K        timeavg        2   0. average over an hour of rural 2-m temper
+ 17 T_VEG24  K        runmean       48   0. 24hr average of vegetation temperature  
+ 18 T_VEG240 K        runmean      480   0. 240hr average of vegetation temperature 
+ 19 BTRANAVG -        timeavg        2   0. average over an hour of btran           
+ 20 FSUN24   fraction runmean       48   0. 24hr average of diffuse solar radiation 
+ 21 FSUN240  fraction runmean      480   0. 240hr average of diffuse solar radiation
+ 22 LAI240   m2/m2    runmean      480   0. 240hr average of leaf area index        
+ 23 nlim_m   -        runmean     1440   0. runing average of N limitation strength 
+ 24 plim_m   -        runmean     1440   0. runing average of P limitation strength 
+ 25 wlim_m   -        runmean     1440   0. runing average of water limitation stren
+_______________________________________________________________________
+
+------------------------------------------------------------
+ Successfully initialized variables for accumulation
+
+ Using cold start initial conditions 
+  
+ ndepdyn stream settings:
+   stream_year_first_ndep  =         1850
+   stream_year_last_ndep   =         2005
+   model_year_align_ndep   =         1850
+   stream_fldFileName_ndep = /home/amanzi_user/compass/inputdata/lnd/clm2/ndepdata/fndep_elm_cbgc_exp_simyr1849-2101_1.9x2.5_c190103.nc                                                                                                                                                      
+  
+ (shr_strdata_init_streams)  stream            1
+ (shr_strdata_init_streams)  filePath =            1 
+ (shr_strdata_init_streams)  fileName =            1 /home/amanzi_user/compass/inputdata/lnd/clm2/ndepdata/fndep_elm_cbgc_exp_simyr1849-2101_1.9x2.5_c190103.nc
+ (shr_strdata_init_streams)  timeName =            1 time
+ (shr_strdata_init_streams)   lonName =            1 lon
+ (shr_strdata_init_streams)   latName =            1 lat
+ (shr_strdata_init_streams)   hgtName =            1 undefined
+ (shr_strdata_init_streams)  maskName =            1 mask
+ (shr_strdata_init_streams)  areaName =            1 area
+(shr_strdata_init_mapping)  calling shr_dmodel_mapSet for remap
+(shr_strdata_print) ----------------------------------------------------------
+(shr_strdata_print) name        = ELMNDEP data
+(shr_strdata_print) dataMode    = NULL
+(shr_strdata_print) domainFile  = null
+(shr_strdata_print) nxg         =      1
+(shr_strdata_print) nyg         =      1
+(shr_strdata_print) nzg         =      1
+(shr_strdata_print) calendar    = NO_LEAP
+(shr_strdata_print) io_type     =      2
+(shr_strdata_print) eccen       =  1.000000E+36
+(shr_strdata_print) mvelpp      =  1.000000E+36
+(shr_strdata_print) lambm0      =  1.000000E+36
+(shr_strdata_print) obliqr      =  1.000000E+36
+(shr_strdata_print) nstreams    =      1
+(shr_strdata_print) pio_iotype  =      2
+(shr_strdata_print)   streams ( 1) = null
+(shr_strdata_print)   taxMode ( 1) = extend
+(shr_strdata_print)   dtlimit ( 1) =  1.000000E+30
+(shr_strdata_print)   strnxg  ( 1) =    144
+(shr_strdata_print)   strnyg  ( 1) =     96
+(shr_strdata_print)   strnzg  ( 1) =     -1
+(shr_strdata_print)   dofill  ( 1) =  F
+(shr_strdata_print)   fillalgo( 1) = none
+(shr_strdata_print)   fillmask( 1) = nomask
+(shr_strdata_print)   fillread( 1) = NOT_SET
+(shr_strdata_print)   fillwrit( 1) = NOT_SET
+(shr_strdata_print)   domaps  ( 1) =  T
+(shr_strdata_print)   mapalgo ( 1) = bilinear
+(shr_strdata_print)   mapmask ( 1) = dstmask
+(shr_strdata_print)   mapread ( 1) = NOT_SET
+(shr_strdata_print)   mapwrit ( 1) = NOT_SET
+(shr_strdata_print)   tintalgo( 1) = linear
+(shr_strdata_print)   readmode( 1) = single
+(shr_strdata_print)  
+(shr_strdata_print) nvectors    =      0
+(shr_strdata_print) ----------------------------------------------------------
+(shr_dmodel_readstrm) open   : /home/amanzi_user/compass/inputdata/lnd/clm2/ndepdata/fndep_elm_cbgc_exp_simyr1849-2101_1.9x2.5_c190103.nc
+(shr_dmodel_readstrm) file lb: /home/amanzi_user/compass/inputdata/lnd/clm2/ndepdata/fndep_elm_cbgc_exp_simyr1849-2101_1.9x2.5_c190103.nc     152
+(shr_dmodel_readstrm) file ub: /home/amanzi_user/compass/inputdata/lnd/clm2/ndepdata/fndep_elm_cbgc_exp_simyr1849-2101_1.9x2.5_c190103.nc     153
+  
+ pdepdyn stream settings:
+   stream_year_first_pdep  =         2000
+   stream_year_last_pdep   =         2000
+   model_year_align_pdep   =         2000
+   stream_fldFileName_pdep = /home/amanzi_user/compass/inputdata/lnd/clm2/pdepdata/fpdep_clm_hist_simyr2000_1.9x2.5_c150929.nc                                                                                                                                                               
+  
+ (shr_strdata_init_streams)  stream            1
+ (shr_strdata_init_streams)  filePath =            1 
+ (shr_strdata_init_streams)  fileName =            1 /home/amanzi_user/compass/inputdata/lnd/clm2/pdepdata/fpdep_clm_hist_simyr2000_1.9x2.5_c150929.nc
+ (shr_strdata_init_streams)  timeName =            1 time
+ (shr_strdata_init_streams)   lonName =            1 lon
+ (shr_strdata_init_streams)   latName =            1 lat
+ (shr_strdata_init_streams)   hgtName =            1 undefined
+ (shr_strdata_init_streams)  maskName =            1 mask
+ (shr_strdata_init_streams)  areaName =            1 area
+(shr_strdata_init_mapping)  calling shr_dmodel_mapSet for remap
+(shr_strdata_print) ----------------------------------------------------------
+(shr_strdata_print) name        = ELMPDEP data
+(shr_strdata_print) dataMode    = NULL
+(shr_strdata_print) domainFile  = null
+(shr_strdata_print) nxg         =      1
+(shr_strdata_print) nyg         =      1
+(shr_strdata_print) nzg         =      1
+(shr_strdata_print) calendar    = NO_LEAP
+(shr_strdata_print) io_type     =      2
+(shr_strdata_print) eccen       =  1.000000E+36
+(shr_strdata_print) mvelpp      =  1.000000E+36
+(shr_strdata_print) lambm0      =  1.000000E+36
+(shr_strdata_print) obliqr      =  1.000000E+36
+(shr_strdata_print) nstreams    =      1
+(shr_strdata_print) pio_iotype  =      2
+(shr_strdata_print)   streams ( 1) = null
+(shr_strdata_print)   taxMode ( 1) = extend
+(shr_strdata_print)   dtlimit ( 1) =  1.000000E+30
+(shr_strdata_print)   strnxg  ( 1) =    144
+(shr_strdata_print)   strnyg  ( 1) =     96
+(shr_strdata_print)   strnzg  ( 1) =     -1
+(shr_strdata_print)   dofill  ( 1) =  F
+(shr_strdata_print)   fillalgo( 1) = none
+(shr_strdata_print)   fillmask( 1) = nomask
+(shr_strdata_print)   fillread( 1) = NOT_SET
+(shr_strdata_print)   fillwrit( 1) = NOT_SET
+(shr_strdata_print)   domaps  ( 1) =  T
+(shr_strdata_print)   mapalgo ( 1) = bilinear
+(shr_strdata_print)   mapmask ( 1) = dstmask
+(shr_strdata_print)   mapread ( 1) = NOT_SET
+(shr_strdata_print)   mapwrit ( 1) = NOT_SET
+(shr_strdata_print)   tintalgo( 1) = linear
+(shr_strdata_print)   readmode( 1) = single
+(shr_strdata_print)  
+(shr_strdata_print) nvectors    =      0
+(shr_strdata_print) ----------------------------------------------------------
+(shr_dmodel_readstrm) open   : /home/amanzi_user/compass/inputdata/lnd/clm2/pdepdata/fpdep_clm_hist_simyr2000_1.9x2.5_c150929.nc
+(shr_dmodel_readstrm) file lb: /home/amanzi_user/compass/inputdata/lnd/clm2/pdepdata/fpdep_clm_hist_simyr2000_1.9x2.5_c150929.nc       1
+(shr_dmodel_readstrm) file ub: /home/amanzi_user/compass/inputdata/lnd/clm2/pdepdata/fpdep_clm_hist_simyr2000_1.9x2.5_c150929.nc       1
+ hist_htapes_build Initializing elm history files
+------------------------------------------------------------
+ htapes_fieldlist : Included fields tape            1 =         543
+           1  ACTUAL_IMMOB                                                               1  A
+           2  ACTUAL_IMMOB_P                                                             1  A
+           3  ADSORBTION_P                                                               1  A
+           4  AGNPP                                                                      1  A
+           5  AGWDNPP                                                                    1  A
+           6  ALT                                                                        1  A
+           7  ALTMAX                                                                     1  A
+           8  ALTMAX_LASTYEAR                                                            1  A
+           9  AR                                                                         1  A
+          10  AVAILC                                                                     1  A
+          11  AVAIL_RETRANSP                                                             1  A
+          12  BAF_CROP                                                                   1  A
+          13  BAF_PEATF                                                                  1  A
+          14  BCDEP                                                                      1  A
+          15  BGNPP                                                                      1  A
+          16  BIOCHEM_PMIN                                                               1  A
+          17  BIOCHEM_PMIN_TO_PLANT                                                      1  A
+          18  BTRAN                                                                      1  A
+          19  BTRAN_DAILY_MIN                                                            1  A
+          20  BUILDHEAT                                                                  1  A
+          21  CH4PROD                                                                    1  A
+          22  CH4_SURF_AERE_SAT                                                          1  A
+          23  CH4_SURF_AERE_UNSAT                                                        1  A
+          24  CH4_SURF_DIFF_SAT                                                          1  A
+          25  CH4_SURF_DIFF_UNSAT                                                        1  A
+          26  CH4_SURF_EBUL_SAT                                                          1  A
+          27  CH4_SURF_EBUL_UNSAT                                                        1  A
+          28  CMASS_BALANCE_ERROR                                                        1  A
+          29  COL_PTRUNC                                                                 1  A
+          30  CONC_CH4_SAT                                                              15  A
+          31  CONC_CH4_UNSAT                                                            15  A
+          32  CONC_O2_SAT                                                               15  A
+          33  CONC_O2_UNSAT                                                             15  A
+          34  CPOOL                                                                      1  A
+          35  CWDC                                                                       1  A
+          36  CWDC_HR                                                                    1  A
+          37  CWDC_LOSS                                                                  1  A
+          38  CWDC_TO_LITR2C                                                             1  A
+          39  CWDC_TO_LITR3C                                                             1  A
+          40  CWDC_vr                                                                   15  A
+          41  CWDN                                                                       1  A
+          42  CWDN_TO_LITR2N                                                             1  A
+          43  CWDN_TO_LITR3N                                                             1  A
+          44  CWDN_vr                                                                   15  A
+          45  CWDP                                                                       1  A
+          46  CWDP_TO_LITR2P                                                             1  A
+          47  CWDP_TO_LITR3P                                                             1  A
+          48  CWDP_vr                                                                   15  A
+          49  DEADCROOTC                                                                 1  A
+          50  DEADCROOTN                                                                 1  A
+          51  DEADCROOTP                                                                 1  A
+          52  DEADSTEMC                                                                  1  A
+          53  DEADSTEMN                                                                  1  A
+          54  DEADSTEMP                                                                  1  A
+          55  DEFICIT                                                                    1  A
+          56  DENIT                                                                      1  A
+          57  DESORPTION_P                                                               1  A
+          58  DISPVEGC                                                                   1  A
+          59  DISPVEGN                                                                   1  A
+          60  DISPVEGP                                                                   1  A
+          61  DSTDEP                                                                     1  A
+          62  DSTFLXT                                                                    1  A
+          63  DWB                                                                        1  A
+          64  DWT_CONV_CFLUX_DRIBBLED                                                    1  A
+          65  DWT_CONV_CFLUX_GRC                                                         1  A
+          66  DWT_CONV_NFLUX_GRC                                                         1  A
+          67  DWT_CONV_PFLUX_GRC                                                         1  A
+          68  DWT_SLASH_CFLUX                                                            1  A
+          69  DWT_SLASH_NFLUX                                                            1  A
+          70  DWT_SLASH_PFLUX                                                            1  A
+          71  EFLX_DYNBAL                                                                1  A
+          72  EFLX_GRND_LAKE                                                             1  A
+          73  EFLX_LH_TOT                                                                1  A
+          74  EFLX_LH_TOT_R                                                              1  A
+          75  EFLX_LH_TOT_U                                                              1  A
+          76  ELAI                                                                       1  A
+          77  ER                                                                         1  A
+          78  ERRH2O                                                                     1  A
+          79  ERRH2OSNO                                                                  1  A
+          80  ERRSEB                                                                     1  A
+          81  ERRSOI                                                                     1  A
+          82  ERRSOL                                                                     1  A
+          83  ESAI                                                                       1  A
+          84  FAREA_BURNED                                                               1  A
+          85  FCEV                                                                       1  A
+          86  FCH4                                                                       1  A
+          87  FCH4TOCO2                                                                  1  A
+          88  FCH4_DFSAT                                                                 1  A
+          89  FCOV                                                                       1  A
+          90  FCTR                                                                       1  A
+          91  FGEV                                                                       1  A
+          92  FGR                                                                        1  A
+          93  FGR12                                                                      1  A
+          94  FGR_R                                                                      1  A
+          95  FGR_U                                                                      1  A
+          96  FH2OSFC                                                                    1  A
+          97  FINUNDATED                                                                 1  A
+          98  FINUNDATED_LAG                                                             1  A
+          99  FIRA                                                                       1  A
+         100  FIRA_R                                                                     1  A
+         101  FIRA_U                                                                     1  A
+         102  FIRE                                                                       1  A
+         103  FIRE_R                                                                     1  A
+         104  FIRE_U                                                                     1  A
+         105  FLDS                                                                       1  A
+         106  FPG                                                                        1  A
+         107  FPG_P                                                                      1  A
+         108  FPI                                                                        1  A
+         109  FPI_P                                                                      1  A
+         110  FPI_P_vr                                                                  15  A
+         111  FPI_vr                                                                    15  A
+         112  FPSN                                                                       1  A
+         113  FPSN_WC                                                                    1  A
+         114  FPSN_WJ                                                                    1  A
+         115  FPSN_WP                                                                    1  A
+         116  FROOTC                                                                     1  A
+         117  FROOTC_ALLOC                                                               1  A
+         118  FROOTC_LOSS                                                                1  A
+         119  FROOTN                                                                     1  A
+         120  FROOTP                                                                     1  A
+         121  FROST_TABLE                                                                1  A
+         122  FSA                                                                        1  A
+         123  FSAT                                                                       1  A
+         124  FSA_R                                                                      1  A
+         125  FSA_U                                                                      1  A
+         126  FSDS                                                                       1  A
+         127  FSDSND                                                                     1  A
+         128  FSDSNDLN                                                                   1  A
+         129  FSDSNI                                                                     1  A
+         130  FSDSVD                                                                     1  A
+         131  FSDSVDLN                                                                   1  A
+         132  FSDSVI                                                                     1  A
+         133  FSDSVILN                                                                   1  A
+         134  FSH                                                                        1  A
+         135  FSH_G                                                                      1  A
+         136  FSH_NODYNLNDUSE                                                            1  A
+         137  FSH_R                                                                      1  A
+         138  FSH_U                                                                      1  A
+         139  FSH_V                                                                      1  A
+         140  FSM                                                                        1  A
+         141  FSM_R                                                                      1  A
+         142  FSM_U                                                                      1  A
+         143  FSNO                                                                       1  A
+         144  FSNO_EFF                                                                   1  A
+         145  FSR                                                                        1  A
+         146  FSRND                                                                      1  A
+         147  FSRNDLN                                                                    1  A
+         148  FSRNI                                                                      1  A
+         149  FSRVD                                                                      1  A
+         150  FSRVDLN                                                                    1  A
+         151  FSRVI                                                                      1  A
+         152  F_CO2_SOIL                                                                 1  A
+         153  F_CO2_SOIL_vr                                                             15  A
+         154  F_DENIT                                                                    1  A
+         155  F_DENIT_vr                                                                15  A
+         156  F_N2O_DENIT                                                                1  A
+         157  F_N2O_NIT                                                                  1  A
+         158  F_NIT                                                                      1  A
+         159  F_NIT_vr                                                                  15  A
+         160  GC_HEAT1                                                                   1  A
+         161  GC_ICE1                                                                    1  A
+         162  GC_LIQ1                                                                    1  A
+         163  GPP                                                                        1  A
+         164  GR                                                                         1  A
+         165  GROSS_NMIN                                                                 1  A
+         166  GROSS_PMIN                                                                 1  A
+         167  H2OCAN                                                                     1  A
+         168  H2OSFC                                                                     1  A
+         169  H2OSNO                                                                     1  A
+         170  H2OSNO_TOP                                                                 1  A
+         171  H2OSOI                                                                    15  A
+         172  HC                                                                         1  A
+         173  HCSOI                                                                      1  A
+         174  HEAT_FROM_AC                                                               1  A
+         175  HR                                                                         1  A
+         176  HR_vr                                                                     15  A
+         177  HTOP                                                                       1  A
+         178  INT_SNOW                                                                   1  A
+         179  LABILEP                                                                    1  A
+         180  LABILEP_TO_SECONDP                                                         1  A
+         181  LABILEP_vr                                                                15  A
+         182  LAISHA                                                                     1  A
+         183  LAISUN                                                                     1  A
+         184  LAKEICEFRAC                                                               10  A
+         185  LAKEICETHICK                                                               1  A
+         186  LAND_UPTAKE                                                                1  A
+         187  LAND_USE_FLUX                                                              1  A
+         188  LEAFC                                                                      1  A
+         189  LEAFC_ALLOC                                                                1  A
+         190  LEAFC_LOSS                                                                 1  A
+         191  LEAFC_TO_LITTER                                                            1  A
+         192  LEAFN                                                                      1  A
+         193  LEAFP                                                                      1  A
+         194  LEAF_MR                                                                    1  A
+         195  LFC2                                                                       1  A
+         196  LITFALL                                                                    1  A
+         197  LITHR                                                                      1  A
+         198  LITR1C                                                                     1  A
+         199  LITR1C_TO_SOIL1C                                                           1  A
+         200  LITR1C_vr                                                                 15  A
+         201  LITR1N                                                                     1  A
+         202  LITR1N_TNDNCY_VERT_TRANS                                                  15  A
+         203  LITR1N_TO_SOIL1N                                                           1  A
+         204  LITR1N_vr                                                                 15  A
+         205  LITR1P                                                                     1  A
+         206  LITR1P_TNDNCY_VERT_TRANS                                                  15  A
+         207  LITR1P_TO_SOIL1P                                                           1  A
+         208  LITR1P_vr                                                                 15  A
+         209  LITR1_HR                                                                   1  A
+         210  LITR2C                                                                     1  A
+         211  LITR2C_TO_SOIL2C                                                           1  A
+         212  LITR2C_vr                                                                 15  A
+         213  LITR2N                                                                     1  A
+         214  LITR2N_TNDNCY_VERT_TRANS                                                  15  A
+         215  LITR2N_TO_SOIL2N                                                           1  A
+         216  LITR2N_vr                                                                 15  A
+         217  LITR2P                                                                     1  A
+         218  LITR2P_TNDNCY_VERT_TRANS                                                  15  A
+         219  LITR2P_TO_SOIL2P                                                           1  A
+         220  LITR2P_vr                                                                 15  A
+         221  LITR2_HR                                                                   1  A
+         222  LITR3C                                                                     1  A
+         223  LITR3C_TO_SOIL3C                                                           1  A
+         224  LITR3C_vr                                                                 15  A
+         225  LITR3N                                                                     1  A
+         226  LITR3N_TNDNCY_VERT_TRANS                                                  15  A
+         227  LITR3N_TO_SOIL3N                                                           1  A
+         228  LITR3N_vr                                                                 15  A
+         229  LITR3P                                                                     1  A
+         230  LITR3P_TNDNCY_VERT_TRANS                                                  15  A
+         231  LITR3P_TO_SOIL3P                                                           1  A
+         232  LITR3P_vr                                                                 15  A
+         233  LITR3_HR                                                                   1  A
+         234  LITTERC                                                                    1  A
+         235  LITTERC_HR                                                                 1  A
+         236  LITTERC_LOSS                                                               1  A
+         237  LIVECROOTC                                                                 1  A
+         238  LIVECROOTN                                                                 1  A
+         239  LIVECROOTP                                                                 1  A
+         240  LIVESTEMC                                                                  1  A
+         241  LIVESTEMN                                                                  1  A
+         242  LIVESTEMP                                                                  1  A
+         243  MR                                                                         1  A
+         244  M_LITR1C_TO_LEACHING                                                       1  A
+         245  M_LITR2C_TO_LEACHING                                                       1  A
+         246  M_LITR3C_TO_LEACHING                                                       1  A
+         247  M_SOIL1C_TO_LEACHING                                                       1  A
+         248  M_SOIL2C_TO_LEACHING                                                       1  A
+         249  M_SOIL3C_TO_LEACHING                                                       1  A
+         250  M_SOIL4C_TO_LEACHING                                                       1  A
+         251  NBP                                                                        1  A
+         252  NDEPLOY                                                                    1  A
+         253  NDEP_TO_SMINN                                                              1  A
+         254  NEE                                                                        1  A
+         255  NEM                                                                        1  A
+         256  NEP                                                                        1  A
+         257  NET_NMIN                                                                   1  A
+         258  NET_PMIN                                                                   1  A
+         259  NFIRE                                                                      1  A
+         260  NFIX_TO_SMINN                                                              1  A
+         261  NPP                                                                        1  A
+         262  OCCLP                                                                      1  A
+         263  OCCLP_vr                                                                  15  A
+         264  OCDEP                                                                      1  A
+         265  O_SCALAR                                                                  15  A
+         266  PARVEGLN                                                                   1  A
+         267  PBOT                                                                       1  A
+         268  PCH4                                                                       1  A
+         269  PCO2                                                                       1  A
+         270  PCT_LANDUNIT                                                               9  A
+         271  PCT_NAT_PFT                                                               17  A
+         272  PDEPLOY                                                                    1  A
+         273  PDEP_TO_SMINP                                                              1  A
+         274  PFT_FIRE_CLOSS                                                             1  A
+         275  PFT_FIRE_NLOSS                                                             1  A
+         276  PLANT_CALLOC                                                               1  A
+         277  PLANT_NDEMAND                                                              1  A
+         278  PLANT_NDEMAND_COL                                                          1  A
+         279  PLANT_PALLOC                                                               1  A
+         280  PLANT_PDEMAND                                                              1  A
+         281  PLANT_PDEMAND_COL                                                          1  A
+         282  POTENTIAL_IMMOB                                                            1  A
+         283  POTENTIAL_IMMOB_P                                                          1  A
+         284  POT_F_DENIT                                                                1  A
+         285  POT_F_NIT                                                                  1  A
+         286  PRIMP                                                                      1  A
+         287  PRIMP_TO_LABILEP                                                           1  A
+         288  PRIMP_vr                                                                  15  A
+         289  PROD1P_LOSS                                                                1  A
+         290  PSNSHA                                                                     1  A
+         291  PSNSHADE_TO_CPOOL                                                          1  A
+         292  PSNSUN                                                                     1  A
+         293  PSNSUN_TO_CPOOL                                                            1  A
+         294  Q2M                                                                        1  A
+         295  QBOT                                                                       1  A
+         296  QCHARGE                                                                    1  A
+         297  QDRAI                                                                      1  A
+         298  QDRAI_PERCH                                                                1  A
+         299  QDRAI_XS                                                                   1  A
+         300  QDRIP                                                                      1  A
+         301  QFLOOD                                                                     1  A
+         302  QFLX_ICE_DYNBAL                                                            1  A
+         303  QFLX_LIQ_DYNBAL                                                            1  A
+         304  QH2OSFC                                                                    1  A
+         305  QICE                                                                       1  A
+         306  QICE_FRZ                                                                   1  A
+         307  QICE_MELT                                                                  1  A
+         308  QINFL                                                                      1  A
+         309  QINTR                                                                      1  A
+         310  QIRRIG_GRND                                                                1  A
+         311  QIRRIG_ORIG                                                                1  A
+         312  QIRRIG_REAL                                                                1  A
+         313  QIRRIG_SURF                                                                1  A
+         314  QIRRIG_WM                                                                  1  A
+         315  QOVER                                                                      1  A
+         316  QOVER_LAG                                                                  1  A
+         317  QRGWL                                                                      1  A
+         318  QRUNOFF                                                                    1  A
+         319  QRUNOFF_NODYNLNDUSE                                                        1  A
+         320  QRUNOFF_R                                                                  1  A
+         321  QRUNOFF_U                                                                  1  A
+         322  QSNOFRZ                                                                    1  A
+         323  QSNOMELT                                                                   1  A
+         324  QSNOMELT_LYR                                                               5  A
+         325  QSNWCPICE                                                                  1  A
+         326  QSNWCPICE_NODYNLNDUSE                                                      1  A
+         327  QSOIL                                                                      1  A
+         328  QVEGE                                                                      1  A
+         329  QVEGT                                                                      1  A
+         330  RAIN                                                                       1  A
+         331  RETRANSN                                                                   1  A
+         332  RETRANSN_TO_NPOOL                                                          1  A
+         333  RETRANSP                                                                   1  A
+         334  RETRANSP_TO_PPOOL                                                          1  A
+         335  RH2M                                                                       1  A
+         336  RH2M_R                                                                     1  A
+         337  RH2M_U                                                                     1  A
+         338  RR                                                                         1  A
+         339  SABG                                                                       1  A
+         340  SABG_PEN                                                                   1  A
+         341  SABV                                                                       1  A
+         342  SCALARAVG_vr                                                              15  A
+         343  SECONDP                                                                    1  A
+         344  SECONDP_TO_LABILEP                                                         1  A
+         345  SECONDP_TO_OCCLP                                                           1  A
+         346  SECONDP_vr                                                                15  A
+         347  SEEDC_GRC                                                                  1  A
+         348  SMINN                                                                      1  A
+         349  SMINN_TO_NPOOL                                                             1  A
+         350  SMINN_TO_PLANT                                                             1  A
+         351  SMINN_TO_SOIL1N_L1                                                         1  A
+         352  SMINN_TO_SOIL2N_L2                                                         1  A
+         353  SMINN_TO_SOIL2N_S1                                                         1  A
+         354  SMINN_TO_SOIL3N_L3                                                         1  A
+         355  SMINN_TO_SOIL3N_S2                                                         1  A
+         356  SMINN_TO_SOIL4N_S3                                                         1  A
+         357  SMINP                                                                      1  A
+         358  SMINP_LEACHED                                                              1  A
+         359  SMINP_TO_PLANT                                                             1  A
+         360  SMINP_TO_PPOOL                                                             1  A
+         361  SMINP_TO_SOIL1P_L1                                                         1  A
+         362  SMINP_TO_SOIL2P_L2                                                         1  A
+         363  SMINP_TO_SOIL2P_S1                                                         1  A
+         364  SMINP_TO_SOIL3P_L3                                                         1  A
+         365  SMINP_TO_SOIL3P_S2                                                         1  A
+         366  SMINP_TO_SOIL4P_S3                                                         1  A
+         367  SMINP_vr                                                                  15  A
+         368  SMIN_NH4                                                                   1  A
+         369  SMIN_NH4_vr                                                               15  A
+         370  SMIN_NO3                                                                   1  A
+         371  SMIN_NO3_LEACHED                                                           1  A
+         372  SMIN_NO3_RUNOFF                                                            1  A
+         373  SMIN_NO3_vr                                                               15  A
+         374  SNOBCMCL                                                                   1  A
+         375  SNOBCMSL                                                                   1  A
+         376  SNODSTMCL                                                                  1  A
+         377  SNODSTMSL                                                                  1  A
+         378  SNOINTABS                                                                  1  A
+         379  SNOOCMCL                                                                   1  A
+         380  SNOOCMSL                                                                   1  A
+         381  SNOW                                                                       1  A
+         382  SNOWDP                                                                     1  A
+         383  SNOWICE                                                                    1  A
+         384  SNOWLIQ                                                                    1  A
+         385  SNOW_DEPTH                                                                 1  A
+         386  SNOW_SINKS                                                                 1  A
+         387  SNOW_SOURCES                                                               1  A
+         388  SOIL1C                                                                     1  A
+         389  SOIL1C_TO_SOIL2C                                                           1  A
+         390  SOIL1C_vr                                                                 15  A
+         391  SOIL1N                                                                     1  A
+         392  SOIL1N_TNDNCY_VERT_TRANS                                                  15  A
+         393  SOIL1N_TO_SOIL2N                                                           1  A
+         394  SOIL1N_vr                                                                 15  A
+         395  SOIL1P                                                                     1  A
+         396  SOIL1P_TNDNCY_VERT_TRANS                                                  15  A
+         397  SOIL1P_TO_SOIL2P                                                           1  A
+         398  SOIL1P_vr                                                                 15  A
+         399  SOIL1_HR                                                                   1  A
+         400  SOIL2C                                                                     1  A
+         401  SOIL2C_TO_SOIL3C                                                           1  A
+         402  SOIL2C_vr                                                                 15  A
+         403  SOIL2N                                                                     1  A
+         404  SOIL2N_TNDNCY_VERT_TRANS                                                  15  A
+         405  SOIL2N_TO_SOIL3N                                                           1  A
+         406  SOIL2N_vr                                                                 15  A
+         407  SOIL2P                                                                     1  A
+         408  SOIL2P_TNDNCY_VERT_TRANS                                                  15  A
+         409  SOIL2P_TO_SOIL3P                                                           1  A
+         410  SOIL2P_vr                                                                 15  A
+         411  SOIL2_HR                                                                   1  A
+         412  SOIL3C                                                                     1  A
+         413  SOIL3C_TO_SOIL4C                                                           1  A
+         414  SOIL3C_vr                                                                 15  A
+         415  SOIL3N                                                                     1  A
+         416  SOIL3N_TNDNCY_VERT_TRANS                                                  15  A
+         417  SOIL3N_TO_SOIL4N                                                           1  A
+         418  SOIL3N_vr                                                                 15  A
+         419  SOIL3P                                                                     1  A
+         420  SOIL3P_TNDNCY_VERT_TRANS                                                  15  A
+         421  SOIL3P_TO_SOIL4P                                                           1  A
+         422  SOIL3P_vr                                                                 15  A
+         423  SOIL3_HR                                                                   1  A
+         424  SOIL4C                                                                     1  A
+         425  SOIL4C_vr                                                                 15  A
+         426  SOIL4N                                                                     1  A
+         427  SOIL4N_TNDNCY_VERT_TRANS                                                  15  A
+         428  SOIL4N_TO_SMINN                                                            1  A
+         429  SOIL4N_vr                                                                 15  A
+         430  SOIL4P                                                                     1  A
+         431  SOIL4P_TNDNCY_VERT_TRANS                                                  15  A
+         432  SOIL4P_TO_SMINP                                                            1  A
+         433  SOIL4P_vr                                                                 15  A
+         434  SOIL4_HR                                                                   1  A
+         435  SOILC                                                                      1  A
+         436  SOILC_HR                                                                   1  A
+         437  SOILC_LOSS                                                                 1  A
+         438  SOILICE                                                                   15  A
+         439  SOILICE_ICE                                                               15  A
+         440  SOILLIQ                                                                   15  A
+         441  SOILLIQ_ICE                                                               15  A
+         442  SOILPSI                                                                   15  A
+         443  SOILWATER_10CM                                                             1  A
+         444  SOLUTIONP                                                                  1  A
+         445  SOLUTIONP_vr                                                              15  A
+         446  SOMHR                                                                      1  A
+         447  SOM_C_LEACHED                                                              1  A
+         448  SR                                                                         1  A
+         449  STORVEGC                                                                   1  A
+         450  STORVEGN                                                                   1  A
+         451  STORVEGP                                                                   1  A
+         452  SUPPLEMENT_TO_SMINN                                                        1  A
+         453  SUPPLEMENT_TO_SMINP                                                        1  A
+         454  SUPPLY                                                                     1  A
+         455  SoilAlpha                                                                  1  A
+         456  SoilAlpha_U                                                                1  A
+         457  TAUX                                                                       1  A
+         458  TAUY                                                                       1  A
+         459  TBOT                                                                       1  A
+         460  TBUILD                                                                     1  A
+         461  TCS_MONTH_BEGIN                                                            1  I
+         462  TCS_MONTH_END                                                              1  I
+         463  TG                                                                         1  A
+         464  TG_R                                                                       1  A
+         465  TG_U                                                                       1  A
+         466  TH2OSFC                                                                    1  A
+         467  THBOT                                                                      1  A
+         468  TKE1                                                                       1  A
+         469  TLAI                                                                       1  A
+         470  TLAKE                                                                     10  A
+         471  TOTCOLC                                                                    1  A
+         472  TOTCOLCH4                                                                  1  A
+         473  TOTCOLN                                                                    1  A
+         474  TOTCOLP                                                                    1  A
+         475  TOTECOSYSC                                                                 1  A
+         476  TOTECOSYSN                                                                 1  A
+         477  TOTECOSYSP                                                                 1  A
+         478  TOTLITC                                                                    1  A
+         479  TOTLITC_1m                                                                 1  A
+         480  TOTLITN                                                                    1  A
+         481  TOTLITP                                                                    1  A
+         482  TOTLITP_1m                                                                 1  A
+         483  TOTPFTC                                                                    1  A
+         484  TOTPFTN                                                                    1  A
+         485  TOTPFTP                                                                    1  A
+         486  TOTSOMC                                                                    1  A
+         487  TOTSOMC_1m                                                                 1  A
+         488  TOTSOMN                                                                    1  A
+         489  TOTSOMP                                                                    1  A
+         490  TOTSOMP_1m                                                                 1  A
+         491  TOTVEGC                                                                    1  A
+         492  TOTVEGC_ABG                                                                1  A
+         493  TOTVEGN                                                                    1  A
+         494  TOTVEGP                                                                    1  A
+         495  TREFMNAV                                                                   1  A
+         496  TREFMNAV_R                                                                 1  A
+         497  TREFMNAV_U                                                                 1  A
+         498  TREFMXAV                                                                   1  A
+         499  TREFMXAV_R                                                                 1  A
+         500  TREFMXAV_U                                                                 1  A
+         501  TSA                                                                        1  A
+         502  TSAI                                                                       1  A
+         503  TSA_R                                                                      1  A
+         504  TSA_U                                                                      1  A
+         505  TSOI                                                                      15  A
+         506  TSOI_10CM                                                                  1  A
+         507  TSOI_ICE                                                                  15  A
+         508  TV                                                                         1  A
+         509  TWS                                                                        1  A
+         510  TWS_MONTH_BEGIN                                                            1  I
+         511  TWS_MONTH_END                                                              1  I
+         512  T_SCALAR                                                                  15  A
+         513  U10                                                                        1  A
+         514  U10WITHGUSTS                                                               1  A
+         515  URBAN_AC                                                                   1  A
+         516  URBAN_HEAT                                                                 1  A
+         517  VOLR                                                                       1  A
+         518  VOLRMCH                                                                    1  A
+         519  WA                                                                         1  A
+         520  WASTEHEAT                                                                  1  A
+         521  WF                                                                         1  A
+         522  WIND                                                                       1  A
+         523  WOODC                                                                      1  A
+         524  WOODC_ALLOC                                                                1  A
+         525  WOODC_LOSS                                                                 1  A
+         526  WOOD_HARVESTC                                                              1  A
+         527  WOOD_HARVESTN                                                              1  A
+         528  WTGQ                                                                       1  A
+         529  W_SCALAR                                                                  15  A
+         530  XR                                                                         1  A
+         531  XSMRPOOL                                                                   1  A
+         532  ZBOT                                                                       1  A
+         533  ZWT                                                                        1  A
+         534  ZWT_CH4_UNSAT                                                              1  A
+         535  ZWT_PERCH                                                                  1  A
+         536  cn_scalar                                                                  1  A
+         537  cp_scalar                                                                  1  A
+         538  leaf_npimbalance                                                           1  A
+         539  nlim_m                                                                     1  A
+         540  o2_decomp_depth_unsat                                                     15  A
+         541  plim_m                                                                     1  A
+         542  water_scalar                                                               1  A
+         543  wlim_m                                                                     1  A
+ htapes_fieldlist : Included fields tape            2 =          10
+           1  PBOT                                                                       1  A
+           2  RAIN                                                                       1  A
+           3  RH                                                                         1  A
+           4  SMP                                                                       15  A
+           5  SNOW                                                                       1  A
+           6  SOILICE                                                                   15  A
+           7  SOILLIQ                                                                   15  A
+           8  TBOT                                                                       1  A
+           9  TLAI                                                                       1  A
+          10  ZWT                                                                        1  A
+ There will be a total of            2  history tapes
+
+ History tape            1  write frequency is MONTHLY
+ All fields on history tape            1  are grid averaged
+ Number of time samples on history tape            1  is            1
+ Output precision on history tape            1 =           2
+
+
+ History tape            2  write frequency =           48
+ All fields on history tape            2  are grid averaged
+ Number of time samples on history tape            2  is          365
+ Output precision on history tape            2 =           2
+
+ hist_htapes_build hist tape =            1  written with dov2xy=  T
+ hist_htapes_build hist tape =            2  written with dov2xy=  T
+ hist_htapes_build Successfully initialized elm history files
+------------------------------------------------------------

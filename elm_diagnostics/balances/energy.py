@@ -96,17 +96,24 @@ class EnergyBalance(Balance):
 
         # Radiation
         if "Rnet" in comps:
-            ax1.plot(_plot_time(comps["Rnet"]), comps["Rnet"], label="Rnet",
-                     color="orange", linewidth=2)
+            ax1.plot(
+                _plot_time(comps["Rnet"]),
+                comps["Rnet"],
+                label="Rnet",
+                color="orange",
+                linewidth=2,
+            )
         if "FSH" in comps:
-            ax1.plot(_plot_time(comps["FSH"]), comps["FSH"], label="FSH",
-                     color="red")
+            ax1.plot(_plot_time(comps["FSH"]), comps["FSH"], label="FSH", color="red")
         if "EFLX_LH_TOT" in comps:
-            ax1.plot(_plot_time(comps["EFLX_LH_TOT"]), comps["EFLX_LH_TOT"],
-                     label="LE", color="blue")
+            ax1.plot(
+                _plot_time(comps["EFLX_LH_TOT"]),
+                comps["EFLX_LH_TOT"],
+                label="LE",
+                color="blue",
+            )
         if "FGR" in comps:
-            ax1.plot(_plot_time(comps["FGR"]), comps["FGR"], label="FGR",
-                     color="brown")
+            ax1.plot(_plot_time(comps["FGR"]), comps["FGR"], label="FGR", color="brown")
 
         ax1.set_xlabel("Time")
         ax1.set_ylabel("W/m²")
@@ -114,7 +121,9 @@ class EnergyBalance(Balance):
         if self.year:
             title += f" ({self.year})"
         ax1.set_title(title)
-        ax1.legend(loc="best", fontsize="small")
+        # Only add legend if there are labeled artists
+        if ax1.get_legend_handles_labels()[0]:
+            ax1.legend(loc="best", fontsize="small")
         ax1.axhline(0, color="gray", linewidth=0.5)
         fig1.tight_layout()
 
@@ -127,10 +136,18 @@ class EnergyBalance(Balance):
             ax2.axhline(0, color="gray", linewidth=0.5)
             ax2.set_ylabel("W/m²")
             ax2.set_xlabel("Time")
-            ax2.set_title(f"Energy Balance Residual (Rnet - H - LE - G) — {self.run.name}")
+            ax2.set_title(
+                f"Energy Balance Residual (Rnet - H - LE - G) — {self.run.name}"
+            )
         except KeyError as e:
-            ax2.text(0.5, 0.5, f"Cannot compute: {e}", transform=ax2.transAxes,
-                     ha="center", va="center")
+            ax2.text(
+                0.5,
+                0.5,
+                f"Cannot compute: {e}",
+                transform=ax2.transAxes,
+                ha="center",
+                va="center",
+            )
             ax2.set_title("Energy Balance Residual — incomplete data")
 
         fig2.tight_layout()

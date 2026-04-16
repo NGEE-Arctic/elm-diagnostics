@@ -325,6 +325,172 @@ def make_carbon_balance_dataset(
     )
 
 
+def make_multicolumn_dataset(
+    n_columns: int = 3,
+    start_year: int = 2000,
+    n_months: int = 12,
+    calendar: str = "noleap",
+    perfect_closure: bool = True,
+) -> xr.Dataset:
+    """Build a synthetic multi-column dataset for sub-gridcell testing.
+    
+    Creates a dataset with sub-gridcell (column) dimension, where each
+    column has independent water balance. If perfect_closure=True, the
+    water balance closes exactly for each column.
+    
+    Parameters
+    ----------
+    n_columns : int, default 3
+        Number of columns
+    start_year : int, default 2000
+    n_months : int, default 12
+    calendar : str, default "noleap"
+    perfect_closure : bool, default True
+        If True, construct water balance to close exactly per column
+    
+    Returns
+    -------
+    xr.Dataset
+        Dataset with 'column' dimension and water/carbon variables
+    """
+    rng = np.random.RandomState(42)
+    n = n_months
+    
+    times, time_bounds_data = make_time_axis(start_year, n_months, calendar)
+    
+    # Compute time deltas for flux integration
+    dts = np.array([
+        (time_bounds_data[i, 1] - time_bounds_data[i, 0]).days * 86400.0
+        for i in range(n)
+    ])
+    
+    # Initialize arrays with (time, column) shape
+    # Each column gets different but realistic values
+    rain_all = np.zeros((n, n_columns))
+    snow_all = np.zeros((n, n_columns))
+    evap_all = np.zeros((n, n_columns))
+    qover_all = np.zeros((n, n_columns))
+    qdrai_all = np.zeros((n, n_columns))
+    soilliq_all = np.zeros((n, n_columns))
+    soilice_all = np.zeros((n, n_columns))
+    h2osno_all = np.zeros((n, n_columns))
+    h2ocan_all = np.zeros((n, n_columns))
+    h2osfc_all = np.zeros((n, n_columns))
+    gpp_all = np.zeros((n, n_columns))
+    
+    for col in range(n_columns):
+        # Use different random seed per column for variation
+        col_rng = np.random.RandomState(42 + col * 10)
+        
+        # Inputs (mm/s) - vary by column
+        rain = col_rng.uniform(1e-6, 5e-5, size=n).astype(np.float64) * (1 + col * 0.2)
+        snow = col_rng.uniform(0, 1e-5, size=n).astype(np.float64) * (1 + col * 0.3)
+        total_input = rain + snow
+        
+        if perfect_closure:
+            # Construct outputs to close balance exactly
+            evap_frac = col_rng.uniform(0.3, 0.5, size=n)
+            runoff_frac = col_rng.uniform(0.1, 0.2, size=n)
+            drain_frac = col_rng.uniform(0.05, 0.1, size=n)
+            # Normalize to leave room for storage change
+            output_frac = evap_frac + runoff_frac + drain_frac
+            output_frac = np.clip(output_frac, 0, 0.9)
+            scale = output_frac / (evap_frac + runoff_frac + drain_frac)
+            evap_frac *= scale
+            runoff_frac *= scale
+            drain_frac *= scale
+            
+            evap = total_input * evap_frac
+            qover = total_input * runoff_frac
+            qdrai = total_input * drain_frac
+            
+            # Storage change rate
+            ds_dt_rate = total_input - evap - qover - qdrai
+        else:
+            # Random outputs (balance won't close)
+            evap = col_rng.uniform(1e-6, 4e-5, size=n)
+            qover = col_rng.uniform(0, 1e-5, size=n)
+            qdrai = col_rng.uniform(0, 5e-6, size=n)
+            ds_dt_rate = col_rng.uniform(-1e-6, 1e-6, size=n)
+        
+        # Cumulative storage
+        ds_cumulative = np.cumsum(ds_dt_rate * dts)
+        initial_storage = 500.0 + col * 50.0  # Different initial storage per column
+        storage_ts = initial_storage + ds_cumulative
+        
+        # Partition storage into components
+        soilliq = storage_ts * 0.6
+        soilice = storage_ts * 0.2
+        h2osno = storage_ts * 0.1
+        h2ocan = storage_ts * 0.05
+        h2osfc = storage_ts * 0.05
+        
+        # GPP for carbon plots (just make it seasonal)
+        gpp = col_rng.uniform(5e-6, 15e-6, size=n) * (1 + col * 0.1)
+        # Add seasonal pattern
+        month_of_year = np.arange(n) % 12
+        seasonal_factor = 1 + 0.5 * np.sin(2 * np.pi * month_of_year / 12)
+        gpp = gpp * seasonal_factor
+        
+        # Store in column arrays
+        rain_all[:, col] = rain
+        snow_all[:, col] = snow
+        evap_all[:, col] = evap
+        qover_all[:, col] = qover
+        qdrai_all[:, col] = qdrai
+        soilliq_all[:, col] = soilliq
+        soilice_all[:, col] = soilice
+        h2osno_all[:, col] = h2osno
+        h2ocan_all[:, col] = h2ocan
+        h2osfc_all[:, col] = h2osfc
+        gpp_all[:, col] = gpp
+    
+    # Build dataset
+    coords = {
+        "time": times,
+        "column": np.arange(1, n_columns + 1),  # 1-indexed like real ELM
+        "lndgrid": [1],  # Single gridcell
+    }
+    
+    ds = xr.Dataset(coords=coords)
+    ds["time_bounds"] = xr.DataArray(
+        time_bounds_data,
+        dims=["time", "ntb"],
+    )
+    
+    # Add variables with (time, column) dimensions
+    variables = {
+        "RAIN": (rain_all, "mm/s", "time: mean"),
+        "SNOW": (snow_all, "mm/s", "time: mean"),
+        "QFLX_EVAP_TOT": (evap_all, "mm/s", "time: mean"),
+        "QOVER": (qover_all, "mm/s", "time: mean"),
+        "QDRAI": (qdrai_all, "mm/s", "time: mean"),
+        "QDRAI_PERCH": (np.zeros((n, n_columns)), "mm/s", "time: mean"),
+        "QSNOMELT": (np.zeros((n, n_columns)), "mm/s", "time: mean"),
+        "SOILLIQ": (soilliq_all, "kg/m2", "time: point"),
+        "SOILICE": (soilice_all, "kg/m2", "time: point"),
+        "H2OSNO": (h2osno_all, "mm", "time: point"),
+        "H2OCAN": (h2ocan_all, "mm", "time: point"),
+        "H2OSFC": (h2osfc_all, "mm", "time: point"),
+        "GPP": (gpp_all, "gC/m^2/s", "time: mean"),
+        # Also add ET components for derived variable testing
+        "QSOIL": (evap_all * 0.4, "mm/s", "time: mean"),
+        "QVEGE": (evap_all * 0.3, "mm/s", "time: mean"),
+        "QVEGT": (evap_all * 0.3, "mm/s", "time: mean"),
+    }
+    
+    for name, (data, units, cell_methods) in variables.items():
+        da = xr.DataArray(
+            data,
+            dims=["time", "column"],
+            attrs={"units": units, "cell_methods": cell_methods},
+            name=name,
+        )
+        ds[name] = da
+    
+    return ds
+
+
 def save_as_elm_files(
     ds: xr.Dataset,
     outdir: Path,

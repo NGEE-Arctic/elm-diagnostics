@@ -4,6 +4,31 @@
 report:
   title_template: "ELM diagnostics — {casename}"
   output_formats: [png, netcdf]
+  
+  thumbnails:
+    enabled: true
+    size: [400, 300]  # pixels
+    dpi: 72
+  
+  plot_types:
+    include: [timeseries, seasonal, anomaly, histogram, diurnal]
+  
+  variable_sections:
+    max_variables_per_group: 10
+    show_statistics_table: true
+  
+  balance_sections:
+    show_statistics_table: true
+    show_residual_percentage: true
+  
+  comparison:
+    show_delta_plots: true
+    side_by_side_layout: true
+  
+  metadata:
+    show_configuration: true
+    show_run_info: true
+    show_generation_timestamp: true
 
 plots:
   style:
@@ -21,9 +46,11 @@ balances:
   water:
     storages: [SOILLIQ, SOILICE, H2OSNO, H2OCAN, H2OSFC]
     inputs: [RAIN, SNOW]
-    outputs: [QFLX_EVAP_TOT, QOVER, QDRAI, QDRAI_PERCH, QFLX_SUB_SNOW, QSNOMELT]
+    # Total ET computed from: QSOIL + QVEGE + QVEGT if QFLX_EVAP_TOT not available
+    # QFLX_SUB_SNOW is part of QSOIL (ground evap includes sublimation)
+    outputs: [QFLX_EVAP_TOT, QOVER, QDRAI, QDRAI_PERCH]
     # Decomposition panel shows ET components separately:
-    et_components: [QFLX_EVAP_VEG, QFLX_EVAP_GRND, QFLX_SUB_SNOW]
+    et_components: [QSOIL, QVEGE, QVEGT]  # Ground evap, canopy evap, transpiration
     residual_against: "dS/dt"
     frame: "water_year"
 
@@ -42,9 +69,11 @@ balances:
   energy:
     radiation: [FSDS, FSR, FLDS, FIRE, FSA, FIRA]
     turbulent: [FSH, EFLX_LH_TOT]
-    ground: [FGR]
-    # Storage term available but not plotted by default (fluxes only)
-    storage: [hc_soisno]
+    ground: [FGR, FGR12]
+    # Storage terms: HC (soil+snow), HCSOI (soil only) - NOT in default h0, must request
+    # These are state variables (MJ/m2), need dHC/dt for flux equivalent
+    storage: [HC, HCSOI]
+    errors: [ERRSOI, ERRSEB]  # Energy balance error diagnostics
     frame: "calendar"
     cumulative: false
 

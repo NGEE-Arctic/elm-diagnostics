@@ -1,0 +1,22 @@
+CASE INFO:
+  nodes: 1
+  total tasks: 1
+  tasks per node: 1
+  thread count: 1
+  ngpus per node: 0
+
+BATCH INFO:
+  FOR JOB: case.run
+    ENV:
+      Setting Environment HDF5_ROOT=/home/amanzi_user/install/tpls
+      Setting Environment NETCDF_C_PATH=/home/amanzi_user/install/tpls
+      Setting Environment NETCDF_FORTRAN_PATH=/home/amanzi_user/install/tpls
+      Setting Environment NETCDF_PATH=/home/amanzi_user/install/tpls
+      Setting Environment OMP_NUM_THREADS=1
+
+    SUBMIT CMD:
+      None
+
+    MPIRUN (job=case.run):
+      mpirun  -np 1 /home/amanzi_user/work/output/oakharbor_column.elm-ats/bld/e3sm.exe   >> e3sm.log.$LID 2>&1 
+
