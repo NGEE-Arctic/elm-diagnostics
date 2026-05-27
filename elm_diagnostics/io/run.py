@@ -167,7 +167,7 @@ class Run:
             else:
                 # Avoid requiring dask when not explicitly requested
                 kwargs["chunks"] = None
-            kwargs.setdefault("compat", "override")
+            kwargs.setdefault("compat", "no_conflicts")
             self._datasets[tape] = xr.open_mfdataset(files, **kwargs)
             self._cadence[tape] = _infer_cadence(self._datasets[tape])
         return self._datasets[tape]
