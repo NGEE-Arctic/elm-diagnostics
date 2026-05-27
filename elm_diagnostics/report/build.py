@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import re
+import sys
+import threading
 import traceback
 from datetime import datetime
 from pathlib import Path
@@ -170,27 +172,44 @@ class Report:
         figdir.mkdir(parents=True, exist_ok=True)
         datadir.mkdir(parents=True, exist_ok=True)
 
+        # Patch threading.excepthook to tolerate C-extension threads that
+        # don't call Thread.__init__() (Python 3.14 incompatibility with
+        # matplotlib/netCDF4 background threads).
+        _orig_excepthook = threading.excepthook
+
+        def _resilient_excepthook(args):
+            try:
+                _orig_excepthook(args)
+            except AssertionError:
+                print(
+                    f"Unhandled exception in background thread: {args.exc_value}",
+                    file=sys.stderr,
+                )
+
+        threading.excepthook = _resilient_excepthook
+
         prev_backend = matplotlib.get_backend()
         matplotlib.use("Agg")
 
         sections: list[_Section] = []
+        try:
+            # --- Metadata section ---
+            if self.config.report.metadata.show_run_info:
+                sections.append(self._build_metadata_section())
 
-        # --- Metadata section ---
-        if self.config.report.metadata.show_run_info:
-            sections.append(self._build_metadata_section())
+            # --- Balance sections ---
+            sections.extend(self._build_balance_sections(figdir, datadir))
 
-        # --- Balance sections ---
-        sections.extend(self._build_balance_sections(figdir, datadir))
+            # --- Variable group sections ---
+            sections.extend(self._build_variable_sections(figdir))
 
-        # --- Variable group sections ---
-        sections.extend(self._build_variable_sections(figdir))
-
-        # --- Error diagnostics section ---
-        if self._errors or self._warnings:
-            sections.append(self._build_diagnostics_section())
-
-        matplotlib.use(prev_backend)
-        plt.close("all")
+            # --- Error diagnostics section ---
+            if self._errors or self._warnings:
+                sections.append(self._build_diagnostics_section())
+        finally:
+            matplotlib.use(prev_backend)
+            plt.close("all")
+            threading.excepthook = _orig_excepthook
 
         # Render HTML
         html_path = self._render_html(outdir, sections)
