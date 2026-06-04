@@ -164,11 +164,11 @@ def _print_report_section_timings(
         if show_phase_breakdown:
             parts = []
             if entry.get("io_seconds") is not None:
-                parts.append(f"I/O {float(entry['io_seconds']):.2f}s")
+                parts.append(f"export/write {float(entry['io_seconds']):.2f}s")
             if entry.get("compute_seconds") is not None:
-                parts.append(f"compute {float(entry['compute_seconds']):.2f}s")
+                parts.append(f"prep/checks {float(entry['compute_seconds']):.2f}s")
             if entry.get("plot_seconds") is not None:
-                parts.append(f"plot {float(entry['plot_seconds']):.2f}s")
+                parts.append(f"plot build {float(entry['plot_seconds']):.2f}s")
             if parts:
                 line += "  (" + ", ".join(parts) + ")"
         console.print(line)
