@@ -218,35 +218,36 @@ class Report:
     def _build_metadata_section(self) -> _Section:
         """Build metadata section with run information."""
         sec = _Section("Run Information", "Metadata about the ELM simulation(s).")
-        
+
         run = self._run
-        
+        streams = run.streams
+
         # Collect metadata
         metadata = {}
         metadata["Case Name"] = run.name
-        
+
         # Get time range from first stream
-        if run.streams:
-            first_stream = list(run.streams.values())[0]
+        if streams:
+            first_stream = next(iter(streams.values()))
             time = first_stream.time
             metadata["Time Range"] = f"{time[0].values} to {time[-1].values}"
             metadata["Number of Time Steps"] = len(time)
-        
+
         # List available streams
-        if run.streams:
-            metadata["History Streams"] = ", ".join(run.streams.keys())
-        
+        if streams:
+            metadata["History Streams"] = ", ".join(streams.keys())
+
         # Add comparison info if applicable
         if self._is_comparison:
             comp = self.source
             metadata["Comparison Mode"] = "Base vs. Experiment"
             metadata["Base Case"] = comp.base.name
             metadata["Experiment Case"] = comp.experiment.name
-        
+
         # Generation info
         if self.config.report.metadata.show_generation_timestamp:
             metadata["Report Generated"] = self._generation_time.strftime("%Y-%m-%d %H:%M:%S")
-        
+
         sec.add_statistics(metadata)
         return sec
 
