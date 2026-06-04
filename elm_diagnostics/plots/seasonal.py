@@ -163,6 +163,7 @@ def _plot_seasonal_single(
         )
 
         ax.legend(loc="best", fontsize="small")
+        units = da_base.attrs.get("units", "")
     else:
         da = _squeeze_spatial(source.get(varname))
         mean, lo, hi = _seasonal_stats(
@@ -188,16 +189,11 @@ def _plot_seasonal_single(
         if include_climos:
             ax.fill_between(months, lo.values, hi.values, alpha=0.2, color="tab:blue")
         ax.plot(months, mean.values, color="tab:blue", linewidth=2)
+        units = da.attrs.get("units", "")
 
     ax.set_xticks(months)
     ax.set_xticklabels(_MONTH_LABELS)
     ax.set_xlabel("Month")
-
-    units = ""
-    if isinstance(source, Comparison):
-        units = source.base.get(varname).attrs.get("units", "")
-    else:
-        units = source.get(varname).attrs.get("units", "")
     ax.set_ylabel(units)
 
     title = f"{varname} — Seasonal Cycle"

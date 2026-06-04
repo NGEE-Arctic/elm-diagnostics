@@ -201,6 +201,7 @@ def _plot_diurnal_single(
         )
 
         ax.legend(loc="best", fontsize="small")
+        units = da_base.attrs.get("units", "")
     else:
         da = _squeeze_spatial(source.get(varname))
 
@@ -240,15 +241,10 @@ def _plot_diurnal_single(
                 mean.hour.values, lo.values, hi.values, alpha=0.2, color="tab:blue"
             )
         ax.plot(mean.hour.values, mean.values, color="tab:blue", linewidth=2)
+        units = da.attrs.get("units", "")
 
     ax.set_xticks(np.arange(0, 24, 3))
     ax.set_xlabel("Hour of Day (UTC)")
-
-    units = ""
-    if isinstance(source, Comparison):
-        units = source.base.get(varname).attrs.get("units", "")
-    else:
-        units = source.get(varname).attrs.get("units", "")
     ax.set_ylabel(units)
 
     title = f"{varname} — Diurnal Cycle"
