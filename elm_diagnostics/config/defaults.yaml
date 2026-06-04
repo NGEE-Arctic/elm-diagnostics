@@ -60,6 +60,10 @@ balances:
     outputs: [QFLX_EVAP_TOT, QOVER, QDRAI, QDRAI_PERCH]
     # Decomposition panel shows ET components separately:
     et_components: [QSOIL, QVEGE, QVEGT]  # Ground evap, canopy evap, transpiration
+    # Optional model-computed residual diagnostics from history output
+    model_residual_candidates: [ERRH2O]
+    # Optional snow-specific imbalance diagnostics for context
+    snow_residual_candidates: [ERRH2OSNO]
     residual_against: "dS/dt"
     frame: "water_year"
 

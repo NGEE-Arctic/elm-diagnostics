@@ -27,6 +27,21 @@ def water_run():
         run.close()
 
 
+@pytest.fixture
+def water_run_with_model_residual():
+    ds = make_water_balance_dataset(
+        start_year=2000,
+        n_months=12,
+        include_model_residual=True,
+        include_snow_residual=True,
+    )
+    with tempfile.TemporaryDirectory() as tmpdir:
+        save_as_elm_files(ds, Path(tmpdir), casename="water_test_model_res", tape="h0")
+        run = Run(tmpdir)
+        yield run
+        run.close()
+
+
 def test_water_balance_components(water_run):
     wb = WaterBalance(water_run)
     comps = wb.components()
@@ -49,6 +64,34 @@ def test_water_balance_residual_near_zero(water_run):
 
 def test_water_balance_plot(water_run):
     wb = WaterBalance(water_run)
+    fig1, fig2, fig3, fig4 = wb.plot()
+    assert fig1 is not None
+    assert fig2 is not None
+    assert fig3 is not None
+    assert fig4 is not None
+    import matplotlib.pyplot as plt
+    plt.close("all")
+
+
+def test_water_balance_model_residual_absent_returns_none(water_run):
+    wb = WaterBalance(water_run)
+    assert wb.model_residual() is None
+    assert wb.model_snow_residual() is None
+
+
+def test_water_balance_model_residual_available(water_run_with_model_residual):
+    wb = WaterBalance(water_run_with_model_residual)
+    model_res = wb.model_residual()
+    snow_res = wb.model_snow_residual()
+
+    assert model_res is not None
+    assert snow_res is not None
+    assert model_res.attrs.get("units") == "mm"
+    assert snow_res.attrs.get("units") == "mm"
+
+
+def test_water_balance_plot_with_model_residual(water_run_with_model_residual):
+    wb = WaterBalance(water_run_with_model_residual)
     fig1, fig2, fig3, fig4 = wb.plot()
     assert fig1 is not None
     assert fig2 is not None

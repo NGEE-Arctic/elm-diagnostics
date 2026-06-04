@@ -98,6 +98,12 @@ class WaterBalanceConfig(BaseModel):
     et_components: list[str] = Field(
         default_factory=lambda: ["QSOIL", "QVEGE", "QVEGT"]
     )
+    model_residual_candidates: list[str] = Field(
+        default_factory=lambda: ["ERRH2O"]
+    )
+    snow_residual_candidates: list[str] = Field(
+        default_factory=lambda: ["ERRH2OSNO"]
+    )
     residual_against: str = "dS/dt"
     frame: Literal["water_year", "calendar"] = "water_year"
 

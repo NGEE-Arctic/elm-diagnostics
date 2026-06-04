@@ -116,6 +116,41 @@ class WaterBalance(Balance):
         residual.name = "residual"
         return residual
 
+    def _get_optional_var(self, candidates: list[str]) -> xr.DataArray | None:
+        """Return first available variable among candidates, or None."""
+        for varname in candidates:
+            try:
+                da = self._get_var(varname)
+                da = self._select_year(da)
+                return da
+            except KeyError:
+                continue
+        return None
+
+    def model_residual(self) -> xr.DataArray | None:
+        """Return model-reported water residual if available (e.g., ERRH2O)."""
+        da = self._get_optional_var(self._balance_config.model_residual_candidates)
+        if da is None:
+            return None
+
+        da = da.copy()
+        da.attrs.setdefault("long_name", "model-reported water residual")
+        da.attrs.setdefault("units", "mm")
+        da.name = "model_residual"
+        return da
+
+    def model_snow_residual(self) -> xr.DataArray | None:
+        """Return model-reported snow imbalance residual if available."""
+        da = self._get_optional_var(self._balance_config.snow_residual_candidates)
+        if da is None:
+            return None
+
+        da = da.copy()
+        da.attrs.setdefault("long_name", "model-reported snow imbalance residual")
+        da.attrs.setdefault("units", "mm")
+        da.name = "model_snow_residual"
+        return da
+
     def _storage_decomposition_components(self) -> dict[str, xr.DataArray]:
         """Return per-storage cumulative change components in mm.
 
@@ -208,6 +243,17 @@ class WaterBalance(Balance):
         # Residual
         res = self.residual()
         ax1.plot(_plot_time(res), res, label="Residual", color="black", linestyle="--")
+
+        # Optional model residual (e.g., ERRH2O)
+        model_res = self.model_residual()
+        if model_res is not None:
+            ax1.plot(
+                _plot_time(model_res),
+                model_res,
+                label="Model residual",
+                color="purple",
+                linestyle=":",
+            )
 
         ax1.set_xlabel("Time")
         ax1.set_ylabel("Cumulative (mm)")
@@ -341,6 +387,18 @@ class WaterBalance(Balance):
             # Residual for this unit
             res_unit = self.residual().sel({self.by: unit_id})
             ax1.plot(_plot_time(res_unit), res_unit, label="Res", color="black", linestyle="--", linewidth=1)
+
+            model_res = self.model_residual()
+            if model_res is not None:
+                model_res_unit = model_res.sel({self.by: unit_id})
+                ax1.plot(
+                    _plot_time(model_res_unit),
+                    model_res_unit,
+                    label="Model",
+                    color="purple",
+                    linestyle=":",
+                    linewidth=1,
+                )
             
             ax1.set_xlabel("Time", fontsize="small")
             ax1.set_ylabel("Cumulative (mm)", fontsize="small")
