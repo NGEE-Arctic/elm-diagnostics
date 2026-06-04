@@ -88,7 +88,13 @@ class WaterBalanceConfig(BaseModel):
     )
     inputs: list[str] = Field(default_factory=lambda: ["RAIN", "SNOW"])
     outputs: list[str] = Field(
-        default_factory=lambda: ["QFLX_EVAP_TOT", "QOVER", "QDRAI", "QDRAI_PERCH"]
+        default_factory=lambda: [
+            "QFLX_EVAP_TOT",
+            "QOVER",
+            "QDRAI",
+            "QDRAI_PERCH",
+            "QH2OSFC"
+        ]
     )
     et_components: list[str] = Field(
         default_factory=lambda: ["QSOIL", "QVEGE", "QVEGT"]

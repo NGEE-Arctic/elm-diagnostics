@@ -57,7 +57,7 @@ balances:
     inputs: [RAIN, SNOW]
     # Total ET computed from: QSOIL + QVEGE + QVEGT if QFLX_EVAP_TOT not available
     # QFLX_SUB_SNOW is part of QSOIL (ground evap includes sublimation)
-    outputs: [QFLX_EVAP_TOT, QOVER, QDRAI, QDRAI_PERCH]
+    outputs: [QFLX_EVAP_TOT, QOVER, QDRAI, QDRAI_PERCH, QH2OSFC]
     # Decomposition panel shows ET components separately:
     et_components: [QSOIL, QVEGE, QVEGT]  # Ground evap, canopy evap, transpiration
     residual_against: "dS/dt"
