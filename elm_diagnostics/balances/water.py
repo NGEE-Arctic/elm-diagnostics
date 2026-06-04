@@ -273,6 +273,16 @@ class WaterBalance(Balance):
                 color=colors[i % len(colors)],
             )
 
+        if storage_available:
+            total_storage_change = sum(storage_comps[v] for v in storage_available)
+            ax4.plot(
+                _plot_time(total_storage_change),
+                total_storage_change,
+                label="Total",
+                color="black",
+                linewidth=2.5,
+            )
+
         ax4.set_xlabel("Time")
         ax4.set_ylabel("Change (mm)")
         ax4.set_title(f"Water Storage Decomposition — {self.run.name}")
@@ -409,6 +419,16 @@ class WaterBalance(Balance):
                     label=varname,
                     color=colors[i % len(colors)],
                     linewidth=1,
+                )
+
+            if storage_available:
+                total_storage_change = sum(storage_unit[v] for v in storage_available)
+                ax4.plot(
+                    _plot_time(total_storage_change),
+                    total_storage_change,
+                    label="Total",
+                    color="black",
+                    linewidth=2.5,
                 )
 
             ax4.set_xlabel("Time", fontsize="small")
