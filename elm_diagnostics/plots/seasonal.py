@@ -117,7 +117,8 @@ def _plot_seasonal_single(
 ) -> plt.Figure:
     """Plot a single seasonal cycle (no faceting)."""
     style = config.plots.style
-    envelope = config.plots.climatology.envelope
+    include_climos = config.plots.climatology.include_climos
+    envelope = config.plots.climatology.envelope if include_climos else "none"
 
     if ax is None:
         fig, ax = plt.subplots(figsize=style.figsize, dpi=style.dpi)
@@ -146,12 +147,14 @@ def _plot_seasonal_single(
             fig.tight_layout()
             return fig
 
-        ax.fill_between(months, lo_b.values, hi_b.values, alpha=0.2, color="gray")
+        if include_climos:
+            ax.fill_between(months, lo_b.values, hi_b.values, alpha=0.2, color="gray")
         ax.plot(
             months, mean_b.values, color="gray", label=source.base.name, linewidth=2
         )
 
-        ax.fill_between(months, lo_e.values, hi_e.values, alpha=0.2, color="tab:blue")
+        if include_climos:
+            ax.fill_between(months, lo_e.values, hi_e.values, alpha=0.2, color="tab:blue")
         ax.plot(
             months,
             mean_e.values,
@@ -178,7 +181,8 @@ def _plot_seasonal_single(
             fig.tight_layout()
             return fig
 
-        ax.fill_between(months, lo.values, hi.values, alpha=0.2, color="tab:blue")
+        if include_climos:
+            ax.fill_between(months, lo.values, hi.values, alpha=0.2, color="tab:blue")
         ax.plot(months, mean.values, color="tab:blue", linewidth=2)
 
     ax.set_xticks(months)
@@ -216,7 +220,8 @@ def _plot_seasonal_faceted(
     )
 
     style = config.plots.style
-    envelope = config.plots.climatology.envelope
+    include_climos = config.plots.climatology.include_climos
+    envelope = config.plots.climatology.envelope if include_climos else "none"
 
     # Get data and validate
     if isinstance(source, Comparison):
@@ -250,11 +255,13 @@ def _plot_seasonal_faceted(
 
             # Check if we have sufficient data
             if mean_b is not None and mean_e is not None:
-                ax_i.fill_between(months, lo_b.values, hi_b.values, alpha=0.2, color="gray")
+                if include_climos:
+                    ax_i.fill_between(months, lo_b.values, hi_b.values, alpha=0.2, color="gray")
                 ax_i.plot(
                     months, mean_b.values, color="gray", label=source.base.name, linewidth=2
                 )
-                ax_i.fill_between(months, lo_e.values, hi_e.values, alpha=0.2, color="tab:blue")
+                if include_climos:
+                    ax_i.fill_between(months, lo_e.values, hi_e.values, alpha=0.2, color="tab:blue")
                 ax_i.plot(
                     months,
                     mean_e.values,
@@ -271,7 +278,8 @@ def _plot_seasonal_faceted(
 
             # Check if we have sufficient data
             if mean is not None:
-                ax_i.fill_between(months, lo.values, hi.values, alpha=0.2, color="tab:blue")
+                if include_climos:
+                    ax_i.fill_between(months, lo.values, hi.values, alpha=0.2, color="tab:blue")
                 ax_i.plot(months, mean.values, color="tab:blue", linewidth=2)
 
             units_str = da.attrs.get("units", "")
