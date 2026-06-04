@@ -109,6 +109,37 @@ def get_available_years(
     return years
 
 
+def subset_climo_years(
+    da: xr.DataArray,
+    climo_start_year: int,
+    climo_end_year: int,
+    dim: str = "time",
+) -> xr.DataArray:
+    """Subset a DataArray to a climatology year window.
+
+    Uses ``-1`` as a sentinel for earliest/latest available year.
+    """
+    if dim not in da.dims or len(da[dim]) == 0:
+        return da
+
+    times = da[dim].values
+    years = np.array([_get_year(t) for t in times], dtype=int)
+    if len(years) == 0:
+        return da
+
+    min_year = int(np.min(years))
+    max_year = int(np.max(years))
+
+    start_year = min_year if climo_start_year == -1 else climo_start_year
+    end_year = max_year if climo_end_year == -1 else climo_end_year
+
+    if start_year > end_year:
+        return da.isel({dim: slice(0, 0)})
+
+    mask = (years >= start_year) & (years <= end_year)
+    return da.isel({dim: mask})
+
+
 def day_of_year(time_val, start_month: int = 1) -> int:
     """Compute day-of-year, optionally offset by start_month.
 
