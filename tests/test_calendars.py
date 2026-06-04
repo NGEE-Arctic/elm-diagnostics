@@ -30,6 +30,12 @@ def test_water_year_jan():
     assert water_year(t, start_month=10) == 2015
 
 
+def test_water_year_january_start_equals_calendar_year():
+    """With start_month=1, water year should match calendar year."""
+    t = cftime.datetime(2015, 12, 15, calendar="noleap")
+    assert water_year(t, start_month=1) == 2015
+
+
 def test_add_water_year_coord():
     ds = make_water_balance_dataset(start_year=2014, n_months=24)
     ds = add_water_year_coord(ds, start_month=10)
@@ -52,6 +58,14 @@ def test_select_water_year():
     sub = select_year(ds, 2000, frame="water_year", start_month=10)
     # WY 2000 = Oct 1999 - Sep 2000 = 12 months
     assert len(sub.time) == 12
+
+
+def test_select_water_year_january_start_matches_calendar_year():
+    ds = make_water_balance_dataset(start_year=2000, n_months=24)
+    sub = select_year(ds, 2000, frame="water_year", start_month=1)
+    assert len(sub.time) == 12
+    assert int(sub.time.dt.year.values[0]) == 2000
+    assert int(sub.time.dt.year.values[-1]) == 2000
 
 
 def test_get_available_years():

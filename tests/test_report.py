@@ -10,6 +10,7 @@ matplotlib.use("Agg")
 
 from elm_diagnostics.io.run import Comparison, Run
 from elm_diagnostics.report.build import Report
+from elm_diagnostics.config.schema import Config
 from tests.fixtures.synthetic_elm import (
     make_multicolumn_dataset,
     make_water_balance_dataset,
@@ -253,3 +254,15 @@ def test_report_generation_timestamp(report_run):
         import datetime
         current_year = str(datetime.datetime.now().year)
         assert current_year in content
+
+
+def test_report_water_balance_section_with_january_water_year_start(report_run):
+    """Water Balance section should render when water year starts in January."""
+    config = Config()
+    config.time.water_year_start_month = 1
+
+    rpt = Report(report_run, config=config, year=2000)
+    with tempfile.TemporaryDirectory() as outdir:
+        html_path = rpt.build(outdir)
+        content = html_path.read_text()
+        assert "Water Balance" in content

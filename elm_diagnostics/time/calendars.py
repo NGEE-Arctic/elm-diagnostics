@@ -29,6 +29,11 @@ def water_year(time_val, start_month: int = 10) -> int:
     """
     month = _get_month(time_val)
     year = _get_year(time_val)
+
+    # January-start water years are identical to calendar years.
+    if start_month == 1:
+        return year
+
     if month >= start_month:
         return year + 1
     return year
