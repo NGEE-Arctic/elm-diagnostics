@@ -185,6 +185,21 @@ This document maps ELM history field names to their definitions, source code loc
 - **Source:** `ColumnDataType.F90`
 - **In default h0:** Yes ✓
 
+#### `WA` (optional)
+- **Long name:** Unconfined aquifer water storage
+- **Units:** mm or kg/m² (configuration dependent)
+- **Type:** State variable
+- **In default h0:** Case dependent
+- **Usage in elm-diagnostics:** Included in water storage change `dS` when present via `optional_storages`.
+
+### Detailed Runoff Partition Variables (optional)
+
+#### `QFLX_ROFLIQ_QSUR`, `QFLX_ROFLIQ_QSURP`, `QFLX_ROFLIQ_QSUB`, `QFLX_ROFLIQ_QSUBP`, `QFLX_ROFLIQ_QGWL`, `QFLX_ROFICE`
+- **Type:** Flux outputs used for enhanced runoff closure
+- **Units:** mm/s
+- **In default h0:** Case dependent
+- **Usage in elm-diagnostics:** When all detailed partition terms are available and enabled, they replace baseline lumped runoff terms in closure calculations to avoid double counting.
+
 ---
 
 ## Carbon Balance Variables

@@ -82,6 +82,13 @@ They have been **verified and updated** based on the oakharbor_column h0 file an
 - Because Python residual diagnostics are cumulative closure style, direct comparisons can be basis-sensitive.
 - For this reason, residual comparison mode and metadata interpretation are explicit and reported in diagnostics.
 
+#### **Optional Closure Enhancements**
+- **Optional aquifer storage (`WA`)** is included in `dS` when available via `balances.water.optional_storages`.
+- Water outputs support two mutually-exclusive families:
+  - **Baseline:** `QFLX_EVAP_TOT`, `QOVER`, `QDRAI`, `QDRAI_PERCH`
+  - **Detailed (preferred when complete):** `QFLX_EVAP_TOT`, `QFLX_ROFLIQ_QSUR`, `QFLX_ROFLIQ_QSURP`, `QFLX_ROFLIQ_QSUB`, `QFLX_ROFLIQ_QSUBP`, `QFLX_ROFLIQ_QGWL`, `QFLX_ROFICE`
+- Detailed family selection is controlled by `balances.water.use_detailed_outputs_when_available` and avoids double-counting by selecting only one family per run.
+
 ### Carbon Balance (verified against VegetationDataType.F90, CNBalanceCheckMod.F90):
 - Pools: `LEAFC`, `LIVESTEMC`, `DEADSTEMC`, `FROOTC`, `LIVECROOTC`, `DEADCROOTC`, `TOTSOMC`, `TOTLITC`, `CWDC` ✓
 - Fluxes: `GPP`, `AR`, `HR`, `ER`, `NEE` ✓
