@@ -85,16 +85,29 @@ class TimeConfig(BaseModel):
 
 class WaterBalanceConfig(BaseModel):
     storages: list[str] = Field(
-        default_factory=lambda: ["SOILLIQ", "SOILICE", "H2OSNO", "H2OCAN", "H2OSFC"]
+        default_factory=lambda: [
+            "H2OCAN",
+            # canopy snow water is missing
+            "H2OSFC",
+            "H2OSNO",
+            "SOILLIQ",
+            "SOILICE",
+            # water in unconfined aquifer is missing
+        ]
     )
-    inputs: list[str] = Field(default_factory=lambda: ["RAIN", "SNOW"])
+    inputs: list[str] = Field(
+        default_factory=lambda: [
+            "RAIN",
+            "SNOW"
+        ]
+    )
     outputs: list[str] = Field(
         default_factory=lambda: [
             "QFLX_EVAP_TOT",
             "QOVER",
+            "QH2OSFC",
             "QDRAI",
             "QDRAI_PERCH",
-            "QH2OSFC"
         ]
     )
     et_components: list[str] = Field(

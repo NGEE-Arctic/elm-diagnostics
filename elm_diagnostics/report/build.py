@@ -46,7 +46,7 @@ class _Section:
         self.id = re.sub(r"[^a-z0-9]+", "-", title.lower()).strip("-")
         self.description = description
         self.figures: list[dict[str, str]] = []
-        self.statistics: dict[str, Any] = {}
+        self.statistics: Any = {}
 
     def add_figure(
         self, path: str, thumb_path: str, caption: str, plot_type: str = ""
@@ -73,7 +73,7 @@ class _Section:
             }
         )
 
-    def add_statistics(self, stats: dict[str, Any]) -> None:
+    def add_statistics(self, stats: Any) -> None:
         """Add statistics table data to section."""
         self.statistics = stats
 
@@ -579,7 +579,7 @@ class Report:
 
     def _compute_water_balance_stats(self, wb: WaterBalance) -> dict[str, Any]:
         """Compute statistics for water balance section."""
-        stats = {}
+        stats: dict[str, Any] = {"table_kind": "balance_grouped", "rows": []}
         try:
             components = wb.components()
             reduced_components = {
@@ -587,15 +587,90 @@ class Report:
                 for name, da in components.items()
             }
             residual = self._reduce_non_time_dims(wb.residual())
+            storage_components = {
+                name: self._reduce_non_time_dims(da)
+                for name, da in wb._storage_decomposition_components().items()
+            }
+            rows: list[dict[str, Any]] = []
 
-            # Get final cumulative values
-            for name, da in reduced_components.items():
-                final_val = self._final_scalar(da)
-                stats[name] = f"{final_val:.2f} mm"
+            def _add_group(
+                title: str,
+                keys: list[str],
+                source: dict[str, xr.DataArray],
+                units: str,
+            ) -> None:
+                available = [(k, source[k]) for k in keys if k in source]
+                if not available:
+                    return
 
-            # Add residual info
+                subtotal = sum(self._final_scalar(da) for _, da in available)
+                rows.append(
+                    self._make_stats_row(
+                        metric=f"{title} (subtotal)",
+                        long_name="",
+                        value=f"{subtotal:.2f} {units}",
+                        kind="group",
+                        indent=0,
+                    )
+                )
+                for key, da in available:
+                    rows.append(
+                        self._make_stats_row(
+                            metric=key,
+                            long_name=self._long_name_from_da(da),
+                            value=f"{self._final_scalar(da):.2f} {units}",
+                            kind="item",
+                            indent=1,
+                        )
+                    )
+
+            bc = wb._balance_config
+            _add_group("Inputs", bc.inputs, reduced_components, "mm")
+            _add_group("Outputs", bc.outputs, reduced_components, "mm")
+
+            if "dS" in reduced_components:
+                ds_da = reduced_components["dS"]
+                rows.append(
+                    self._make_stats_row(
+                        metric="Change in Storage (subtotal)",
+                        long_name="",
+                        value=f"{self._final_scalar(ds_da):.2f} mm",
+                        kind="group",
+                        indent=0,
+                    )
+                )
+                rows.append(
+                    self._make_stats_row(
+                        metric="dS",
+                        long_name=self._long_name_from_da(ds_da),
+                        value=f"{self._final_scalar(ds_da):.2f} mm",
+                        kind="item",
+                        indent=1,
+                    )
+                )
+                for storage_name in bc.storages:
+                    if storage_name in storage_components:
+                        da = storage_components[storage_name]
+                        rows.append(
+                            self._make_stats_row(
+                                metric=storage_name,
+                                long_name=self._long_name_from_da(da),
+                                value=f"{self._final_scalar(da):.2f} mm",
+                                kind="item",
+                                indent=2,
+                            )
+                        )
+
             final_residual = self._final_scalar(residual)
-            stats["Residual"] = f"{final_residual:.2f} mm"
+            rows.append(
+                self._make_stats_row(
+                    metric="Residual",
+                    long_name=self._long_name_from_da(residual),
+                    value=f"{final_residual:.2f} mm",
+                    kind="summary",
+                    indent=0,
+                )
+            )
 
             # Calculate percentage if requested
             if self.config.report.balance_sections.show_residual_percentage:
@@ -606,15 +681,35 @@ class Report:
                         total_input += abs(self._final_scalar(reduced_components[key]))
                 if total_input > 0:
                     pct = (abs(final_residual) / total_input) * 100
-                    stats["Residual (%)"] = f"{pct:.2f}%"
+                    rows.append(
+                        self._make_stats_row(
+                            metric="Residual (%)",
+                            long_name="",
+                            value=f"{pct:.2f}%",
+                            kind="summary",
+                            indent=0,
+                        )
+                    )
+            stats["rows"] = rows
         except Exception as e:
-            stats["Error"] = str(e)
-
+            stats = {
+                "table_kind": "balance_flat",
+                "rows": [
+                    self._make_stats_row(
+                        metric="Error",
+                        long_name="",
+                        value=str(e),
+                        kind="summary",
+                        indent=0,
+                    )
+                ],
+            }
+        
         return stats
 
     def _compute_energy_balance_stats(self, eb: EnergyBalance) -> dict[str, Any]:
         """Compute statistics for energy balance section."""
-        stats = {}
+        stats: dict[str, Any] = {"table_kind": "balance_flat", "rows": []}
         try:
             components = {
                 name: self._reduce_non_time_dims(da)
@@ -624,15 +719,34 @@ class Report:
             # Get mean flux values
             for name, da in components.items():
                 mean_val = self._mean_scalar(da)
-                stats[name] = f"{mean_val:.2f} W/m²"
+                stats["rows"].append(
+                    self._make_stats_row(
+                        metric=name,
+                        long_name=self._long_name_from_da(da),
+                        value=f"{mean_val:.2f} W/m²",
+                        kind="item",
+                        indent=0,
+                    )
+                )
         except Exception as e:
-            stats["Error"] = str(e)
+            stats = {
+                "table_kind": "balance_flat",
+                "rows": [
+                    self._make_stats_row(
+                        metric="Error",
+                        long_name="",
+                        value=str(e),
+                        kind="summary",
+                        indent=0,
+                    )
+                ],
+            }
 
         return stats
 
     def _compute_carbon_balance_stats(self, cb: CarbonBalance) -> dict[str, Any]:
         """Compute statistics for carbon balance section."""
-        stats = {}
+        stats: dict[str, Any] = {"table_kind": "balance_flat", "rows": []}
         try:
             components = {
                 name: self._reduce_non_time_dims(da)
@@ -643,12 +757,39 @@ class Report:
             for name, da in components.items():
                 if "cumulative" in name.lower() or name in ["GPP", "NEE", "HR"]:
                     final_val = self._final_scalar(da)
-                    stats[name] = f"{final_val:.2f} gC/m²"
+                    stats["rows"].append(
+                        self._make_stats_row(
+                            metric=name,
+                            long_name=self._long_name_from_da(da),
+                            value=f"{final_val:.2f} gC/m²",
+                            kind="item",
+                            indent=0,
+                        )
+                    )
                 else:
                     mean_val = self._mean_scalar(da)
-                    stats[name] = f"{mean_val:.2f} gC/m²"
+                    stats["rows"].append(
+                        self._make_stats_row(
+                            metric=name,
+                            long_name=self._long_name_from_da(da),
+                            value=f"{mean_val:.2f} gC/m²",
+                            kind="item",
+                            indent=0,
+                        )
+                    )
         except Exception as e:
-            stats["Error"] = str(e)
+            stats = {
+                "table_kind": "balance_flat",
+                "rows": [
+                    self._make_stats_row(
+                        metric="Error",
+                        long_name="",
+                        value=str(e),
+                        kind="summary",
+                        indent=0,
+                    )
+                ],
+            }
 
         return stats
 
@@ -669,6 +810,40 @@ class Report:
     def _mean_scalar(da: xr.DataArray) -> float:
         """Return the time mean as a Python float."""
         return float(da.mean().values)
+
+    @staticmethod
+    def _long_name_from_da(da: xr.DataArray | None) -> str:
+        """Return best-available descriptive name for a variable."""
+        if da is None:
+            return ""
+
+        for attr_name in ("long_name", "description", "standard_name"):
+            raw = da.attrs.get(attr_name)
+            if raw:
+                description = " ".join(str(raw).split())
+                if "__tmp" in description:
+                    description = description.replace("__tmp", "total water storage")
+                return description
+
+        return ""
+
+    @staticmethod
+    def _make_stats_row(
+        metric: str,
+        long_name: str,
+        value: str,
+        *,
+        kind: str,
+        indent: int,
+    ) -> dict[str, Any]:
+        """Create a normalized row for report statistics tables."""
+        return {
+            "metric": metric,
+            "long_name": long_name,
+            "value": value,
+            "kind": kind,
+            "indent": indent,
+        }
 
     @staticmethod
     def _close_new_figures(existing_fignums: set[int]) -> None:

@@ -69,7 +69,7 @@ class WaterBalance(Balance):
                 result[varname] = cumulative_integral(da, parent_ds)
                 logger.info("Output variable '%s' included in balance components.", varname)
             except KeyError:
-                logger.info("Missing expected water output variable '%s'", varname)
+                logger.warning("Missing expected water output variable '%s'", varname)
 
         # Storage change
         total_storage = None
@@ -92,10 +92,14 @@ class WaterBalance(Balance):
                 else:
                     total_storage = total_storage + da
             except KeyError:
-                logger.info("Missing expected water storage variable '%s'", varname)
+                logger.warning("Missing expected water storage variable '%s'", varname)
 
         if total_storage is not None:
-            result["dS"] = storage_change(total_storage)
+            ds_change = storage_change(total_storage)
+            ds_change.attrs["long_name"] = "change in total water storage"
+            ds_change.attrs["units"] = "mm"
+            ds_change.name = "dS"
+            result["dS"] = ds_change
 
         return result
 
@@ -142,7 +146,7 @@ class WaterBalance(Balance):
                 storage_components[varname] = storage_change(da)
                 logger.info("Storage component '%s' included in storage decomposition.", varname)
             except KeyError:
-                logger.info("Missing expected water storage variable '%s'", varname)
+                logger.warning("Missing expected water storage variable '%s'", varname)
 
         return storage_components
 
