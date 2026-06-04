@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{{ title }}</title>
 <style>
-{{ css }}
+{{ css | safe }}
 </style>
 </head>
 <body>
@@ -117,7 +117,7 @@
 
 {# Lightbox JavaScript #}
 <script>
-{{ js }}
+{{ js | safe }}
 </script>
 </body>
 </html>
