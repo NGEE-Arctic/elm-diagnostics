@@ -38,6 +38,9 @@ plots:
   climatology:
     envelope: "minmax"  # or "p10_p90", "std"
 
+io:
+  strict_combine: false
+
 time:
   water_year_start_month: 10
   cumulative_years: "all"  # or list of ints, or "each"
