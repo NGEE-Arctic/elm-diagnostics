@@ -99,6 +99,8 @@ class Report:
         self._section_timings: list[dict[str, Any]] = []
         self._rendered_section_titles: list[str] = []
         self._build_total_seconds: float | None = None
+        self._progress_section_index = 0
+        self._progress_total_sections = 0
 
         if config is None or isinstance(config, (str, Path)):
             self.config = load_config(config)
@@ -164,6 +166,25 @@ class Report:
         """Add a warning message."""
         self._warnings.append(message)
 
+    def _announce_section_progress(self, title: str) -> None:
+        """Write a one-line section progress message to stdout immediately."""
+        self._progress_section_index += 1
+        total = self._progress_total_sections
+        print(
+            f"[report {self._progress_section_index}/{total}] {title}",
+            flush=True,
+        )
+
+    def _planned_progress_sections(self) -> list[str]:
+        """Return configured section titles announced during report generation."""
+        return [
+            "Water Balance",
+            "Energy Balance",
+            "Carbon Balance",
+            *[group_name.replace("_", " ").title() for group_name in self.config.variables.groups],
+            "Diagnostics",
+        ]
+
     def _record_section_timing(
         self,
         title: str,
@@ -226,6 +247,8 @@ class Report:
         self._section_timings = []
         self._rendered_section_titles = []
         self._build_total_seconds = None
+        self._progress_section_index = 0
+        self._progress_total_sections = len(self._planned_progress_sections())
         build_start = time.perf_counter()
 
         # Patch threading.excepthook to tolerate C-extension threads that
@@ -262,6 +285,8 @@ class Report:
             # --- Error diagnostics section ---
             if self._errors or self._warnings:
                 sections.append(self._build_diagnostics_section())
+            else:
+                self._announce_section_progress("Diagnostics skipped")
         finally:
             matplotlib.use(prev_backend)
             plt.close("all")
@@ -322,6 +347,7 @@ class Report:
         run = self._run
 
         # Water Balance
+        section_title = "Water Balance"
         section_start = time.perf_counter()
         compute_seconds = 0.0
         plot_seconds = 0.0
@@ -329,10 +355,11 @@ class Report:
         fig1: plt.Figure | None = None
         fig2: plt.Figure | None = None
         existing_fignums = set(plt.get_fignums())
+        self._announce_section_progress(section_title)
         try:
             compute_start = time.perf_counter()
             wb = WaterBalance(run, year=self.year, config=self.config)
-            sec = _Section("Water Balance", "Column water budget closure.")
+            sec = _Section(section_title, "Column water budget closure.")
             if self.config.report.balance_sections.show_statistics_table:
                 wb.components()
                 wb.residual()
@@ -381,6 +408,7 @@ class Report:
             )
 
         # Energy Balance
+        section_title = "Energy Balance"
         section_start = time.perf_counter()
         compute_seconds = 0.0
         plot_seconds = 0.0
@@ -388,10 +416,11 @@ class Report:
         fig1 = None
         fig2 = None
         existing_fignums = set(plt.get_fignums())
+        self._announce_section_progress(section_title)
         try:
             compute_start = time.perf_counter()
             eb = EnergyBalance(run, year=self.year, config=self.config)
-            sec = _Section("Energy Balance", "Surface energy budget closure.")
+            sec = _Section(section_title, "Surface energy budget closure.")
             if self.config.report.balance_sections.show_statistics_table:
                 eb.components()
                 eb.residual()
@@ -447,6 +476,7 @@ class Report:
             )
 
         # Carbon Balance
+        section_title = "Carbon Balance"
         section_start = time.perf_counter()
         compute_seconds = 0.0
         plot_seconds = 0.0
@@ -454,10 +484,11 @@ class Report:
         fig1 = None
         fig2 = None
         existing_fignums = set(plt.get_fignums())
+        self._announce_section_progress(section_title)
         try:
             compute_start = time.perf_counter()
             cb = CarbonBalance(run, year=self.year, config=self.config)
-            sec = _Section("Carbon Balance", "Ecosystem carbon budget closure.")
+            sec = _Section(section_title, "Ecosystem carbon budget closure.")
             if self.config.report.balance_sections.show_statistics_table:
                 cb.components()
                 cb.residual()
@@ -625,8 +656,10 @@ class Report:
             io_seconds = 0.0
             compute_seconds = 0.0
             plot_seconds = 0.0
-            sec = _Section(group_name.replace("_", " ").title())
-
+            section_title = group_name.replace("_", " ").title()
+            sec = _Section(section_title)
+            self._announce_section_progress(section_title)
+            
             # Limit number of variables if configured
             varnames_to_plot = varnames[:max_vars]
             if len(varnames) > max_vars:
@@ -758,9 +791,12 @@ class Report:
 
     def _build_diagnostics_section(self) -> _Section:
         """Build diagnostics section showing errors and warnings."""
+        section_title = "Diagnostics"
         start_time = time.perf_counter()
+        self._announce_section_progress(section_title)
         sec = _Section(
-            "Diagnostics", "Errors and warnings encountered during report generation."
+            section_title,
+            "Errors and warnings encountered during report generation."
         )
 
         # Format errors and warnings for display
@@ -776,7 +812,7 @@ class Report:
             diagnostics["Warnings"] = self._warnings
 
         sec.add_statistics(diagnostics)
-        self._record_section_timing("Diagnostics", start_time)
+        self._record_section_timing(section_title, start_time)
         return sec
 
     def _render_html(self, outdir: Path, sections: list[_Section]) -> Path:
