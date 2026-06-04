@@ -96,6 +96,18 @@ class WaterBalanceConfig(BaseModel):
             "QDRAI_PERCH"
         ]
     )
+    detailed_outputs: list[str] = Field(
+        default_factory=lambda: [
+            "QFLX_EVAP_TOT",
+            "QFLX_ROFLIQ_QSUR",
+            "QFLX_ROFLIQ_QSURP",
+            "QFLX_ROFLIQ_QSUB",
+            "QFLX_ROFLIQ_QSUBP",
+            "QFLX_ROFLIQ_QGWL",
+            "QFLX_ROFICE",
+        ]
+    )
+    use_detailed_outputs_when_available: bool = True
     et_components: list[str] = Field(
         default_factory=lambda: ["QSOIL", "QVEGE", "QVEGT"]
     )

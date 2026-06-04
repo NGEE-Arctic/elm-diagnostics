@@ -38,7 +38,32 @@ class WaterBalance(Balance):
 
     def _get_variable_names(self) -> list[str]:
         bc = self._balance_config
-        return bc.inputs + bc.outputs + bc.storages + bc.optional_storages
+        return (
+            bc.inputs
+            + bc.outputs
+            + bc.detailed_outputs
+            + bc.storages
+            + bc.optional_storages
+        )
+
+    def _active_output_terms(self) -> list[str]:
+        """Return output terms for this run, preferring detailed family when complete."""
+        key = self._cache_key()
+        cached_key = getattr(self, "_active_outputs_cache_key", None)
+        if cached_key == key and hasattr(self, "_active_outputs_cache"):
+            return self._active_outputs_cache
+
+        bc = self._balance_config
+        outputs = list(bc.outputs)
+        if bc.use_detailed_outputs_when_available:
+            detailed = list(dict.fromkeys(bc.detailed_outputs))
+            if detailed and all(self.run.has(varname) for varname in detailed):
+                outputs = detailed
+
+        outputs = list(dict.fromkeys(outputs))
+        self._active_outputs_cache_key = key
+        self._active_outputs_cache = outputs
+        return outputs
 
     def _storage_variable_names(self) -> list[str]:
         """Return ordered storage variable names including optional candidates."""
@@ -68,8 +93,8 @@ class WaterBalance(Balance):
             da = self._select_year(da)
             result[varname] = cumulative_integral(da, parent_ds)
 
-        # Cumulative outputs
-        for varname in bc.outputs:
+        # Cumulative outputs (choose one family to avoid double counting)
+        for varname in self._active_output_terms():
             try:
                 da = self._get_var(varname)
                 da = self._select_year(da)
@@ -137,10 +162,10 @@ class WaterBalance(Balance):
     def _compute_residual(self) -> xr.DataArray:
         """Compute closure residual: cumul(inputs) - cumul(outputs) - dS."""
         comps = self.components()
-        bc = self._balance_config
+        output_terms = self._active_output_terms()
 
-        total_in = sum(comps[v] for v in bc.inputs if v in comps)
-        total_out = sum(comps[v] for v in bc.outputs if v in comps)
+        total_in = sum(comps[v] for v in self._balance_config.inputs if v in comps)
+        total_out = sum(comps[v] for v in output_terms if v in comps)
         ds_change = comps.get("dS", 0)
 
         residual = total_in - total_out - ds_change
@@ -384,7 +409,7 @@ class WaterBalance(Balance):
             )
 
         # Sum outputs
-        outputs_available = [v for v in bc.outputs if v in comps]
+        outputs_available = [v for v in self._active_output_terms() if v in comps]
         if outputs_available:
             total_out = sum(comps[v] for v in outputs_available)
             ax1.plot(
@@ -550,7 +575,7 @@ class WaterBalance(Balance):
                     _plot_time(total_in), total_in, label="P", color="blue", linewidth=1
                 )
             
-            outputs_available = [v for v in bc.outputs if v in comps_unit]
+            outputs_available = [v for v in self._active_output_terms() if v in comps_unit]
             if outputs_available:
                 total_out = sum(comps_unit[v] for v in outputs_available)
                 ax1.plot(

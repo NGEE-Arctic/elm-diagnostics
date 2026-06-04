@@ -59,6 +59,11 @@ balances:
     # Total ET computed from: QSOIL + QVEGE + QVEGT if QFLX_EVAP_TOT not available
     # QFLX_SUB_SNOW is part of QSOIL (ground evap includes sublimation)
     outputs: [QFLX_EVAP_TOT, QOVER, QDRAI, QDRAI_PERCH]
+    # Prefer detailed ELM runoff partitions when all are available.
+    detailed_outputs: [QFLX_EVAP_TOT, QFLX_ROFLIQ_QSUR, QFLX_ROFLIQ_QSURP,
+              QFLX_ROFLIQ_QSUB, QFLX_ROFLIQ_QSUBP, QFLX_ROFLIQ_QGWL,
+              QFLX_ROFICE]
+    use_detailed_outputs_when_available: true
     # Decomposition panel shows ET components separately:
     et_components: [QSOIL, QVEGE, QVEGT]  # Ground evap, canopy evap, transpiration
     # Optional model-computed residual diagnostics from history output

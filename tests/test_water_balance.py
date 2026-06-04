@@ -194,6 +194,35 @@ def test_water_balance_includes_optional_wa_storage():
         run.close()
 
 
+def test_water_balance_prefers_detailed_runoff_family_when_available():
+    ds = make_water_balance_dataset(
+        start_year=2000,
+        n_months=12,
+        include_detailed_runoff=True,
+    )
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        save_as_elm_files(ds, Path(tmpdir), casename="water_test_detailed_runoff", tape="h0")
+        run = Run(tmpdir)
+        wb = WaterBalance(run)
+        comps = wb.components()
+
+        assert "QFLX_ROFLIQ_QSUR" in comps
+        assert "QFLX_ROFLIQ_QSURP" in comps
+        assert "QFLX_ROFLIQ_QSUB" in comps
+        assert "QFLX_ROFLIQ_QSUBP" in comps
+        assert "QFLX_ROFLIQ_QGWL" in comps
+        assert "QFLX_ROFICE" in comps
+
+        # Baseline lumped runoff/drainage terms should not be used when detailed
+        # family is complete.
+        assert "QOVER" not in comps
+        assert "QDRAI" not in comps
+        assert "QDRAI_PERCH" not in comps
+
+        run.close()
+
+
 def test_water_balance_to_netcdf(water_run):
     wb = WaterBalance(water_run)
     with tempfile.NamedTemporaryFile(suffix=".nc", delete=False) as f:

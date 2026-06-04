@@ -133,6 +133,7 @@ def make_water_balance_dataset(
     snow_residual_values: np.ndarray | None = None,
     include_wa_storage: bool = False,
     wa_storage_values: np.ndarray | None = None,
+    include_detailed_runoff: bool = False,
 ) -> xr.Dataset:
     """Build a synthetic dataset that closes the water balance exactly.
 
@@ -224,6 +225,39 @@ def make_water_balance_dataset(
             "data": wa_data,
             "units": "mm",
             "cell_methods": "time: point",
+        }
+
+    if include_detailed_runoff:
+        # Partition existing runoff/drainage into detailed runoff components.
+        variables["QFLX_ROFLIQ_QSUR"] = {
+            "data": qover * 0.5,
+            "units": "mm/s",
+            "cell_methods": "time: mean",
+        }
+        variables["QFLX_ROFLIQ_QSURP"] = {
+            "data": qover * 0.5,
+            "units": "mm/s",
+            "cell_methods": "time: mean",
+        }
+        variables["QFLX_ROFLIQ_QSUB"] = {
+            "data": qdrai * 0.5,
+            "units": "mm/s",
+            "cell_methods": "time: mean",
+        }
+        variables["QFLX_ROFLIQ_QSUBP"] = {
+            "data": qdrai * 0.3,
+            "units": "mm/s",
+            "cell_methods": "time: mean",
+        }
+        variables["QFLX_ROFLIQ_QGWL"] = {
+            "data": qdrai * 0.2,
+            "units": "mm/s",
+            "cell_methods": "time: mean",
+        }
+        variables["QFLX_ROFICE"] = {
+            "data": np.zeros(n),
+            "units": "mm/s",
+            "cell_methods": "time: mean",
         }
 
     return make_single_point_dataset(
