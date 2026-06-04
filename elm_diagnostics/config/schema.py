@@ -86,6 +86,7 @@ class WaterBalanceConfig(BaseModel):
     storages: list[str] = Field(
         default_factory=lambda: ["SOILLIQ", "SOILICE", "H2OSNO", "H2OCAN", "H2OSFC"]
     )
+    optional_storages: list[str] = Field(default_factory=lambda: ["WA"])
     inputs: list[str] = Field(default_factory=lambda: ["RAIN", "SNOW"])
     outputs: list[str] = Field(
         default_factory=lambda: [

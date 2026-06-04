@@ -54,6 +54,7 @@ time:
 balances:
   water:
     storages: [SOILLIQ, SOILICE, H2OSNO, H2OCAN, H2OSFC]
+    optional_storages: [WA]
     inputs: [RAIN, SNOW]
     # Total ET computed from: QSOIL + QVEGE + QVEGT if QFLX_EVAP_TOT not available
     # QFLX_SUB_SNOW is part of QSOIL (ground evap includes sublimation)

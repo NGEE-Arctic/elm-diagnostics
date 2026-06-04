@@ -38,7 +38,14 @@ class WaterBalance(Balance):
 
     def _get_variable_names(self) -> list[str]:
         bc = self._balance_config
-        return bc.inputs + bc.outputs + bc.storages
+        return bc.inputs + bc.outputs + bc.storages + bc.optional_storages
+
+    def _storage_variable_names(self) -> list[str]:
+        """Return ordered storage variable names including optional candidates."""
+        bc = self._balance_config
+        names = bc.storages + bc.optional_storages
+        # Preserve order while removing duplicates.
+        return list(dict.fromkeys(names))
 
     def _compute_components(self) -> dict[str, xr.DataArray]:
         """Return cumulative water balance components (all in mm)."""
@@ -72,7 +79,7 @@ class WaterBalance(Balance):
 
         # Storage change
         total_storage = None
-        for varname in bc.storages:
+        for varname in self._storage_variable_names():
             try:
                 da = self._get_var(varname)
                 # Aggregate over vertical dimensions if present (SOILLIQ, SOILICE have levgrnd)
@@ -313,7 +320,7 @@ class WaterBalance(Balance):
         bc = self._balance_config
         storage_components: dict[str, xr.DataArray] = {}
 
-        for varname in bc.storages:
+        for varname in self._storage_variable_names():
             try:
                 da = self._get_var(varname)
 

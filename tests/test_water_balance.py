@@ -171,6 +171,29 @@ def test_model_residual_alignment_sign_flip():
         run.close()
 
 
+def test_water_balance_includes_optional_wa_storage():
+    wa_vals = np.linspace(0.0, 11.0, 12)
+    ds = make_water_balance_dataset(
+        start_year=2000,
+        n_months=12,
+        include_wa_storage=True,
+        wa_storage_values=wa_vals,
+    )
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        save_as_elm_files(ds, Path(tmpdir), casename="water_test_wa", tape="h0")
+        run = Run(tmpdir)
+        wb = WaterBalance(run)
+
+        # With WA added as optional storage, closure residual now reflects WA change.
+        final_residual = float(wb.residual().values[-1])
+        assert np.isclose(final_residual, -11.0, atol=1e-3)
+
+        storage_comps = wb._storage_decomposition_components()
+        assert "WA" in storage_comps
+        run.close()
+
+
 def test_water_balance_to_netcdf(water_run):
     wb = WaterBalance(water_run)
     with tempfile.NamedTemporaryFile(suffix=".nc", delete=False) as f:

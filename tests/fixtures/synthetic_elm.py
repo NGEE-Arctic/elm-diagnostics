@@ -131,6 +131,8 @@ def make_water_balance_dataset(
     include_snow_residual: bool = False,
     model_residual_values: np.ndarray | None = None,
     snow_residual_values: np.ndarray | None = None,
+    include_wa_storage: bool = False,
+    wa_storage_values: np.ndarray | None = None,
 ) -> xr.Dataset:
     """Build a synthetic dataset that closes the water balance exactly.
 
@@ -214,6 +216,14 @@ def make_water_balance_dataset(
             "data": snow_data,
             "units": "mm",
             "cell_methods": "time: mean",
+        }
+
+    if include_wa_storage:
+        wa_data = np.zeros(n) if wa_storage_values is None else wa_storage_values
+        variables["WA"] = {
+            "data": wa_data,
+            "units": "mm",
+            "cell_methods": "time: point",
         }
 
     return make_single_point_dataset(
