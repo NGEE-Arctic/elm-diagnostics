@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+import warnings
 from pathlib import Path
 from typing import Literal
 
@@ -125,11 +126,15 @@ class Run:
         name: str | None = None,
         streams: dict[str, str] | None = None,
         chunks: dict | None = None,
+        chunk_mode: Literal["off", "auto", "manual"] = "off",
+        chunk_target_mb: int = 64,
         strict_combine: bool = False,
     ):
         self.path = Path(path)
         self.name = name or _extract_casename(self.path)
         self._chunks = chunks
+        self._chunk_mode = chunk_mode
+        self._chunk_target_mb = chunk_target_mb
         self._strict_combine = strict_combine
         self._datasets: dict[str, xr.Dataset] = {}
         self._cadence: dict[str, str | pd.Timedelta] = {}
@@ -149,6 +154,33 @@ class Run:
 
         # Sort tapes by name for deterministic ordering
         self._tape_order = sorted(self._stream_files.keys())
+
+    def _auto_chunks_for_stream(self, files: list[Path]) -> dict[str, int] | None:
+        """Estimate a conservative chunk map for a stream.
+
+        Uses a time-only chunk with target size budget in MiB.
+        """
+        if not files:
+            return None
+
+        try:
+            with xr.open_dataset(files[0], decode_times=False) as ds0:
+                if "time" not in ds0.dims:
+                    return None
+                time_dim = "time"
+                non_time_size = 1
+                for dim, size in ds0.sizes.items():
+                    if dim != time_dim:
+                        non_time_size *= max(1, int(size))
+
+                target_bytes = max(1, int(self._chunk_target_mb)) * 1024 * 1024
+                bytes_per_step = max(8, non_time_size * 8)
+                est_chunk = max(1, target_bytes // bytes_per_step)
+                time_len = max(1, int(ds0.sizes.get(time_dim, 1)))
+                time_chunk = int(min(time_len, est_chunk))
+                return {time_dim: time_chunk}
+        except Exception:
+            return None
 
     def _open_stream(self, tape: str, strict_combine: bool | None = None) -> xr.Dataset:
         """Lazily open a stream's files as a single dataset."""
@@ -186,11 +218,28 @@ class Run:
             if self._chunks is not None:
                 kwargs["chunks"] = self._chunks
             else:
-                # Avoid requiring dask when not explicitly requested
-                kwargs["chunks"] = None
+                if self._chunk_mode == "auto":
+                    kwargs["chunks"] = self._auto_chunks_for_stream(files)
+                else:
+                    # Avoid requiring dask when not explicitly requested
+                    kwargs["chunks"] = None
             kwargs.setdefault("compat", "no_conflicts")
             kwargs.setdefault("join", "outer")
-            self._datasets[tape] = xr.open_mfdataset(files, **kwargs)
+            try:
+                self._datasets[tape] = xr.open_mfdataset(files, **kwargs)
+            except Exception as e:
+                if kwargs.get("chunks") is not None and (
+                    "dask" in str(e).lower() or "chunk manager" in str(e).lower()
+                ):
+                    warnings.warn(
+                        "Chunked loading unavailable in this environment; retrying "
+                        "without chunks.",
+                        RuntimeWarning,
+                    )
+                    kwargs["chunks"] = None
+                    self._datasets[tape] = xr.open_mfdataset(files, **kwargs)
+                else:
+                    raise
             self._cadence[tape] = _infer_cadence(self._datasets[tape])
         return self._datasets[tape]
 

@@ -43,6 +43,9 @@ plots:
 
 io:
   strict_combine: false
+  chunk_mode: auto      # off | auto | manual
+  chunk_target_mb: 64   # target chunk size budget for auto mode
+  chunks: {}            # manual mode, e.g. {time: 240}
 
 time:
   water_year_start_month: 10
