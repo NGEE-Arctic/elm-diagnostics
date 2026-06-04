@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import logging
+from pathlib import Path
 
 import matplotlib.pyplot as plt
 import xarray as xr
@@ -12,6 +14,8 @@ from elm_diagnostics.time.integration import (
     cumulative_integral,
     storage_change,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class WaterBalance(Balance):
@@ -55,6 +59,7 @@ class WaterBalance(Balance):
             da = self._get_var(varname)
             da = self._select_year(da)
             result[varname] = cumulative_integral(da, parent_ds)
+            logger.info("Input variable '%s' included in balance components.", varname)
 
         # Cumulative outputs
         for varname in bc.outputs:
@@ -62,8 +67,9 @@ class WaterBalance(Balance):
                 da = self._get_var(varname)
                 da = self._select_year(da)
                 result[varname] = cumulative_integral(da, parent_ds)
+                logger.info("Output variable '%s' included in balance components.", varname)
             except KeyError:
-                pass  # Variable not available in this run
+                logger.info("Missing expected water output variable '%s'", varname)
 
         # Storage change
         total_storage = None
@@ -86,7 +92,7 @@ class WaterBalance(Balance):
                 else:
                     total_storage = total_storage + da
             except KeyError:
-                pass
+                logger.info("Missing expected water storage variable '%s'", varname)
 
         if total_storage is not None:
             result["dS"] = storage_change(total_storage)
@@ -134,8 +140,9 @@ class WaterBalance(Balance):
                 da = convert_water_to_mm(da)
                 da = self._select_year(da)
                 storage_components[varname] = storage_change(da)
+                logger.info("Storage component '%s' included in storage decomposition.", varname)
             except KeyError:
-                pass
+                logger.info("Missing expected water storage variable '%s'", varname)
 
         return storage_components
 
