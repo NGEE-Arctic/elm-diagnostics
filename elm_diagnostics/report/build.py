@@ -262,6 +262,9 @@ class Report:
         run = self._run
 
         # Water Balance
+        fig1: plt.Figure | None = None
+        fig2: plt.Figure | None = None
+        existing_fignums = set(plt.get_fignums())
         try:
             wb = WaterBalance(run, year=self.year, config=self.config)
             sec = _Section("Water Balance", "Column water budget closure.")
@@ -291,8 +294,17 @@ class Report:
             sections.append(sec)
         except Exception as e:
             self._record_error("Water Balance", e)
+        finally:
+            if fig1 is not None:
+                plt.close(fig1)
+            if fig2 is not None:
+                plt.close(fig2)
+            self._close_new_figures(existing_fignums)
 
         # Energy Balance
+        fig1 = None
+        fig2 = None
+        existing_fignums = set(plt.get_fignums())
         try:
             eb = EnergyBalance(run, year=self.year, config=self.config)
             sec = _Section("Energy Balance", "Surface energy budget closure.")
@@ -328,8 +340,17 @@ class Report:
             sections.append(sec)
         except Exception as e:
             self._record_error("Energy Balance", e)
+        finally:
+            if fig1 is not None:
+                plt.close(fig1)
+            if fig2 is not None:
+                plt.close(fig2)
+            self._close_new_figures(existing_fignums)
 
         # Carbon Balance
+        fig1 = None
+        fig2 = None
+        existing_fignums = set(plt.get_fignums())
         try:
             cb = CarbonBalance(run, year=self.year, config=self.config)
             sec = _Section("Carbon Balance", "Ecosystem carbon budget closure.")
@@ -365,6 +386,12 @@ class Report:
             sections.append(sec)
         except Exception as e:
             self._record_error("Carbon Balance", e)
+        finally:
+            if fig1 is not None:
+                plt.close(fig1)
+            if fig2 is not None:
+                plt.close(fig2)
+            self._close_new_figures(existing_fignums)
 
         return sections
 
@@ -461,6 +488,12 @@ class Report:
         """Return the time mean as a Python float."""
         return float(da.mean().values)
 
+    @staticmethod
+    def _close_new_figures(existing_fignums: set[int]) -> None:
+        """Close figures opened after a snapshot, including leaked ones on errors."""
+        for fignum in set(plt.get_fignums()) - existing_fignums:
+            plt.close(fignum)
+
     def _build_variable_sections(self, figdir: Path) -> list[_Section]:
         sections = []
         groups = self.config.variables.groups
@@ -484,6 +517,8 @@ class Report:
 
                 # Try each plot type
                 for plot_type in plot_types:
+                    fig: plt.Figure | None = None
+                    existing_fignums = set(plt.get_fignums())
                     try:
                         fig = self._create_plot(plot_type, varname)
                         if fig is not None:
@@ -493,12 +528,15 @@ class Report:
                             )
                             caption = f"{varname} ({plot_type})"
                             sec.add_figure(full_path, thumb_path, caption, plot_type)
-                            plt.close(fig)
-                    except Exception:
+                    except Exception as e:
                         # Silently skip individual plot failures
                         # (e.g., diurnal for monthly data, seasonal for insufficient data)
                         pass
-
+                    finally:
+                        if fig is not None:
+                            plt.close(fig)
+                        self._close_new_figures(existing_fignums)
+            
             if sec.figures:
                 sections.append(sec)
 

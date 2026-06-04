@@ -37,6 +37,29 @@ def _diurnal_stats(
     )
 
 
+def _median_time_step_hours(da: xr.DataArray) -> float | None:
+    """Return the median timestep in hours, or None if it cannot be inferred."""
+    if len(da.time) < 2:
+        return None
+
+    diffs = da.time.diff("time")
+    try:
+        if np.issubdtype(diffs.dtype, np.timedelta64):
+            diff_hours = diffs / np.timedelta64(1, "h")
+            return float(diff_hours.median().item())
+
+        diff_seconds = xr.apply_ufunc(
+            lambda x: float(x.total_seconds()) if hasattr(x, "total_seconds") else np.nan,
+            diffs,
+            vectorize=True,
+            dask="parallelized",
+            output_dtypes=[np.float64],
+        )
+        return float((diff_seconds / 3600.0).median().item())
+    except Exception:
+        return None
+
+
 def plot_diurnal(
     source: Run | Comparison,
     varname: str,
@@ -118,18 +141,8 @@ def _plot_diurnal_single(
         """Check if data has sub-daily resolution."""
         if len(da.time) < 24:
             return False
-        # Check time resolution - if median delta < 1 day, it's sub-daily
-        try:
-            time_diffs = np.diff(da.time.values)
-            if hasattr(time_diffs[0], "astype"):
-                median_hours = np.median(time_diffs).astype(
-                    "timedelta64[h]"
-                ) / np.timedelta64(1, "h")
-            else:
-                median_hours = np.median(time_diffs).total_seconds() / 3600
-            return median_hours < 24
-        except Exception:
-            return False
+        median_hours = _median_time_step_hours(da)
+        return median_hours is not None and median_hours < 24
 
     if isinstance(source, Comparison):
         da_base = _squeeze_spatial(source.base.get(varname))
@@ -171,10 +184,6 @@ def _plot_diurnal_single(
             )
             fig.tight_layout()
             return fig
-
-        # Pad to 24 hours if needed
-        all_hours_b = np.arange(0, 24)
-        all_hours_e = np.arange(0, 24)
 
         if include_climos:
             ax.fill_between(
@@ -300,18 +309,8 @@ def _plot_diurnal_faceted(
         """Check if data has sub-daily resolution."""
         if len(da.time) < 24:
             return False
-        # Check time resolution - if median delta < 1 day, it's sub-daily
-        try:
-            time_diffs = np.diff(da.time.values)
-            if hasattr(time_diffs[0], "astype"):
-                median_hours = np.median(time_diffs).astype(
-                    "timedelta64[h]"
-                ) / np.timedelta64(1, "h")
-            else:
-                median_hours = np.median(time_diffs).total_seconds() / 3600
-            return median_hours < 24
-        except Exception:
-            return False
+        median_hours = _median_time_step_hours(da)
+        return median_hours is not None and median_hours < 24
 
     # Plot each subgrid unit
     for unit_id, ax_i in zip(units, axes.flat):

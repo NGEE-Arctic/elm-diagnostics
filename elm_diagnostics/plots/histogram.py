@@ -19,6 +19,18 @@ def _squeeze_spatial(da: xr.DataArray) -> xr.DataArray:
     return da
 
 
+def _flatten_finite_values(da: xr.DataArray) -> np.ndarray:
+    """Return finite values as a 1D NumPy array.
+
+    This keeps flattening and NaN filtering in xarray until the final
+    materialization step, which is friendlier to chunked arrays than
+    immediately calling ``.values.ravel()``.
+    """
+    stacked = da.stack(sample=da.dims)
+    finite = stacked.where(np.isfinite(stacked), drop=True)
+    return finite.values
+
+
 def plot_histogram(
     source: Run | Comparison,
     varname: str,
@@ -95,10 +107,8 @@ def _plot_histogram_single(
     if isinstance(source, Comparison):
         da_base = _squeeze_spatial(source.base.get(varname))
         da_exp = _squeeze_spatial(source.experiment.get(varname))
-        vals_b = da_base.values.ravel()
-        vals_e = da_exp.values.ravel()
-        vals_b = vals_b[np.isfinite(vals_b)]
-        vals_e = vals_e[np.isfinite(vals_e)]
+        vals_b = _flatten_finite_values(da_base)
+        vals_e = _flatten_finite_values(da_exp)
 
         # Shared bins
         all_vals = np.concatenate([vals_b, vals_e])
@@ -124,8 +134,7 @@ def _plot_histogram_single(
         units = da_base.attrs.get("units", "")
     else:
         da = _squeeze_spatial(source.get(varname))
-        vals = da.values.ravel()
-        vals = vals[np.isfinite(vals)]
+        vals = _flatten_finite_values(da)
         ax.hist(vals, bins=bins, density=density, alpha=0.7, color="tab:blue")
         units = da.attrs.get("units", "")
 
@@ -181,10 +190,8 @@ def _plot_histogram_faceted(
     # Plot each subgrid unit
     for unit_id, ax_i in zip(units, axes.flat):
         if isinstance(source, Comparison):
-            vals_b = _squeeze_spatial(da_base.sel({by: unit_id})).values.ravel()
-            vals_e = _squeeze_spatial(da_exp.sel({by: unit_id})).values.ravel()
-            vals_b = vals_b[np.isfinite(vals_b)]
-            vals_e = vals_e[np.isfinite(vals_e)]
+            vals_b = _flatten_finite_values(_squeeze_spatial(da_base.sel({by: unit_id})))
+            vals_e = _flatten_finite_values(_squeeze_spatial(da_exp.sel({by: unit_id})))
 
             # Shared bins
             all_vals = np.concatenate([vals_b, vals_e])
@@ -210,8 +217,7 @@ def _plot_histogram_faceted(
 
             units_str = da_base.attrs.get("units", "")
         else:
-            vals = _squeeze_spatial(da.sel({by: unit_id})).values.ravel()
-            vals = vals[np.isfinite(vals)]
+            vals = _flatten_finite_values(_squeeze_spatial(da.sel({by: unit_id})))
             ax_i.hist(vals, bins=bins, density=density, alpha=0.7, color="tab:blue")
 
             units_str = da.attrs.get("units", "")
