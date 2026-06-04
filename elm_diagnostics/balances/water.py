@@ -101,6 +101,32 @@ class WaterBalance(Balance):
         """Return cumulative balance components as a Dataset."""
         return xr.Dataset(self.components())
 
+    def to_netcdf(self, path: str | Path) -> None:
+        """Save water balance components and residual diagnostics to NetCDF."""
+        ds = xr.Dataset(self.components())
+        ds["residual"] = self.residual()
+
+        model_res = self.model_residual()
+        if model_res is not None:
+            ds["model_residual"] = model_res
+
+        model_aligned, mode = self.aligned_model_residual()
+        if model_aligned is not None:
+            model_aligned = model_aligned.copy()
+            if mode is not None:
+                model_aligned.attrs["comparison_mode"] = mode
+            ds["model_residual_aligned"] = model_aligned
+
+        residual_diff = self.residual_difference()
+        if residual_diff is not None:
+            ds["residual_difference"] = residual_diff
+
+        snow_res = self.model_snow_residual()
+        if snow_res is not None:
+            ds["model_snow_residual"] = snow_res
+
+        ds.to_netcdf(path)
+
     def _compute_residual(self) -> xr.DataArray:
         """Compute closure residual: cumul(inputs) - cumul(outputs) - dS."""
         comps = self.components()

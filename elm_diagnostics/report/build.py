@@ -585,6 +585,27 @@ class Report:
             final_residual = self._final_scalar(residual)
             stats["Residual"] = f"{final_residual:.2f} mm"
 
+            model_res_aligned, mode = wb.aligned_model_residual()
+            if model_res_aligned is not None:
+                model_res_aligned = self._reduce_non_time_dims(model_res_aligned)
+                final_model_residual = self._final_scalar(model_res_aligned)
+                stats["Model Residual"] = f"{final_model_residual:.2f} mm"
+                if mode is not None:
+                    stats["Residual Compare Mode"] = mode
+
+                diff = wb.residual_difference()
+                if diff is not None:
+                    diff = self._reduce_non_time_dims(diff)
+                    final_diff = self._final_scalar(diff)
+                    diff_rmse = float(np.sqrt(np.nanmean(np.asarray(diff.values) ** 2)))
+                    stats["Residual Diff (final)"] = f"{final_diff:.2f} mm"
+                    stats["Residual Diff (RMSE)"] = f"{diff_rmse:.2f} mm"
+
+            snow_res = wb.model_snow_residual()
+            if snow_res is not None:
+                snow_res = self._reduce_non_time_dims(snow_res)
+                stats["Snow Residual"] = f"{self._final_scalar(snow_res):.2f} mm"
+
             # Calculate percentage if requested
             if self.config.report.balance_sections.show_residual_percentage:
                 # Compute as percentage of inputs

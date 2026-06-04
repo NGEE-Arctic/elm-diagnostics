@@ -179,3 +179,18 @@ def test_water_balance_to_netcdf(water_run):
         ds = xr.open_dataset(f.name)
         assert "residual" in ds
         ds.close()
+
+
+def test_water_balance_to_netcdf_with_model_residual(water_run_with_model_residual):
+    wb = WaterBalance(water_run_with_model_residual)
+    with tempfile.NamedTemporaryFile(suffix=".nc", delete=False) as f:
+        wb.to_netcdf(f.name)
+        import xarray as xr
+
+        ds = xr.open_dataset(f.name)
+        assert "residual" in ds
+        assert "model_residual" in ds
+        assert "model_residual_aligned" in ds
+        assert "residual_difference" in ds
+        assert "model_snow_residual" in ds
+        ds.close()
