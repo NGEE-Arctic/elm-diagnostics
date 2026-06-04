@@ -47,18 +47,37 @@ class WaterBalance(Balance):
         )
 
     def _active_output_terms(self) -> list[str]:
-        """Return output terms for this run, preferring detailed family when complete."""
+        """Return output terms for this run with safe no-double-counting rules.
+
+        Selection rules:
+        1) Keep baseline non-runoff terms (e.g., QFLX_EVAP_TOT).
+        2) If detailed runoff is enabled and at least one detailed runoff term exists,
+           use available detailed runoff terms.
+        3) Otherwise, use available baseline runoff terms.
+        """
         key = self._cache_key()
         cached_key = getattr(self, "_active_outputs_cache_key", None)
         if cached_key == key and hasattr(self, "_active_outputs_cache"):
             return self._active_outputs_cache
 
         bc = self._balance_config
-        outputs = list(bc.outputs)
+        baseline_outputs = list(dict.fromkeys(bc.outputs))
+        detailed_outputs = list(dict.fromkeys(bc.detailed_outputs))
+
+        baseline_runoff = [v for v in baseline_outputs if v != "QFLX_EVAP_TOT"]
+        detailed_runoff = [v for v in detailed_outputs if v != "QFLX_EVAP_TOT"]
+        non_runoff_outputs = [v for v in baseline_outputs if v not in baseline_runoff]
+
+        outputs = list(non_runoff_outputs)
+
         if bc.use_detailed_outputs_when_available:
-            detailed = list(dict.fromkeys(bc.detailed_outputs))
-            if detailed and all(self.run.has(varname) for varname in detailed):
-                outputs = detailed
+            available_detailed_runoff = [v for v in detailed_runoff if self.run.has(v)]
+            if available_detailed_runoff:
+                outputs.extend(available_detailed_runoff)
+            else:
+                outputs.extend([v for v in baseline_runoff if self.run.has(v)])
+        else:
+            outputs.extend([v for v in baseline_runoff if self.run.has(v)])
 
         outputs = list(dict.fromkeys(outputs))
         self._active_outputs_cache_key = key
