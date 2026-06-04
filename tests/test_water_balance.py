@@ -49,9 +49,11 @@ def test_water_balance_residual_near_zero(water_run):
 
 def test_water_balance_plot(water_run):
     wb = WaterBalance(water_run)
-    fig1, fig2 = wb.plot()
+    fig1, fig2, fig3, fig4 = wb.plot()
     assert fig1 is not None
     assert fig2 is not None
+    assert fig3 is not None
+    assert fig4 is not None
     import matplotlib.pyplot as plt
     plt.close("all")
 
