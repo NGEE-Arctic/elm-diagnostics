@@ -112,7 +112,8 @@ def _plot_diurnal_single(
 ) -> plt.Figure:
     """Plot a single diurnal cycle (no faceting)."""
     style = config.plots.style
-    envelope = config.plots.climatology.envelope
+    include_climos = config.plots.climatology.include_climos
+    envelope = config.plots.climatology.envelope if include_climos else "none"
 
     if ax is None:
         fig, ax = plt.subplots(figsize=style.figsize, dpi=style.dpi)
@@ -156,9 +157,14 @@ def _plot_diurnal_single(
         mean_b, lo_b, hi_b = _diurnal_stats(da_base, envelope)
         mean_e, lo_e, hi_e = _diurnal_stats(da_exp, envelope)
 
-        ax.fill_between(
-            mean_b.hour.values, lo_b.values, hi_b.values, alpha=0.2, color="gray"
-        )
+        # Pad to 24 hours if needed
+        all_hours_b = np.arange(0, 24)
+        all_hours_e = np.arange(0, 24)
+
+        if include_climos:
+            ax.fill_between(
+                mean_b.hour.values, lo_b.values, hi_b.values, alpha=0.2, color="gray"
+            )
         ax.plot(
             mean_b.hour.values,
             mean_b.values,
@@ -167,9 +173,10 @@ def _plot_diurnal_single(
             linewidth=2,
         )
 
-        ax.fill_between(
-            mean_e.hour.values, lo_e.values, hi_e.values, alpha=0.2, color="tab:blue"
-        )
+        if include_climos:
+            ax.fill_between(
+                mean_e.hour.values, lo_e.values, hi_e.values, alpha=0.2, color="tab:blue"
+            )
         ax.plot(
             mean_e.hour.values,
             mean_e.values,
@@ -196,9 +203,10 @@ def _plot_diurnal_single(
 
         mean, lo, hi = _diurnal_stats(da, envelope)
 
-        ax.fill_between(
-            mean.hour.values, lo.values, hi.values, alpha=0.2, color="tab:blue"
-        )
+        if include_climos:
+            ax.fill_between(
+                mean.hour.values, lo.values, hi.values, alpha=0.2, color="tab:blue"
+            )
         ax.plot(mean.hour.values, mean.values, color="tab:blue", linewidth=2)
 
     ax.set_xticks(np.arange(0, 24, 3))
@@ -237,7 +245,8 @@ def _plot_diurnal_faceted(
     )
 
     style = config.plots.style
-    envelope = config.plots.climatology.envelope
+    include_climos = config.plots.climatology.include_climos
+    envelope = config.plots.climatology.envelope if include_climos else "none"
 
     # Get data and validate
     if isinstance(source, Comparison):
@@ -286,13 +295,10 @@ def _plot_diurnal_faceted(
                 mean_b, lo_b, hi_b = _diurnal_stats(da_base_unit, envelope)
                 mean_e, lo_e, hi_e = _diurnal_stats(da_exp_unit, envelope)
 
-                ax_i.fill_between(
-                    mean_b.hour.values,
-                    lo_b.values,
-                    hi_b.values,
-                    alpha=0.2,
-                    color="gray",
-                )
+                if include_climos:
+                    ax_i.fill_between(
+                        mean_b.hour.values, lo_b.values, hi_b.values, alpha=0.2, color="gray"
+                    )
                 ax_i.plot(
                     mean_b.hour.values,
                     mean_b.values,
@@ -300,13 +306,10 @@ def _plot_diurnal_faceted(
                     label=source.base.name,
                     linewidth=2,
                 )
-                ax_i.fill_between(
-                    mean_e.hour.values,
-                    lo_e.values,
-                    hi_e.values,
-                    alpha=0.2,
-                    color="tab:blue",
-                )
+                if include_climos:
+                    ax_i.fill_between(
+                        mean_e.hour.values, lo_e.values, hi_e.values, alpha=0.2, color="tab:blue"
+                    )
                 ax_i.plot(
                     mean_e.hour.values,
                     mean_e.values,
@@ -323,9 +326,10 @@ def _plot_diurnal_faceted(
             if _check_subdaily(da_unit):
                 mean, lo, hi = _diurnal_stats(da_unit, envelope)
 
-                ax_i.fill_between(
-                    mean.hour.values, lo.values, hi.values, alpha=0.2, color="tab:blue"
-                )
+                if include_climos:
+                    ax_i.fill_between(
+                        mean.hour.values, lo.values, hi.values, alpha=0.2, color="tab:blue"
+                    )
                 ax_i.plot(mean.hour.values, mean.values, color="tab:blue", linewidth=2)
 
             units_str = da.attrs.get("units", "")

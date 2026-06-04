@@ -24,6 +24,7 @@ class PlotStyleConfig(BaseModel):
 
 
 class ClimatologyConfig(BaseModel):
+    include_climos: bool = True
     envelope: Literal["minmax", "p10_p90", "std"] = "minmax"
 
 

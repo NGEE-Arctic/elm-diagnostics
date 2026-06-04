@@ -36,6 +36,7 @@ plots:
     dpi: 150
     palette: "tab10"
   climatology:
+    include_climos: true
     envelope: "minmax"  # or "p10_p90", "std"
 
 io:

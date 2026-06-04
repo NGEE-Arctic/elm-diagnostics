@@ -119,7 +119,12 @@ def _plot_timeseries_single(
         ax.plot(_plot_time(da), da.values, color="tab:blue")
 
         # Climatology envelope if multi-year
-        _add_climatology_envelope(da, ax, config.plots.climatology.envelope)
+        _add_climatology_envelope(
+            da,
+            ax,
+            config.plots.climatology.envelope,
+            include_climos=config.plots.climatology.include_climos,
+        )
 
     units = ""
     if isinstance(source, Comparison):
@@ -200,7 +205,12 @@ def _plot_timeseries_faceted(
             ax_i.plot(_plot_time(da_unit), da_unit.values, color="tab:blue")
 
             # Climatology envelope
-            _add_climatology_envelope(da_unit, ax_i, config.plots.climatology.envelope)
+            _add_climatology_envelope(
+                da_unit,
+                ax_i,
+                config.plots.climatology.envelope,
+                include_climos=config.plots.climatology.include_climos,
+            )
 
             units_str = da.attrs.get("units", "")
 
@@ -231,8 +241,12 @@ def _add_climatology_envelope(
     da: xr.DataArray,
     ax: plt.Axes,
     method: str,
+    include_climos: bool = True,
 ) -> None:
     """Add a climatology envelope if data spans multiple years."""
+    if not include_climos:
+        return
+
     times = da.time.values
     if len(times) < 24:
         return  # Need at least 2 years for meaningful climatology
