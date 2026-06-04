@@ -37,6 +37,8 @@ plots:
     palette: "tab10"
   climatology:
     include_climos: true
+    climo_start_year: -1  # -1 means earliest available year
+    climo_end_year: -1    # -1 means latest available year
     envelope: "minmax"  # or "p10_p90", "std"
 
 io:

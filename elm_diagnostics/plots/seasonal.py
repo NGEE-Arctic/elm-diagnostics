@@ -11,6 +11,7 @@ import xarray as xr
 from elm_diagnostics.config.schema import Config, load_config
 from elm_diagnostics.io.run import Comparison, Run
 from elm_diagnostics.io.subgrid import SubgridLevel
+from elm_diagnostics.plots.climatology import compute_climo_stats
 
 
 _MONTH_LABELS = ["J", "F", "M", "A", "M", "J", "J", "A", "S", "O", "N", "D"]
@@ -27,33 +28,22 @@ def _squeeze_spatial(da: xr.DataArray) -> xr.DataArray:
 def _seasonal_stats(
     da: xr.DataArray,
     envelope: str,
-) -> tuple[xr.DataArray, xr.DataArray, xr.DataArray]:
+    climo_start_year: int = -1,
+    climo_end_year: int = -1,
+) -> tuple[xr.DataArray | None, xr.DataArray | None, xr.DataArray | None]:
     """Return (mean, lower, upper) grouped by month.
 
     Returns None values if insufficient data.
     """
-    # Need at least 12 months for meaningful seasonal cycle
-    if len(da.time) < 12:
-        return None, None, None
-
-    grouped = da.groupby("time.month")
-    mean = grouped.mean()
-
-    if envelope == "minmax":
-        lo = grouped.min()
-        hi = grouped.max()
-    elif envelope == "p10_p90":
-        lo = grouped.quantile(0.1)
-        hi = grouped.quantile(0.9)
-    elif envelope == "std":
-        std = grouped.std()
-        lo = mean - std
-        hi = mean + std
-    else:
-        lo = mean
-        hi = mean
-
-    return mean, lo, hi
+    return compute_climo_stats(
+        da,
+        groupby="time.month",
+        method=envelope,
+        climo_start_year=climo_start_year,
+        climo_end_year=climo_end_year,
+        min_points=12,
+        required_groups=12,
+    )
 
 
 def plot_seasonal(
@@ -131,8 +121,18 @@ def _plot_seasonal_single(
         da_base = _squeeze_spatial(source.base.get(varname))
         da_exp = _squeeze_spatial(source.experiment.get(varname))
 
-        mean_b, lo_b, hi_b = _seasonal_stats(da_base, envelope)
-        mean_e, lo_e, hi_e = _seasonal_stats(da_exp, envelope)
+        mean_b, lo_b, hi_b = _seasonal_stats(
+            da_base,
+            envelope,
+            config.plots.climatology.climo_start_year,
+            config.plots.climatology.climo_end_year,
+        )
+        mean_e, lo_e, hi_e = _seasonal_stats(
+            da_exp,
+            envelope,
+            config.plots.climatology.climo_start_year,
+            config.plots.climatology.climo_end_year,
+        )
 
         # Check if we have sufficient data
         if mean_b is None or mean_e is None:
@@ -166,7 +166,12 @@ def _plot_seasonal_single(
         ax.legend(loc="best", fontsize="small")
     else:
         da = _squeeze_spatial(source.get(varname))
-        mean, lo, hi = _seasonal_stats(da, envelope)
+        mean, lo, hi = _seasonal_stats(
+            da,
+            envelope,
+            config.plots.climatology.climo_start_year,
+            config.plots.climatology.climo_end_year,
+        )
 
         # Check if we have sufficient data
         if mean is None:
@@ -250,8 +255,18 @@ def _plot_seasonal_faceted(
             da_base_unit = _squeeze_spatial(da_base.sel({by: unit_id}))
             da_exp_unit = _squeeze_spatial(da_exp.sel({by: unit_id}))
 
-            mean_b, lo_b, hi_b = _seasonal_stats(da_base_unit, envelope)
-            mean_e, lo_e, hi_e = _seasonal_stats(da_exp_unit, envelope)
+            mean_b, lo_b, hi_b = _seasonal_stats(
+                da_base_unit,
+                envelope,
+                config.plots.climatology.climo_start_year,
+                config.plots.climatology.climo_end_year,
+            )
+            mean_e, lo_e, hi_e = _seasonal_stats(
+                da_exp_unit,
+                envelope,
+                config.plots.climatology.climo_start_year,
+                config.plots.climatology.climo_end_year,
+            )
 
             # Check if we have sufficient data
             if mean_b is not None and mean_e is not None:
@@ -274,7 +289,12 @@ def _plot_seasonal_faceted(
             units_str = da_base.attrs.get("units", "")
         else:
             da_unit = _squeeze_spatial(da.sel({by: unit_id}))
-            mean, lo, hi = _seasonal_stats(da_unit, envelope)
+            mean, lo, hi = _seasonal_stats(
+                da_unit,
+                envelope,
+                config.plots.climatology.climo_start_year,
+                config.plots.climatology.climo_end_year,
+            )
 
             # Check if we have sufficient data
             if mean is not None:

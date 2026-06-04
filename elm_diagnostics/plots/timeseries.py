@@ -12,6 +12,7 @@ from elm_diagnostics.balances.base import _plot_time
 from elm_diagnostics.config.schema import Config, load_config
 from elm_diagnostics.io.run import Comparison, Run
 from elm_diagnostics.io.subgrid import SubgridLevel
+from elm_diagnostics.plots.climatology import compute_climo_stats
 
 
 def _squeeze_spatial(da: xr.DataArray) -> xr.DataArray:
@@ -125,6 +126,8 @@ def _plot_timeseries_single(
             ax,
             config.plots.climatology.envelope,
             include_climos=config.plots.climatology.include_climos,
+            climo_start_year=config.plots.climatology.climo_start_year,
+            climo_end_year=config.plots.climatology.climo_end_year,
         )
 
     units = ""
@@ -211,6 +214,8 @@ def _plot_timeseries_faceted(
                 ax_i,
                 config.plots.climatology.envelope,
                 include_climos=config.plots.climatology.include_climos,
+                climo_start_year=config.plots.climatology.climo_start_year,
+                climo_end_year=config.plots.climatology.climo_end_year,
             )
 
             units_str = da.attrs.get("units", "")
@@ -243,35 +248,24 @@ def _add_climatology_envelope(
     ax: plt.Axes,
     method: str,
     include_climos: bool = True,
+    climo_start_year: int = -1,
+    climo_end_year: int = -1,
 ) -> None:
     """Add a climatology envelope if data spans multiple years."""
     if not include_climos:
         return
 
-    times = da.time.values
-    if len(times) < 24:
-        return  # Need at least 2 years for meaningful climatology
+    _, lo, hi = compute_climo_stats(
+        da,
+        groupby="time.month",
+        method=method,
+        climo_start_year=climo_start_year,
+        climo_end_year=climo_end_year,
+        min_points=24,
+        required_groups=12,
+    )
 
-    # Group by month
-    months = da.time.dt.month
-    unique_months = np.unique(months.values)
-    if len(unique_months) < 12:
-        return
-
-    grouped = da.groupby("time.month")
-
-    if method == "minmax":
-        lo = grouped.min()
-        hi = grouped.max()
-    elif method == "p10_p90":
-        lo = grouped.quantile(0.1)
-        hi = grouped.quantile(0.9)
-    elif method == "std":
-        mean = grouped.mean()
-        std = grouped.std()
-        lo = mean - std
-        hi = mean + std
-    else:
+    if lo is None or hi is None:
         return
 
     # Plot envelope as fill between month indices

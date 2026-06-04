@@ -9,6 +9,7 @@ import xarray as xr
 from elm_diagnostics.config.schema import Config, load_config
 from elm_diagnostics.io.run import Comparison, Run
 from elm_diagnostics.io.subgrid import SubgridLevel
+from elm_diagnostics.plots.climatology import compute_climo_stats
 
 
 def _squeeze_spatial(da: xr.DataArray) -> xr.DataArray:
@@ -22,26 +23,18 @@ def _squeeze_spatial(da: xr.DataArray) -> xr.DataArray:
 def _diurnal_stats(
     da: xr.DataArray,
     envelope: str,
-) -> tuple[xr.DataArray, xr.DataArray, xr.DataArray]:
+    climo_start_year: int = -1,
+    climo_end_year: int = -1,
+) -> tuple[xr.DataArray | None, xr.DataArray | None, xr.DataArray | None]:
     """Return (mean, lower, upper) grouped by hour of day."""
-    grouped = da.groupby("time.hour")
-    mean = grouped.mean()
-
-    if envelope == "minmax":
-        lo = grouped.min()
-        hi = grouped.max()
-    elif envelope == "p10_p90":
-        lo = grouped.quantile(0.1)
-        hi = grouped.quantile(0.9)
-    elif envelope == "std":
-        std = grouped.std()
-        lo = mean - std
-        hi = mean + std
-    else:
-        lo = mean
-        hi = mean
-
-    return mean, lo, hi
+    return compute_climo_stats(
+        da,
+        groupby="time.hour",
+        method=envelope,
+        climo_start_year=climo_start_year,
+        climo_end_year=climo_end_year,
+        min_points=1,
+    )
 
 
 def plot_diurnal(
@@ -156,8 +149,30 @@ def _plot_diurnal_single(
             fig.tight_layout()
             return fig
 
-        mean_b, lo_b, hi_b = _diurnal_stats(da_base, envelope)
-        mean_e, lo_e, hi_e = _diurnal_stats(da_exp, envelope)
+        mean_b, lo_b, hi_b = _diurnal_stats(
+            da_base,
+            envelope,
+            config.plots.climatology.climo_start_year,
+            config.plots.climatology.climo_end_year,
+        )
+        mean_e, lo_e, hi_e = _diurnal_stats(
+            da_exp,
+            envelope,
+            config.plots.climatology.climo_start_year,
+            config.plots.climatology.climo_end_year,
+        )
+
+        if mean_b is None or mean_e is None:
+            ax.text(
+                0.5,
+                0.5,
+                "No data in climatology year window",
+                transform=ax.transAxes,
+                ha="center",
+                va="center",
+            )
+            fig.tight_layout()
+            return fig
 
         # Pad to 24 hours if needed
         all_hours_b = np.arange(0, 24)
@@ -203,7 +218,24 @@ def _plot_diurnal_single(
             fig.tight_layout()
             return fig
 
-        mean, lo, hi = _diurnal_stats(da, envelope)
+        mean, lo, hi = _diurnal_stats(
+            da,
+            envelope,
+            config.plots.climatology.climo_start_year,
+            config.plots.climatology.climo_end_year,
+        )
+
+        if mean is None:
+            ax.text(
+                0.5,
+                0.5,
+                "No data in climatology year window",
+                transform=ax.transAxes,
+                ha="center",
+                va="center",
+            )
+            fig.tight_layout()
+            return fig
 
         if include_climos:
             ax.fill_between(
@@ -294,8 +326,22 @@ def _plot_diurnal_faceted(
             da_exp_unit = _squeeze_spatial(da_exp.sel({by: unit_id}))
 
             if _check_subdaily(da_base_unit) and _check_subdaily(da_exp_unit):
-                mean_b, lo_b, hi_b = _diurnal_stats(da_base_unit, envelope)
-                mean_e, lo_e, hi_e = _diurnal_stats(da_exp_unit, envelope)
+                mean_b, lo_b, hi_b = _diurnal_stats(
+                    da_base_unit,
+                    envelope,
+                    config.plots.climatology.climo_start_year,
+                    config.plots.climatology.climo_end_year,
+                )
+                mean_e, lo_e, hi_e = _diurnal_stats(
+                    da_exp_unit,
+                    envelope,
+                    config.plots.climatology.climo_start_year,
+                    config.plots.climatology.climo_end_year,
+                )
+
+                if mean_b is None or mean_e is None:
+                    units_str = da_base.attrs.get("units", "")
+                    continue
 
                 if include_climos:
                     ax_i.fill_between(
@@ -326,7 +372,16 @@ def _plot_diurnal_faceted(
             da_unit = _squeeze_spatial(da.sel({by: unit_id}))
 
             if _check_subdaily(da_unit):
-                mean, lo, hi = _diurnal_stats(da_unit, envelope)
+                mean, lo, hi = _diurnal_stats(
+                    da_unit,
+                    envelope,
+                    config.plots.climatology.climo_start_year,
+                    config.plots.climatology.climo_end_year,
+                )
+
+                if mean is None:
+                    units_str = da.attrs.get("units", "")
+                    continue
 
                 if include_climos:
                     ax_i.fill_between(
