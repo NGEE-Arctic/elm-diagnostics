@@ -354,32 +354,28 @@ class Report:
         stats = {}
         try:
             components = wb.components()
-            residual = wb.residual()
-            
+            reduced_components = {
+                name: self._reduce_non_time_dims(da)
+                for name, da in components.items()
+            }
+            residual = self._reduce_non_time_dims(wb.residual())
+
             # Get final cumulative values
-            for name, da in components.items():
-                if len(da.dims) > 1:
-                    # Spatial mean if needed
-                    da = da.mean(dim=[d for d in da.dims if d != "time"])
-                final_val = float(da.isel(time=-1).values)
+            for name, da in reduced_components.items():
+                final_val = self._final_scalar(da)
                 stats[name] = f"{final_val:.2f} mm"
-            
+
             # Add residual info
-            if len(residual.dims) > 1:
-                residual = residual.mean(dim=[d for d in residual.dims if d != "time"])
-            final_residual = float(residual.isel(time=-1).values)
+            final_residual = self._final_scalar(residual)
             stats["Residual"] = f"{final_residual:.2f} mm"
-            
+
             # Calculate percentage if requested
             if self.config.report.balance_sections.show_residual_percentage:
                 # Compute as percentage of inputs
-                total_input = 0
+                total_input = 0.0
                 for key in ["RAIN", "SNOW"]:
-                    if key in components:
-                        val = components[key]
-                        if len(val.dims) > 1:
-                            val = val.mean(dim=[d for d in val.dims if d != "time"])
-                        total_input += abs(float(val.isel(time=-1).values))
+                    if key in reduced_components:
+                        total_input += abs(self._final_scalar(reduced_components[key]))
                 if total_input > 0:
                     pct = (abs(final_residual) / total_input) * 100
                     stats["Residual (%)"] = f"{pct:.2f}%"
@@ -392,39 +388,59 @@ class Report:
         """Compute statistics for energy balance section."""
         stats = {}
         try:
-            components = eb.components()
-            
+            components = {
+                name: self._reduce_non_time_dims(da)
+                for name, da in eb.components().items()
+            }
+
             # Get mean flux values
             for name, da in components.items():
-                if len(da.dims) > 1:
-                    da = da.mean(dim=[d for d in da.dims if d != "time"])
-                mean_val = float(da.mean().values)
+                mean_val = self._mean_scalar(da)
                 stats[name] = f"{mean_val:.2f} W/m²"
         except Exception as e:
             stats["Error"] = str(e)
-        
+
         return stats
 
     def _compute_carbon_balance_stats(self, cb: CarbonBalance) -> dict[str, Any]:
         """Compute statistics for carbon balance section."""
         stats = {}
         try:
-            components = cb.components()
-            
+            components = {
+                name: self._reduce_non_time_dims(da)
+                for name, da in cb.components().items()
+            }
+
             # Get final cumulative or mean values
             for name, da in components.items():
-                if len(da.dims) > 1:
-                    da = da.mean(dim=[d for d in da.dims if d != "time"])
                 if "cumulative" in name.lower() or name in ["GPP", "NEE", "HR"]:
-                    final_val = float(da.isel(time=-1).values)
+                    final_val = self._final_scalar(da)
                     stats[name] = f"{final_val:.2f} gC/m²"
                 else:
-                    mean_val = float(da.mean().values)
+                    mean_val = self._mean_scalar(da)
                     stats[name] = f"{mean_val:.2f} gC/m²"
         except Exception as e:
             stats["Error"] = str(e)
-        
+
         return stats
+
+    @staticmethod
+    def _reduce_non_time_dims(da: xr.DataArray) -> xr.DataArray:
+        """Average over non-time dimensions so report stats use one time series."""
+        reduce_dims = [dim for dim in da.dims if dim != "time"]
+        if reduce_dims:
+            return da.mean(dim=reduce_dims)
+        return da
+
+    @staticmethod
+    def _final_scalar(da: xr.DataArray) -> float:
+        """Return the final time-step value as a Python float."""
+        return float(da.isel(time=-1).values)
+
+    @staticmethod
+    def _mean_scalar(da: xr.DataArray) -> float:
+        """Return the time mean as a Python float."""
+        return float(da.mean().values)
 
     def _build_variable_sections(self, figdir: Path) -> list[_Section]:
         sections = []
