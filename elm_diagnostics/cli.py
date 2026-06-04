@@ -140,6 +140,49 @@ def _get_run_chunk_options(
     return mode, manual_chunks, target_mb
 
 
+def _print_report_section_timings(
+    timings: list[dict[str, float | str | None]],
+    build_total_seconds: float | None = None,
+) -> None:
+    """Print a section-level timing summary for report generation."""
+    if not timings:
+        return
+
+    grand_total = sum(float(entry["total_seconds"]) for entry in timings)
+    title_width = max(len(str(entry["title"])) for entry in timings)
+    show_phase_breakdown = any(
+        any(entry.get(key) is not None for key in ("io_seconds", "compute_seconds", "plot_seconds"))
+        for entry in timings
+    )
+
+    console.print("\n[bold]Section timings[/bold]")
+    for entry in timings:
+        title = str(entry["title"])
+        total = float(entry["total_seconds"])
+        pct = 100.0 * total / grand_total if grand_total > 0 else 0.0
+        line = f"  {title:<{title_width}}  total {total:6.2f}s  {pct:5.1f}%"
+        if show_phase_breakdown:
+            parts = []
+            if entry.get("io_seconds") is not None:
+                parts.append(f"I/O {float(entry['io_seconds']):.2f}s")
+            if entry.get("compute_seconds") is not None:
+                parts.append(f"compute {float(entry['compute_seconds']):.2f}s")
+            if entry.get("plot_seconds") is not None:
+                parts.append(f"plot {float(entry['plot_seconds']):.2f}s")
+            if parts:
+                line += "  (" + ", ".join(parts) + ")"
+        console.print(line)
+
+    console.print(f"  {'Grand total':<{title_width}}  total {grand_total:6.2f}s  100.0%")
+    if build_total_seconds is not None:
+        overhead = build_total_seconds - grand_total
+        console.print(f"  {'Report build total':<{title_width}}  total {build_total_seconds:6.2f}s")
+        if abs(overhead) >= 0.01:
+            console.print(
+                f"  {'Unattributed overhead':<{title_width}}  total {overhead:6.2f}s"
+            )
+
+
 @app.command()
 def report(
     path: str = typer.Argument(..., help="Path to ELM history files directory."),
@@ -306,6 +349,7 @@ def report(
             console.print(f"[green]✓[/green] Report generated in {elapsed:.1f}s")
 
         console.print(f"\n[bold green]Report generated:[/bold green] {html_path}")
+        _print_report_section_timings(rpt.section_timings, rpt.build_total_seconds)
 
         if verbose:
             logger.info(f"Output directory: {Path(out).resolve()}")
