@@ -622,6 +622,9 @@ class Report:
 
         for group_name, varnames in groups.items():
             section_start = time.perf_counter()
+            io_seconds = 0.0
+            compute_seconds = 0.0
+            plot_seconds = 0.0
             sec = _Section(group_name.replace("_", " ").title())
 
             # Limit number of variables if configured
@@ -632,7 +635,10 @@ class Report:
                 )
 
             for varname in varnames_to_plot:
-                if not run.has(varname):
+                compute_start = time.perf_counter()
+                has_var = run.has(varname)
+                compute_seconds += time.perf_counter() - compute_start
+                if not has_var:
                     continue
 
                 # Try each plot type
@@ -640,12 +646,17 @@ class Report:
                     fig: plt.Figure | None = None
                     existing_fignums = set(plt.get_fignums())
                     try:
-                        fig = self._create_plot(plot_type, varname)
+                        fig, plot_compute_seconds, plot_render_seconds = self._create_plot(
+                            plot_type,
+                            varname,
+                        )
+                        compute_seconds += plot_compute_seconds
+                        plot_seconds += plot_render_seconds
                         if fig is not None:
                             basename = f"{group_name}_{varname}_{plot_type}"
-                            full_path, thumb_path = self._save_figure(
-                                fig, figdir, basename
-                            )
+                            io_start = time.perf_counter()
+                            full_path, thumb_path = self._save_figure(fig, figdir, basename)
+                            io_seconds += time.perf_counter() - io_start
                             caption = f"{varname} ({plot_type})"
                             sec.add_figure(full_path, thumb_path, caption, plot_type)
                     except Exception as e:
@@ -660,49 +671,90 @@ class Report:
             if sec.figures:
                 sections.append(sec)
 
-            self._record_section_timing(sec.title, section_start)
+            self._record_section_timing(
+                sec.title,
+                section_start,
+                io_seconds=io_seconds,
+                compute_seconds=compute_seconds,
+                plot_seconds=plot_seconds,
+            )
 
         return sections
 
-    def _create_plot(self, plot_type: str, varname: str) -> plt.Figure | None:
-        """Create a specific type of plot for a variable.
-
+    def _create_plot(
+        self,
+        plot_type: str,
+        varname: str,
+    ) -> tuple[plt.Figure | None, float, float]:
+        """Create one plot and return aggregated compute and render timings.
+        
         Returns
         -------
-        Figure or None if plot type should be skipped.
+        Tuple of ``(figure, compute_seconds, plot_seconds)``.
         """
         if plot_type == "timeseries":
-            return plot_timeseries(self.source, varname, config=self.config)
+            plot_start = time.perf_counter()
+            return (
+                plot_timeseries(self.source, varname, config=self.config),
+                0.0,
+                time.perf_counter() - plot_start,
+            )
         elif plot_type == "seasonal":
             # Check if we have enough data
+            compute_start = time.perf_counter()
             run = self._run
             var = run.get(varname)
             if len(var.time) < 12:
-                return None
-            return plot_seasonal(self.source, varname, config=self.config)
+                return None, time.perf_counter() - compute_start, 0.0
+            compute_seconds = time.perf_counter() - compute_start
+            plot_start = time.perf_counter()
+            return (
+                plot_seasonal(self.source, varname, config=self.config),
+                compute_seconds,
+                time.perf_counter() - plot_start,
+            )
         elif plot_type == "anomaly":
             # Check if we have enough data (need at least 2 years)
+            compute_start = time.perf_counter()
             run = self._run
             var = run.get(varname)
             if len(var.time) < 24:  # Rough approximation
-                return None
-            return plot_anomaly(self.source, varname, config=self.config)
+                return None, time.perf_counter() - compute_start, 0.0
+            compute_seconds = time.perf_counter() - compute_start
+            plot_start = time.perf_counter()
+            return (
+                plot_anomaly(self.source, varname, config=self.config),
+                compute_seconds,
+                time.perf_counter() - plot_start,
+            )
         elif plot_type == "histogram":
-            return plot_histogram(self.source, varname, config=self.config)
+            plot_start = time.perf_counter()
+            return (
+                plot_histogram(self.source, varname, config=self.config),
+                0.0,
+                time.perf_counter() - plot_start,
+            )
         elif plot_type == "diurnal":
             # Check if data is sub-daily
+            compute_start = time.perf_counter()
             run = self._run
             var = run.get(varname)
             if len(var.time) < 24:
-                return None
+                return None, time.perf_counter() - compute_start, 0.0
             # Check time resolution
             time_diff = np.diff(var.time.values).astype("timedelta64[h]").astype(int)
             median_hours = np.median(time_diff)
             if median_hours >= 24:
-                return None  # Not sub-daily
-            return plot_diurnal(self.source, varname, config=self.config)
+                return None, time.perf_counter() - compute_start, 0.0  # Not sub-daily
+            compute_seconds = time.perf_counter() - compute_start
+            plot_start = time.perf_counter()
+            return (
+                plot_diurnal(self.source, varname, config=self.config),
+                compute_seconds,
+                time.perf_counter() - plot_start,
+            )
         else:
-            return None
+            return None, 0.0, 0.0
 
     def _build_diagnostics_section(self) -> _Section:
         """Build diagnostics section showing errors and warnings."""
