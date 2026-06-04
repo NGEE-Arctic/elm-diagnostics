@@ -153,28 +153,56 @@ class WaterBalance(Balance):
                 continue
         return None
 
+    def _model_diag_cache_key(self) -> tuple[object, ...]:
+        """Return cache key for model residual diagnostics."""
+        return (
+            self._cache_key(),
+            tuple(self._balance_config.model_residual_candidates),
+            tuple(self._balance_config.snow_residual_candidates),
+            self._balance_config.model_residual_compare_mode,
+            float(self._balance_config.model_residual_sign),
+        )
+
     def model_residual(self) -> xr.DataArray | None:
         """Return model-reported water residual if available (e.g., ERRH2O)."""
+        key = self._model_diag_cache_key()
+        cached_key = getattr(self, "_model_residual_cache_key", None)
+        if cached_key == key and hasattr(self, "_model_residual_cache"):
+            return self._model_residual_cache
+
         da = self._get_optional_var(self._balance_config.model_residual_candidates)
         if da is None:
+            self._model_residual_cache_key = key
+            self._model_residual_cache = None
             return None
 
         da = da.copy()
         da.attrs.setdefault("long_name", "model-reported water residual")
         da.attrs.setdefault("units", "mm")
         da.name = "model_residual"
+        self._model_residual_cache_key = key
+        self._model_residual_cache = da
         return da
 
     def model_snow_residual(self) -> xr.DataArray | None:
         """Return model-reported snow imbalance residual if available."""
+        key = self._model_diag_cache_key()
+        cached_key = getattr(self, "_model_snow_residual_cache_key", None)
+        if cached_key == key and hasattr(self, "_model_snow_residual_cache"):
+            return self._model_snow_residual_cache
+
         da = self._get_optional_var(self._balance_config.snow_residual_candidates)
         if da is None:
+            self._model_snow_residual_cache_key = key
+            self._model_snow_residual_cache = None
             return None
 
         da = da.copy()
         da.attrs.setdefault("long_name", "model-reported snow imbalance residual")
         da.attrs.setdefault("units", "mm")
         da.name = "model_snow_residual"
+        self._model_snow_residual_cache_key = key
+        self._model_snow_residual_cache = da
         return da
 
     @staticmethod
@@ -202,8 +230,15 @@ class WaterBalance(Balance):
             mode : str or None
                 One of {"direct", "cumulative"}, or None if unavailable.
         """
+        key = self._model_diag_cache_key()
+        cached_key = getattr(self, "_aligned_model_residual_cache_key", None)
+        if cached_key == key and hasattr(self, "_aligned_model_residual_cache"):
+            return self._aligned_model_residual_cache
+
         model_res = self.model_residual()
         if model_res is None:
+            self._aligned_model_residual_cache_key = key
+            self._aligned_model_residual_cache = (None, None)
             return None, None
 
         sign = float(self._balance_config.model_residual_sign)
@@ -236,18 +271,37 @@ class WaterBalance(Balance):
         aligned.name = "model_residual_aligned"
         aligned.attrs["comparison_mode"] = mode
         aligned.attrs.setdefault("units", "mm")
+        self._aligned_model_residual_cache_key = key
+        self._aligned_model_residual_cache = (aligned, mode)
         return aligned, mode
+
+    def _has_meaningful_model_residual(self, model_aligned: xr.DataArray) -> bool:
+        """Return True when model residual magnitude warrants diff plotting."""
+        model_scale = self._rmse(model_aligned)
+        py_scale = self._rmse(self.residual())
+        abs_tol = 1e-6
+        rel_tol = 1e-3
+        return model_scale > max(abs_tol, rel_tol * py_scale)
 
     def residual_difference(self) -> xr.DataArray | None:
         """Return Python residual minus aligned model residual, if available."""
+        key = self._model_diag_cache_key()
+        cached_key = getattr(self, "_residual_difference_cache_key", None)
+        if cached_key == key and hasattr(self, "_residual_difference_cache"):
+            return self._residual_difference_cache
+
         model_aligned, _ = self.aligned_model_residual()
         if model_aligned is None:
+            self._residual_difference_cache_key = key
+            self._residual_difference_cache = None
             return None
 
         diff = self.residual() - model_aligned
         diff.name = "residual_difference"
         diff.attrs["long_name"] = "python residual minus model residual"
         diff.attrs["units"] = "mm"
+        self._residual_difference_cache_key = key
+        self._residual_difference_cache = diff
         return diff
 
     def _storage_decomposition_components(self) -> dict[str, xr.DataArray]:
@@ -358,7 +412,7 @@ class WaterBalance(Balance):
             )
 
             diff = self.residual_difference()
-            if diff is not None:
+            if diff is not None and self._has_meaningful_model_residual(model_res):
                 ax1.plot(
                     _plot_time(diff),
                     diff,
@@ -458,6 +512,15 @@ class WaterBalance(Balance):
         fig4, axes4 = create_facet_figure(len(units), style)
         
         # Plot each subgrid unit
+        res_all = self.residual()
+        model_res_all, model_mode = self.aligned_model_residual()
+        diff_all = self.residual_difference()
+        show_diff = (
+            model_res_all is not None
+            and diff_all is not None
+            and self._has_meaningful_model_residual(model_res_all)
+        )
+
         for unit_id, ax1, ax2, ax3, ax4 in zip(
             units,
             axes1.flat,
@@ -497,12 +560,11 @@ class WaterBalance(Balance):
                 )
             
             # Residual for this unit
-            res_unit = self.residual().sel({self.by: unit_id})
+            res_unit = res_all.sel({self.by: unit_id})
             ax1.plot(_plot_time(res_unit), res_unit, label="Res", color="black", linestyle="--", linewidth=1)
 
-            model_res, model_mode = self.aligned_model_residual()
-            if model_res is not None:
-                model_res_unit = model_res.sel({self.by: unit_id})
+            if model_res_all is not None:
+                model_res_unit = model_res_all.sel({self.by: unit_id})
                 label = "Model"
                 if model_mode is not None:
                     label += f" ({model_mode})"
@@ -515,9 +577,8 @@ class WaterBalance(Balance):
                     linewidth=1,
                 )
 
-                diff = self.residual_difference()
-                if diff is not None:
-                    diff_unit = diff.sel({self.by: unit_id})
+                if show_diff:
+                    diff_unit = diff_all.sel({self.by: unit_id})
                     ax1.plot(
                         _plot_time(diff_unit),
                         diff_unit,
