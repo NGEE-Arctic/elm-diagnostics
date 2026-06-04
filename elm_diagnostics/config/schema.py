@@ -169,6 +169,9 @@ class VariableGroupsConfig(BaseModel):
 
 class IOConfig(BaseModel):
     strict_combine: bool = False
+    chunk_mode: Literal["off", "auto", "manual"] = "auto"
+    chunk_target_mb: int = 64
+    chunks: dict[str, int] = Field(default_factory=dict)
 
 
 class Config(BaseModel):

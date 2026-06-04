@@ -123,6 +123,23 @@ def _get_run_strict_combine(config_path: str | None) -> bool:
     return cfg.io.strict_combine
 
 
+def _get_run_chunk_options(
+    config_path: str | None,
+) -> tuple[str, dict[str, int] | None, int]:
+    """Resolve chunking mode/settings from merged defaults/user config."""
+    from elm_diagnostics.config.schema import load_config
+
+    cfg = load_config(path=config_path) if config_path else load_config()
+    mode = cfg.io.chunk_mode
+    target_mb = cfg.io.chunk_target_mb
+    manual_chunks = cfg.io.chunks or None
+    if mode == "manual" and manual_chunks is None:
+        mode = "off"
+    if mode != "manual":
+        manual_chunks = None
+    return mode, manual_chunks, target_mb
+
+
 @app.command()
 def report(
     path: str = typer.Argument(..., help="Path to ELM history files directory."),
@@ -191,6 +208,7 @@ def report(
             validate_config(config)
 
         strict_combine = _get_run_strict_combine(config)
+        chunk_mode, manual_chunks, chunk_target_mb = _get_run_chunk_options(config)
 
         # Import here to avoid slow startup
         from elm_diagnostics.io.run import Comparison, Run
@@ -207,13 +225,25 @@ def report(
                 transient=True,
             ) as progress:
                 task = progress.add_task("Loading ELM data...", total=None)
-                run = Run(str(elm_path), strict_combine=strict_combine)
+                run = Run(
+                    str(elm_path),
+                    strict_combine=strict_combine,
+                    chunk_mode=chunk_mode,
+                    chunks=manual_chunks,
+                    chunk_target_mb=chunk_target_mb,
+                )
                 progress.update(task, completed=True)
                 elapsed = time.time() - start_time
                 if verbose:
                     logger.info(f"Loaded data in {elapsed:.1f}s")
         else:
-            run = Run(str(elm_path), strict_combine=strict_combine)
+            run = Run(
+                str(elm_path),
+                strict_combine=strict_combine,
+                chunk_mode=chunk_mode,
+                chunks=manual_chunks,
+                chunk_target_mb=chunk_target_mb,
+            )
 
         # Load comparison run if specified
         if compare:
@@ -226,12 +256,22 @@ def report(
                 ) as progress:
                     task = progress.add_task("Loading comparison data...", total=None)
                     compare_run = Run(
-                        str(compare_path), strict_combine=strict_combine
+                        str(compare_path),
+                        strict_combine=strict_combine,
+                        chunk_mode=chunk_mode,
+                        chunks=manual_chunks,
+                        chunk_target_mb=chunk_target_mb,
                     )
                     source = Comparison(run, compare_run)
                     progress.update(task, completed=True)
             else:
-                compare_run = Run(str(compare_path), strict_combine=strict_combine)
+                compare_run = Run(
+                    str(compare_path),
+                    strict_combine=strict_combine,
+                    chunk_mode=chunk_mode,
+                    chunks=manual_chunks,
+                    chunk_target_mb=chunk_target_mb,
+                )
                 source = Comparison(run, compare_run)
         else:
             source = run
@@ -327,6 +367,7 @@ def balance(
             validate_config(config)
 
         strict_combine = _get_run_strict_combine(config)
+        chunk_mode, manual_chunks, chunk_target_mb = _get_run_chunk_options(config)
 
         from elm_diagnostics.balances.carbon import CarbonBalance
         from elm_diagnostics.balances.energy import EnergyBalance
@@ -357,13 +398,25 @@ def balance(
                 transient=True,
             ) as progress:
                 task = progress.add_task("Loading ELM data...", total=None)
-                run = Run(str(elm_path), strict_combine=strict_combine)
+                run = Run(
+                    str(elm_path),
+                    strict_combine=strict_combine,
+                    chunk_mode=chunk_mode,
+                    chunks=manual_chunks,
+                    chunk_target_mb=chunk_target_mb,
+                )
                 progress.update(task, completed=True)
                 elapsed = time.time() - start_time
                 if verbose:
                     logger.info(f"Loaded data in {elapsed:.1f}s")
         else:
-            run = Run(str(elm_path), strict_combine=strict_combine)
+            run = Run(
+                str(elm_path),
+                strict_combine=strict_combine,
+                chunk_mode=chunk_mode,
+                chunks=manual_chunks,
+                chunk_target_mb=chunk_target_mb,
+            )
 
         # Compute balance
         if not quiet:
@@ -475,6 +528,7 @@ def plot(
             validate_config(config)
 
         strict_combine = _get_run_strict_combine(config)
+        chunk_mode, manual_chunks, chunk_target_mb = _get_run_chunk_options(config)
 
         from elm_diagnostics.io.run import Run
         from elm_diagnostics.plots import (
@@ -509,13 +563,25 @@ def plot(
                 transient=True,
             ) as progress:
                 task = progress.add_task("Loading ELM data...", total=None)
-                run = Run(str(elm_path), strict_combine=strict_combine)
+                run = Run(
+                    str(elm_path),
+                    strict_combine=strict_combine,
+                    chunk_mode=chunk_mode,
+                    chunks=manual_chunks,
+                    chunk_target_mb=chunk_target_mb,
+                )
                 progress.update(task, completed=True)
                 elapsed = time.time() - start_time
                 if verbose:
                     logger.info(f"Loaded data in {elapsed:.1f}s")
         else:
-            run = Run(str(elm_path), strict_combine=strict_combine)
+            run = Run(
+                str(elm_path),
+                strict_combine=strict_combine,
+                chunk_mode=chunk_mode,
+                chunks=manual_chunks,
+                chunk_target_mb=chunk_target_mb,
+            )
 
         if verbose:
             logger.info(f"Variable: {varname}")
