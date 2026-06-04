@@ -16,6 +16,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import xarray as xr
 from jinja2 import Environment, FileSystemLoader
+from PIL import Image
 
 from elm_diagnostics.balances.carbon import CarbonBalance
 from elm_diagnostics.balances.energy import EnergyBalance
@@ -32,6 +33,9 @@ from elm_diagnostics.plots import (
 
 _TEMPLATE_DIR = Path(__file__).parent / "templates"
 _ASSETS_DIR = Path(__file__).parent / "assets"
+
+_RESAMPLING = getattr(Image, "Resampling", Image)
+_PNG_PIL_KWARGS = {"compress_level": 1, "optimize": False}
 
 
 class _Section:
@@ -134,17 +138,39 @@ class Report:
         """
         full_path = figdir / f"{basename}.png"
         thumb_path = figdir / f"{basename}_thumb.png"
-
-        # Save full resolution
-        fig.savefig(full_path, bbox_inches="tight", dpi=self.config.plots.style.dpi)
-
-        # Save thumbnail if enabled
+        
+        # Save full resolution with faster PNG settings when supported.
+        savefig_kwargs = {
+            "bbox_inches": "tight",
+            "dpi": self.config.plots.style.dpi,
+            "pil_kwargs": _PNG_PIL_KWARGS,
+        }
+        try:
+            fig.savefig(full_path, **savefig_kwargs)
+        except TypeError:
+            savefig_kwargs.pop("pil_kwargs", None)
+            fig.savefig(full_path, **savefig_kwargs)
+        
+        # Save thumbnail by resizing the already-written full image.
         if self.config.report.thumbnails.enabled:
-            fig.savefig(
-                thumb_path,
-                bbox_inches="tight",
-                dpi=self.config.report.thumbnails.dpi,
-            )
+            thumb_size = tuple(self.config.report.thumbnails.size)
+            try:
+                with Image.open(full_path) as image:
+                    thumb = image.copy()
+                    thumb.thumbnail(thumb_size, _RESAMPLING.LANCZOS)
+                    thumb.save(thumb_path, **_PNG_PIL_KWARGS)
+            except Exception:
+                # Fall back to legacy behavior if image resize fails.
+                fallback_kwargs = {
+                    "bbox_inches": "tight",
+                    "dpi": self.config.report.thumbnails.dpi,
+                    "pil_kwargs": _PNG_PIL_KWARGS,
+                }
+                try:
+                    fig.savefig(thumb_path, **fallback_kwargs)
+                except TypeError:
+                    fallback_kwargs.pop("pil_kwargs", None)
+                    fig.savefig(thumb_path, **fallback_kwargs)
         else:
             # If thumbnails disabled, use same file for both
             thumb_path = full_path
