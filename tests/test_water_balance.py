@@ -261,6 +261,23 @@ def test_water_balance_uses_partial_detailed_runoff_when_available():
         run.close()
 
 
+def test_water_balance_includes_supplemental_runoff_term_when_present():
+    ds = make_water_balance_dataset(
+        start_year=2000,
+        n_months=12,
+        include_supplemental_runoff=True,
+    )
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        save_as_elm_files(ds, Path(tmpdir), casename="water_test_supp_runoff", tape="h0")
+        run = Run(tmpdir)
+        wb = WaterBalance(run)
+        comps = wb.components()
+
+        assert "QSNWCPICE" in comps
+        run.close()
+
+
 def test_water_balance_to_netcdf(water_run):
     wb = WaterBalance(water_run)
     with tempfile.NamedTemporaryFile(suffix=".nc", delete=False) as f:

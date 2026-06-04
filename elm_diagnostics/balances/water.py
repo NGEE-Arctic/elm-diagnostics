@@ -42,6 +42,7 @@ class WaterBalance(Balance):
             bc.inputs
             + bc.outputs
             + bc.detailed_outputs
+            + bc.supplemental_outputs
             + bc.storages
             + bc.optional_storages
         )
@@ -49,11 +50,12 @@ class WaterBalance(Balance):
     def _active_output_terms(self) -> list[str]:
         """Return output terms for this run with safe no-double-counting rules.
 
-        Selection rules:
+          Selection rules:
         1) Keep baseline non-runoff terms (e.g., QFLX_EVAP_TOT).
         2) If detailed runoff is enabled and at least one detailed runoff term exists,
            use available detailed runoff terms.
-        3) Otherwise, use available baseline runoff terms.
+          3) Otherwise, use available baseline runoff terms.
+          4) Include available supplemental output terms (e.g., QSNWCPICE).
         """
         key = self._cache_key()
         cached_key = getattr(self, "_active_outputs_cache_key", None)
@@ -78,6 +80,8 @@ class WaterBalance(Balance):
                 outputs.extend([v for v in baseline_runoff if self.run.has(v)])
         else:
             outputs.extend([v for v in baseline_runoff if self.run.has(v)])
+
+        outputs.extend([v for v in bc.supplemental_outputs if self.run.has(v)])
 
         outputs = list(dict.fromkeys(outputs))
         self._active_outputs_cache_key = key

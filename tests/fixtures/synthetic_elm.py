@@ -134,6 +134,7 @@ def make_water_balance_dataset(
     include_wa_storage: bool = False,
     wa_storage_values: np.ndarray | None = None,
     include_detailed_runoff: bool = False,
+    include_supplemental_runoff: bool = False,
 ) -> xr.Dataset:
     """Build a synthetic dataset that closes the water balance exactly.
 
@@ -256,6 +257,13 @@ def make_water_balance_dataset(
         }
         variables["QFLX_ROFICE"] = {
             "data": np.zeros(n),
+            "units": "mm/s",
+            "cell_methods": "time: mean",
+        }
+
+    if include_supplemental_runoff:
+        variables["QSNWCPICE"] = {
+            "data": np.full(n, 1e-6),
             "units": "mm/s",
             "cell_methods": "time: mean",
         }

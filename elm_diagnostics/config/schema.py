@@ -107,6 +107,9 @@ class WaterBalanceConfig(BaseModel):
             "QFLX_ROFICE",
         ]
     )
+    supplemental_outputs: list[str] = Field(
+        default_factory=lambda: ["QSNWCPICE"]
+    )
     use_detailed_outputs_when_available: bool = True
     et_components: list[str] = Field(
         default_factory=lambda: ["QSOIL", "QVEGE", "QVEGT"]

@@ -63,6 +63,8 @@ balances:
     detailed_outputs: [QFLX_EVAP_TOT, QFLX_ROFLIQ_QSUR, QFLX_ROFLIQ_QSURP,
               QFLX_ROFLIQ_QSUB, QFLX_ROFLIQ_QSUBP, QFLX_ROFLIQ_QGWL,
               QFLX_ROFICE]
+    # Additional runoff/output terms included opportunistically when present.
+    supplemental_outputs: [QSNWCPICE]
     use_detailed_outputs_when_available: true
     # Decomposition panel shows ET components separately:
     et_components: [QSOIL, QVEGE, QVEGT]  # Ground evap, canopy evap, transpiration
