@@ -68,6 +68,20 @@ They have been **verified and updated** based on the oakharbor_column h0 file an
 - Source: SnowHydrologyMod.F90 lines 2240-2352, lnd2atmType.F90 lines 211-213
 - **Removed from water balance output list**
 
+#### **Model Residual Comparison (ERRH2O / ERRH2OSNO)**
+- If available in history output, **`ERRH2O`** is used as the model-reported total water conservation residual for comparison against Python residual diagnostics.
+- **`ERRH2OSNO`** is treated as a **snow-specific imbalance context** term, not as the total water residual.
+- `elm-diagnostics` compares Python and model residuals in one of three modes:
+  - `direct`: compare as-is
+  - `cumulative`: compare against cumulative model residual anchored at zero
+  - `auto`: select the lower-RMSE mode between direct and cumulative
+- Sign mismatches can be handled via configuration (`model_residual_sign`), preserving raw model values.
+
+#### **Residual Basis Caveat**
+- Some history streams report `ERRH2O` with units `mm` and `cell_methods = time: mean`.
+- Because Python residual diagnostics are cumulative closure style, direct comparisons can be basis-sensitive.
+- For this reason, residual comparison mode and metadata interpretation are explicit and reported in diagnostics.
+
 ### Carbon Balance (verified against VegetationDataType.F90, CNBalanceCheckMod.F90):
 - Pools: `LEAFC`, `LIVESTEMC`, `DEADSTEMC`, `FROOTC`, `LIVECROOTC`, `DEADCROOTC`, `TOTSOMC`, `TOTLITC`, `CWDC` ✓
 - Fluxes: `GPP`, `AR`, `HR`, `ER`, `NEE` ✓

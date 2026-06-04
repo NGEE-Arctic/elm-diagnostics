@@ -124,6 +124,26 @@ This document maps ELM history field names to their definitions, source code loc
 - **In default h0:** May be present
 - **Critical correction:** This is **NOT** snow sublimation! It's excess snow removed when depth exceeds `h2osno_max`. It should be included in runoff/outputs if present, not as evaporation.
 
+### Residual Diagnostics
+
+#### `ERRH2O`
+- **Long name:** Total water conservation error
+- **Units:** mm
+- **Type:** Model-reported water residual diagnostic
+- **In default h0:** Case dependent
+- **Usage in elm-diagnostics:**
+    - Candidate source for model residual comparison with Python water residual
+    - Comparison mode can be `direct`, `cumulative`, or `auto`
+- **Important note:** `cell_methods` may be `time: mean`, which can require basis harmonization before direct comparison to cumulative residual diagnostics.
+
+#### `ERRH2OSNO`
+- **Long name:** Imbalance in snow depth (liquid water)
+- **Units:** mm
+- **Type:** Snow-only imbalance diagnostic
+- **In default h0:** Case dependent
+- **Usage in elm-diagnostics:** Context term for interpreting residual behavior during snow transitions.
+- **Important note:** Not a replacement for total water residual (`ERRH2O`).
+
 ### Storage Variables
 
 #### `SOILLIQ`
