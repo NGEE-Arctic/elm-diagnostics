@@ -116,6 +116,38 @@
     </table>
     {% endif %}
 
+    {# Additional tables for section-specific structured data #}
+    {% if section.extra_tables %}
+    {% for table in section.extra_tables %}
+    <h3>{{ table.title }}</h3>
+    <table class="stats-table">
+      <thead>
+        <tr>
+          {% for column in table.columns %}
+          <th>{{ column }}</th>
+          {% endfor %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in table.rows %}
+        <tr>
+          {% for cell in row %}
+          <td>{{ cell }}</td>
+          {% endfor %}
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% endfor %}
+    {% endif %}
+
+    {% if section.extra_text_blocks %}
+    {% for block in section.extra_text_blocks %}
+    <h3>{{ block.title }}</h3>
+    <pre>{{ block.content }}</pre>
+    {% endfor %}
+    {% endif %}
+
     {# Figures grid #}
     {% if section.figures %}
     <div class="figure-grid">

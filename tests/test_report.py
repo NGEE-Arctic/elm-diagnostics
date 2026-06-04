@@ -256,6 +256,30 @@ def test_report_generation_timestamp(report_run):
         assert current_year in content
 
 
+def test_report_diagnostics_include_provenance(report_run, monkeypatch):
+    """Diagnostics section should include git version and invocation command."""
+    monkeypatch.setattr(Report, "_detect_git_version", lambda self: "test-git-version")
+    rpt = Report(report_run, invocation_command="elm-diagnostics report /tmp/run")
+
+    with tempfile.TemporaryDirectory() as outdir:
+        html_path = rpt.build(outdir)
+        content = html_path.read_text()
+        assert "Diagnostics" in content
+        assert "Git version" in content
+        assert "test-git-version" in content
+        assert "Invocation command" in content
+        assert "elm-diagnostics report /tmp/run" in content
+        assert "Analysis run at" in content
+        assert "Working directory" in content
+        assert "User" in content
+        assert "Machine" in content
+        assert "Section timings" in content
+        assert (
+            "Configuration (merged)" in content
+            or "Configuration file contents" in content
+        )
+
+
 def test_report_water_balance_section_with_january_water_year_start(report_run):
     """Water Balance section should render when water year starts in January."""
     config = Config()

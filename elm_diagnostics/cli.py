@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import logging
+import shlex
+import sys
 import time
 from pathlib import Path
 from typing import List, Optional
@@ -399,7 +401,13 @@ def report(
             console.print("\n[bold]Building diagnostics report...[/bold]")
             start_time = time.time()
 
-        rpt = Report(source, config=config, year=year)
+        rpt = Report(
+            source,
+            config=config,
+            year=year,
+            invocation_command=shlex.join(sys.argv),
+            config_path=config,
+        )
         html_path = rpt.build(out)
 
         if not quiet:

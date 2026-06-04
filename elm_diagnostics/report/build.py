@@ -2,7 +2,11 @@
 
 from __future__ import annotations
 
+import getpass
+import os
 import re
+import socket
+import subprocess
 import sys
 import threading
 import time
@@ -15,6 +19,7 @@ import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 import xarray as xr
+import yaml
 from jinja2 import Environment, FileSystemLoader
 from PIL import Image
 
@@ -33,6 +38,7 @@ from elm_diagnostics.plots import (
 
 _TEMPLATE_DIR = Path(__file__).parent / "templates"
 _ASSETS_DIR = Path(__file__).parent / "assets"
+_DEFAULT_USER_CONFIG_PATH = Path.home() / ".config" / "elm-diagnostics" / "config.yaml"
 
 _RESAMPLING = getattr(Image, "Resampling", Image)
 _PNG_PIL_KWARGS = {"compress_level": 1, "optimize": False}
@@ -47,6 +53,8 @@ class _Section:
         self.description = description
         self.figures: list[dict[str, str]] = []
         self.statistics: Any = {}
+        self.extra_tables: list[dict[str, Any]] = []
+        self.extra_text_blocks: list[dict[str, str]] = []
 
     def add_figure(
         self, path: str, thumb_path: str, caption: str, plot_type: str = ""
@@ -77,6 +85,20 @@ class _Section:
         """Add statistics table data to section."""
         self.statistics = stats
 
+    def add_table(self, title: str, columns: list[str], rows: list[list[str]]) -> None:
+        """Add an additional table to render beneath the primary statistics."""
+        self.extra_tables.append(
+            {
+                "title": title,
+                "columns": columns,
+                "rows": rows,
+            }
+        )
+
+    def add_text_block(self, title: str, content: str) -> None:
+        """Add a preformatted text block beneath section tables."""
+        self.extra_text_blocks.append({"title": title, "content": content})
+
 
 class Report:
     """Diagnostics report generator.
@@ -94,6 +116,8 @@ class Report:
         source: Run | Comparison,
         config: Config | str | Path | None = None,
         year: int | None = None,
+        invocation_command: str | None = None,
+        config_path: str | Path | None = None,
     ):
         self.source = source
         self.year = year
@@ -105,11 +129,53 @@ class Report:
         self._build_total_seconds: float | None = None
         self._progress_section_index = 0
         self._progress_total_sections = 0
+        self._invocation_command = invocation_command or "Unavailable"
+        self._git_version = self._detect_git_version()
+        self._working_directory = os.getcwd()
+        self._user = getpass.getuser()
+        self._machine = socket.gethostname()
+        self._config_source_path: Path | None = None
+
+        if config_path is not None:
+            self._config_source_path = Path(config_path).expanduser().resolve()
+        elif isinstance(config, (str, Path)):
+            self._config_source_path = Path(config).expanduser().resolve()
+        elif config is None and _DEFAULT_USER_CONFIG_PATH.exists():
+            self._config_source_path = _DEFAULT_USER_CONFIG_PATH
 
         if config is None or isinstance(config, (str, Path)):
             self.config = load_config(config)
         else:
             self.config = config
+
+    def _detect_git_version(self) -> str:
+        """Return repository git describe string, or 'Unavailable'."""
+        repo_root = Path(__file__).resolve().parents[2]
+        try:
+            result = subprocess.run(
+                ["git", "-C", str(repo_root), "describe", "--always", "--dirty", "--tags"],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            version = result.stdout.strip()
+            return version or "Unavailable"
+        except Exception:
+            return "Unavailable"
+
+    def _diagnostics_config_yaml(self) -> tuple[str, str]:
+        """Return a title/content pair for reported config YAML."""
+        if self._config_source_path is not None and self._config_source_path.exists():
+            try:
+                return (
+                    f"Configuration file contents ({self._config_source_path})",
+                    self._config_source_path.read_text(),
+                )
+            except Exception:
+                pass
+
+        merged_yaml = yaml.safe_dump(self.config.model_dump(), sort_keys=False)
+        return ("Configuration (merged)", merged_yaml)
 
     @property
     def _run(self) -> Run:
@@ -308,11 +374,8 @@ class Report:
             # --- Variable group sections ---
             sections.extend(self._build_variable_sections(figdir))
 
-            # --- Error diagnostics section ---
-            if self._errors or self._warnings:
-                sections.append(self._build_diagnostics_section())
-            else:
-                self._announce_section_progress("Diagnostics skipped")
+            # --- Diagnostics section ---
+            sections.append(self._build_diagnostics_section())
         finally:
             matplotlib.use(prev_backend)
             plt.close("all")
@@ -1007,8 +1070,15 @@ class Report:
         )
 
         # Format errors and warnings for display
-        diagnostics = {}
-
+        diagnostics = {
+            "Git version": self._git_version,
+            "Invocation command": self._invocation_command,
+            "Analysis run at": self._generation_time.strftime("%Y-%m-%d %H:%M:%S"),
+            "Working directory": self._working_directory,
+            "User": self._user,
+            "Machine": self._machine,
+        }
+        
         if self._errors:
             diagnostics["Errors"] = [
                 f"{err['section']}: {err['type']} - {err['error']}"
@@ -1018,7 +1088,49 @@ class Report:
         if self._warnings:
             diagnostics["Warnings"] = self._warnings
 
+        timings = list(self._section_timings)
+        diagnostics_elapsed = time.perf_counter() - start_time
+        timings.append(
+            {
+                "title": section_title,
+                "total_seconds": diagnostics_elapsed,
+                "io_seconds": None,
+                "compute_seconds": None,
+                "plot_seconds": None,
+            }
+        )
+        attributed_total = sum(float(entry["total_seconds"]) for entry in timings)
+        timing_rows: list[list[str]] = []
+        for entry in timings:
+            total = float(entry["total_seconds"])
+            pct = 100.0 * total / attributed_total if attributed_total > 0 else 0.0
+            timing_rows.append(
+                [
+                    str(entry["title"]),
+                    f"{total:.2f}",
+                    f"{pct:.1f}%",
+                    "" if entry.get("io_seconds") is None else f"{float(entry['io_seconds']):.2f}",
+                    "" if entry.get("compute_seconds") is None else f"{float(entry['compute_seconds']):.2f}",
+                    "" if entry.get("plot_seconds") is None else f"{float(entry['plot_seconds']):.2f}",
+                ]
+            )
+        timing_rows.append(["Grand total", f"{attributed_total:.2f}", "100.0%", "", "", ""])
+        
         sec.add_statistics(diagnostics)
+        sec.add_table(
+            title="Section timings",
+            columns=[
+                "Section",
+                "Total (s)",
+                "% of attributed",
+                "Export/Write (s)",
+                "Prep/Checks (s)",
+                "Plot Build (s)",
+            ],
+            rows=timing_rows,
+        )
+        config_title, config_yaml = self._diagnostics_config_yaml()
+        sec.add_text_block(config_title, config_yaml)
         self._record_section_timing(section_title, start_time)
         return sec
 
@@ -1082,6 +1194,8 @@ class Report:
                     "description": s.description,
                     "figures": s.figures,
                     "statistics": s.statistics,
+                    "extra_tables": s.extra_tables,
+                    "extra_text_blocks": s.extra_text_blocks,
                 }
                 for s in sections
             ],
