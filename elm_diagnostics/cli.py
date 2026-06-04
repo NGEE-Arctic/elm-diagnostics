@@ -144,17 +144,23 @@ def _resolve_analysis_year_filter(
     config_path: str | None,
     year: int | None,
     all_years: bool,
-) -> int | None:
-    """Return analysis year for early loader narrowing when safe to do so."""
+) -> tuple[int | None, int | None]:
+    """Return inclusive year range for early loader narrowing when safe."""
     if year is None or all_years:
-        return None
+        return None, None
 
     from elm_diagnostics.config.schema import load_config
 
     cfg = load_config(path=config_path) if config_path else load_config()
     if cfg.plots.climatology.include_climos:
-        return None
-    return year
+        start = cfg.plots.climatology.climo_start_year
+        end = cfg.plots.climatology.climo_end_year
+        if start == -1 or end == -1:
+            return None, None
+        lo = min(year, start, end)
+        hi = max(year, start, end)
+        return lo, hi
+    return year, year
 
 
 def _print_report_section_timings(
@@ -269,12 +275,16 @@ def report(
 
         strict_combine = _get_run_strict_combine(config)
         chunk_mode, manual_chunks, chunk_target_mb = _get_run_chunk_options(config)
-        analysis_year_filter = _resolve_analysis_year_filter(config, year, all_years)
+        analysis_year_min, analysis_year_max = _resolve_analysis_year_filter(
+            config,
+            year,
+            all_years,
+        )
 
-        if year is not None and analysis_year_filter is None and not quiet:
+        if year is not None and analysis_year_min is None and not quiet:
             console.print(
                 "[yellow]Note:[/yellow] Early file narrowing disabled because "
-                "climatology is enabled; full-year range remains available for climo."
+                "climatology uses an open-ended year window; full range remains available."
             )
 
         # Import here to avoid slow startup
@@ -298,7 +308,8 @@ def report(
                     chunk_mode=chunk_mode,
                     chunks=manual_chunks,
                     chunk_target_mb=chunk_target_mb,
-                    analysis_year=analysis_year_filter,
+                    analysis_year_min=analysis_year_min,
+                    analysis_year_max=analysis_year_max,
                 )
                 progress.update(task, completed=True)
                 elapsed = time.time() - start_time
@@ -311,7 +322,8 @@ def report(
                 chunk_mode=chunk_mode,
                 chunks=manual_chunks,
                 chunk_target_mb=chunk_target_mb,
-                analysis_year=analysis_year_filter,
+                analysis_year_min=analysis_year_min,
+                analysis_year_max=analysis_year_max,
             )
 
         # Load comparison run if specified
@@ -330,7 +342,8 @@ def report(
                         chunk_mode=chunk_mode,
                         chunks=manual_chunks,
                         chunk_target_mb=chunk_target_mb,
-                        analysis_year=analysis_year_filter,
+                        analysis_year_min=analysis_year_min,
+                        analysis_year_max=analysis_year_max,
                     )
                     source = Comparison(run, compare_run)
                     progress.update(task, completed=True)
@@ -341,7 +354,8 @@ def report(
                     chunk_mode=chunk_mode,
                     chunks=manual_chunks,
                     chunk_target_mb=chunk_target_mb,
-                    analysis_year=analysis_year_filter,
+                    analysis_year_min=analysis_year_min,
+                    analysis_year_max=analysis_year_max,
                 )
                 source = Comparison(run, compare_run)
         else:

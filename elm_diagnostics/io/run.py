@@ -125,11 +125,12 @@ def _extract_file_year(path: Path) -> int | None:
 def _filter_stream_files_by_year(
     files: list[Path],
     *,
-    year: int,
+    year_min: int,
+    year_max: int,
     tolerance_years: int,
     tape: str,
 ) -> list[Path]:
-    """Return files narrowed to a year window with safe fallback behavior."""
+    """Return files narrowed to a year range with safe fallback behavior."""
     parsed: list[tuple[Path, int]] = []
     unparsed_count = 0
     for file in files:
@@ -161,14 +162,15 @@ def _filter_stream_files_by_year(
 
     filtered = [
         path for path, file_year in parsed
-        if abs(file_year - year) <= tolerance_years
+        if (year_min - tolerance_years) <= file_year <= (year_max + tolerance_years)
     ]
     if filtered:
         return filtered
 
     warnings.warn(
         (
-            f"Early year filter for stream {tape} matched no files for year={year}; "
+            f"Early year filter for stream {tape} matched no files for "
+            f"year_range={year_min}:{year_max}; "
             "using all files instead."
         ),
         RuntimeWarning,
@@ -192,6 +194,10 @@ class Run:
         Passed to ``xr.open_mfdataset`` for dask-backed lazy loading.
     analysis_year : int, optional
         Requested analysis year for early file narrowing before open.
+    analysis_year_min : int, optional
+        Inclusive lower bound for year-aware file narrowing.
+    analysis_year_max : int, optional
+        Inclusive upper bound for year-aware file narrowing.
     analysis_year_tolerance : int, optional
         Year-window half-width when narrowing files (0 means exact year).
     strict_combine : bool, optional
@@ -208,6 +214,8 @@ class Run:
         chunk_mode: Literal["off", "auto", "manual"] = "off",
         chunk_target_mb: int = 64,
         analysis_year: int | None = None,
+        analysis_year_min: int | None = None,
+        analysis_year_max: int | None = None,
         analysis_year_tolerance: int = 0,
         strict_combine: bool = False,
     ):
@@ -216,7 +224,14 @@ class Run:
         self._chunks = chunks
         self._chunk_mode = chunk_mode
         self._chunk_target_mb = chunk_target_mb
-        self._analysis_year = analysis_year
+        if analysis_year_min is None and analysis_year_max is None and analysis_year is not None:
+            analysis_year_min = analysis_year
+            analysis_year_max = analysis_year
+        if analysis_year_min is not None and analysis_year_max is not None:
+            if analysis_year_min > analysis_year_max:
+                analysis_year_min, analysis_year_max = analysis_year_max, analysis_year_min
+        self._analysis_year_min = analysis_year_min
+        self._analysis_year_max = analysis_year_max
         self._analysis_year_tolerance = max(0, int(analysis_year_tolerance))
         self._strict_combine = strict_combine
         self._datasets: dict[str, xr.Dataset] = {}
@@ -230,11 +245,12 @@ class Run:
         else:
             self._stream_files = _discover_streams(self.path)
 
-        if self._analysis_year is not None:
+        if self._analysis_year_min is not None and self._analysis_year_max is not None:
             self._stream_files = {
                 tape: _filter_stream_files_by_year(
                     files,
-                    year=self._analysis_year,
+                    year_min=self._analysis_year_min,
+                    year_max=self._analysis_year_max,
                     tolerance_years=self._analysis_year_tolerance,
                     tape=tape,
                 )
