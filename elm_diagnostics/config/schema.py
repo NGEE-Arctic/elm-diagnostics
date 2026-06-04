@@ -104,6 +104,8 @@ class WaterBalanceConfig(BaseModel):
     snow_residual_candidates: list[str] = Field(
         default_factory=lambda: ["ERRH2OSNO"]
     )
+    model_residual_compare_mode: Literal["auto", "direct", "cumulative"] = "auto"
+    model_residual_sign: float = 1.0
     residual_against: str = "dS/dt"
     frame: Literal["water_year", "calendar"] = "water_year"
 

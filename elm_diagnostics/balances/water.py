@@ -151,6 +151,79 @@ class WaterBalance(Balance):
         da.name = "model_snow_residual"
         return da
 
+    @staticmethod
+    def _rmse(da: xr.DataArray) -> float:
+        """Return root-mean-square value, ignoring NaNs."""
+        vals = np.asarray(da.values, dtype=float)
+        return float(np.sqrt(np.nanmean(vals ** 2)))
+
+    @staticmethod
+    def _as_cumulative(da: xr.DataArray) -> xr.DataArray:
+        """Convert a time series to cumulative form anchored at zero."""
+        if "time" not in da.dims:
+            return da
+        cumul = da.cumsum(dim="time")
+        return cumul - cumul.isel(time=0)
+
+    def aligned_model_residual(self) -> tuple[xr.DataArray | None, str | None]:
+        """Return model residual aligned to Python residual basis.
+
+        Returns
+        -------
+        (aligned, mode)
+            aligned : DataArray or None
+                Aligned model residual series, or None if unavailable.
+            mode : str or None
+                One of {"direct", "cumulative"}, or None if unavailable.
+        """
+        model_res = self.model_residual()
+        if model_res is None:
+            return None, None
+
+        sign = float(self._balance_config.model_residual_sign)
+        if sign != 1.0:
+            model_res = model_res * sign
+
+        mode_cfg = self._balance_config.model_residual_compare_mode
+        if mode_cfg == "direct":
+            aligned = model_res
+            mode = "direct"
+        elif mode_cfg == "cumulative":
+            aligned = self._as_cumulative(model_res)
+            mode = "cumulative"
+        else:
+            py_res = self.residual()
+            direct = model_res
+            cumulative = self._as_cumulative(model_res)
+
+            rmse_direct = self._rmse(py_res - direct)
+            rmse_cumulative = self._rmse(py_res - cumulative)
+
+            if rmse_direct <= rmse_cumulative:
+                aligned = direct
+                mode = "direct"
+            else:
+                aligned = cumulative
+                mode = "cumulative"
+
+        aligned = aligned.copy()
+        aligned.name = "model_residual_aligned"
+        aligned.attrs["comparison_mode"] = mode
+        aligned.attrs.setdefault("units", "mm")
+        return aligned, mode
+
+    def residual_difference(self) -> xr.DataArray | None:
+        """Return Python residual minus aligned model residual, if available."""
+        model_aligned, _ = self.aligned_model_residual()
+        if model_aligned is None:
+            return None
+
+        diff = self.residual() - model_aligned
+        diff.name = "residual_difference"
+        diff.attrs["long_name"] = "python residual minus model residual"
+        diff.attrs["units"] = "mm"
+        return diff
+
     def _storage_decomposition_components(self) -> dict[str, xr.DataArray]:
         """Return per-storage cumulative change components in mm.
 
@@ -244,16 +317,29 @@ class WaterBalance(Balance):
         res = self.residual()
         ax1.plot(_plot_time(res), res, label="Residual", color="black", linestyle="--")
 
-        # Optional model residual (e.g., ERRH2O)
-        model_res = self.model_residual()
+        # Optional model residual (e.g., ERRH2O), aligned for comparison
+        model_res, model_mode = self.aligned_model_residual()
         if model_res is not None:
+            label = "Model residual"
+            if model_mode is not None:
+                label += f" ({model_mode})"
             ax1.plot(
                 _plot_time(model_res),
                 model_res,
-                label="Model residual",
+                label=label,
                 color="purple",
                 linestyle=":",
             )
+
+            diff = self.residual_difference()
+            if diff is not None:
+                ax1.plot(
+                    _plot_time(diff),
+                    diff,
+                    label="Residual diff",
+                    color="orange",
+                    linestyle="-.",
+                )
 
         ax1.set_xlabel("Time")
         ax1.set_ylabel("Cumulative (mm)")
@@ -388,17 +474,32 @@ class WaterBalance(Balance):
             res_unit = self.residual().sel({self.by: unit_id})
             ax1.plot(_plot_time(res_unit), res_unit, label="Res", color="black", linestyle="--", linewidth=1)
 
-            model_res = self.model_residual()
+            model_res, model_mode = self.aligned_model_residual()
             if model_res is not None:
                 model_res_unit = model_res.sel({self.by: unit_id})
+                label = "Model"
+                if model_mode is not None:
+                    label += f" ({model_mode})"
                 ax1.plot(
                     _plot_time(model_res_unit),
                     model_res_unit,
-                    label="Model",
+                    label=label,
                     color="purple",
                     linestyle=":",
                     linewidth=1,
                 )
+
+                diff = self.residual_difference()
+                if diff is not None:
+                    diff_unit = diff.sel({self.by: unit_id})
+                    ax1.plot(
+                        _plot_time(diff_unit),
+                        diff_unit,
+                        label="Diff",
+                        color="orange",
+                        linestyle="-.",
+                        linewidth=1,
+                    )
             
             ax1.set_xlabel("Time", fontsize="small")
             ax1.set_ylabel("Cumulative (mm)", fontsize="small")

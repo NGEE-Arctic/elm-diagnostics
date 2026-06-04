@@ -64,6 +64,10 @@ balances:
     model_residual_candidates: [ERRH2O]
     # Optional snow-specific imbalance diagnostics for context
     snow_residual_candidates: [ERRH2OSNO]
+    # How to compare model residual to Python residual: auto | direct | cumulative
+    model_residual_compare_mode: auto
+    # Multiply model residual by this factor before comparison (use -1 if needed)
+    model_residual_sign: 1.0
     residual_against: "dS/dt"
     frame: "water_year"
 

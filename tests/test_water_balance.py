@@ -10,6 +10,7 @@ import pytest
 matplotlib.use("Agg")
 
 from elm_diagnostics.balances.water import WaterBalance
+from elm_diagnostics.config.schema import Config
 from elm_diagnostics.io.run import Run
 from tests.fixtures.synthetic_elm import (
     make_water_balance_dataset,
@@ -99,6 +100,75 @@ def test_water_balance_plot_with_model_residual(water_run_with_model_residual):
     assert fig4 is not None
     import matplotlib.pyplot as plt
     plt.close("all")
+
+
+def test_model_residual_alignment_auto_prefers_direct():
+    model_vals = np.linspace(0.0, 2.0, 12)
+    ds = make_water_balance_dataset(
+        start_year=2000,
+        n_months=12,
+        include_model_residual=True,
+        model_residual_values=model_vals,
+    )
+    with tempfile.TemporaryDirectory() as tmpdir:
+        save_as_elm_files(ds, Path(tmpdir), casename="water_test_align_auto", tape="h0")
+        run = Run(tmpdir)
+        wb = WaterBalance(run)
+
+        aligned, mode = wb.aligned_model_residual()
+        assert aligned is not None
+        assert mode == "direct"
+
+        aligned_vals = np.asarray(aligned.squeeze().values)
+        np.testing.assert_allclose(aligned_vals, model_vals)
+        run.close()
+
+
+def test_model_residual_alignment_forced_cumulative():
+    model_vals = np.ones(12) * 0.5
+    ds = make_water_balance_dataset(
+        start_year=2000,
+        n_months=12,
+        include_model_residual=True,
+        model_residual_values=model_vals,
+    )
+    cfg = Config()
+    cfg.balances.water.model_residual_compare_mode = "cumulative"
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        save_as_elm_files(ds, Path(tmpdir), casename="water_test_align_cum", tape="h0")
+        run = Run(tmpdir)
+        wb = WaterBalance(run, config=cfg)
+
+        aligned, mode = wb.aligned_model_residual()
+        assert aligned is not None
+        assert mode == "cumulative"
+        assert np.allclose(np.asarray(aligned.isel(time=0).values), 0.0)
+        run.close()
+
+
+def test_model_residual_alignment_sign_flip():
+    model_vals = np.linspace(0.0, 1.0, 12)
+    ds = make_water_balance_dataset(
+        start_year=2000,
+        n_months=12,
+        include_model_residual=True,
+        model_residual_values=model_vals,
+    )
+    cfg = Config()
+    cfg.balances.water.model_residual_compare_mode = "direct"
+    cfg.balances.water.model_residual_sign = -1.0
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        save_as_elm_files(ds, Path(tmpdir), casename="water_test_sign", tape="h0")
+        run = Run(tmpdir)
+        wb = WaterBalance(run, config=cfg)
+
+        aligned, mode = wb.aligned_model_residual()
+        assert aligned is not None
+        assert mode == "direct"
+        np.testing.assert_allclose(np.asarray(aligned.squeeze().values), -model_vals)
+        run.close()
 
 
 def test_water_balance_to_netcdf(water_run):

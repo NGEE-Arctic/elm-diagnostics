@@ -129,6 +129,8 @@ def make_water_balance_dataset(
     calendar: str = "noleap",
     include_model_residual: bool = False,
     include_snow_residual: bool = False,
+    model_residual_values: np.ndarray | None = None,
+    snow_residual_values: np.ndarray | None = None,
 ) -> xr.Dataset:
     """Build a synthetic dataset that closes the water balance exactly.
 
@@ -199,15 +201,17 @@ def make_water_balance_dataset(
 
     if include_model_residual:
         # Synthetic closure is exact; model residual should be near zero.
+        model_data = np.zeros(n) if model_residual_values is None else model_residual_values
         variables["ERRH2O"] = {
-            "data": np.zeros(n),
+            "data": model_data,
             "units": "mm",
             "cell_methods": "time: mean",
         }
 
     if include_snow_residual:
+        snow_data = np.zeros(n) if snow_residual_values is None else snow_residual_values
         variables["ERRH2OSNO"] = {
-            "data": np.zeros(n),
+            "data": snow_data,
             "units": "mm",
             "cell_methods": "time: mean",
         }
