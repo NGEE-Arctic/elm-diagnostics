@@ -30,7 +30,7 @@ class EnergyBalance(Balance):
         bc = self._balance_config
         return bc.radiation + bc.turbulent + bc.ground
 
-    def components(self) -> dict[str, xr.DataArray]:
+    def _compute_components(self) -> dict[str, xr.DataArray]:
         """Return energy balance components (all in W/m2)."""
         bc = self._balance_config
         result = {}
@@ -51,7 +51,7 @@ class EnergyBalance(Balance):
 
         return result
 
-    def residual(self) -> xr.DataArray:
+    def _compute_residual(self) -> xr.DataArray:
         """Compute energy closure residual: Rnet - FSH - LE - G."""
         comps = self.components()
 

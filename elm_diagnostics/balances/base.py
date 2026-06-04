@@ -62,6 +62,10 @@ class Balance(ABC):
             self.config = config
 
         self._balance_config = self._get_balance_config()
+        self._components_cache: dict[str, xr.DataArray] | None = None
+        self._components_cache_key: tuple[Any, ...] | None = None
+        self._residual_cache: xr.DataArray | None = None
+        self._residual_cache_key: tuple[Any, ...] | None = None
         
         # Validate sub-gridcell dimension if requested
         if by is not None:
@@ -105,13 +109,33 @@ class Balance(ABC):
         tmp = select_year(tmp, self.year, self.frame, start_month)
         return tmp["__tmp"]
 
-    @abstractmethod
-    def components(self) -> dict[str, xr.DataArray]:
-        """Return unit-normalized, time-aligned balance components."""
+    def _cache_key(self) -> tuple[Any, ...]:
+        """Return a key describing the current balance state."""
+        return (self.year, self.by, self.frame)
 
     @abstractmethod
+    def _compute_components(self) -> dict[str, xr.DataArray]:
+        """Return unit-normalized, time-aligned balance components."""
+
+    def components(self) -> dict[str, xr.DataArray]:
+        """Return cached unit-normalized, time-aligned balance components."""
+        key = self._cache_key()
+        if self._components_cache is None or self._components_cache_key != key:
+            self._components_cache = self._compute_components()
+            self._components_cache_key = key
+        return self._components_cache
+
+    @abstractmethod
+    def _compute_residual(self) -> xr.DataArray:
+        """Compute the closure residual."""
+
     def residual(self) -> xr.DataArray:
-        """Return the closure residual."""
+        """Return the cached closure residual."""
+        key = self._cache_key()
+        if self._residual_cache is None or self._residual_cache_key != key:
+            self._residual_cache = self._compute_residual()
+            self._residual_cache_key = key
+        return self._residual_cache
 
     @abstractmethod
     def plot(self) -> tuple[plt.Figure, plt.Figure]:

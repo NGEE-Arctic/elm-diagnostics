@@ -40,7 +40,7 @@ class WaterBalance(Balance):
         bc = self._balance_config
         return bc.inputs + bc.outputs + bc.storages
 
-    def components(self) -> dict[str, xr.DataArray]:
+    def _compute_components(self) -> dict[str, xr.DataArray]:
         """Return cumulative water balance components (all in mm)."""
         bc = self._balance_config
         result = {}
@@ -101,7 +101,7 @@ class WaterBalance(Balance):
         """Return cumulative balance components as a Dataset."""
         return xr.Dataset(self.components())
 
-    def residual(self) -> xr.DataArray:
+    def _compute_residual(self) -> xr.DataArray:
         """Compute closure residual: cumul(inputs) - cumul(outputs) - dS."""
         comps = self.components()
         bc = self._balance_config
