@@ -115,6 +115,7 @@ def _plot_timeseries_single(
             label=source.experiment.name,
         )
         ax.legend(loc="best", fontsize="small")
+        units = da_base.attrs.get("units", "")
     else:
         da = _squeeze_spatial(source.get(varname))
         ax.plot(_plot_time(da), da.values, color="tab:blue")
@@ -128,12 +129,7 @@ def _plot_timeseries_single(
             climo_start_year=config.plots.climatology.climo_start_year,
             climo_end_year=config.plots.climatology.climo_end_year,
         )
-
-    units = ""
-    if isinstance(source, Comparison):
-        units = source.base.get(varname).attrs.get("units", "")
-    else:
-        units = source.get(varname).attrs.get("units", "")
+        units = da.attrs.get("units", "")
 
     ax.set_xlabel("Time")
     ax.set_ylabel(units)

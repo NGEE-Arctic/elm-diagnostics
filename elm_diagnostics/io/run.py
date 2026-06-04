@@ -138,6 +138,7 @@ class Run:
         self._strict_combine = strict_combine
         self._datasets: dict[str, xr.Dataset] = {}
         self._cadence: dict[str, str | pd.Timedelta] = {}
+        self._streams_cache: dict[str, xr.Dataset] | None = None
 
         if streams is not None:
             self._stream_files: dict[str, list[Path]] = {}
@@ -246,7 +247,11 @@ class Run:
     @property
     def streams(self) -> dict[str, xr.Dataset]:
         """All streams as open datasets, keyed by tape name."""
-        return {tape: self._open_stream(tape) for tape in self._tape_order}
+        if self._streams_cache is None:
+            self._streams_cache = {
+                tape: self._open_stream(tape) for tape in self._tape_order
+            }
+        return self._streams_cache
 
     @property
     def cadence(self) -> dict[str, str | pd.Timedelta]:
@@ -339,6 +344,7 @@ class Run:
         for ds in self._datasets.values():
             ds.close()
         self._datasets.clear()
+        self._streams_cache = None
 
     def __repr__(self) -> str:
         tapes = ", ".join(self._tape_order)
