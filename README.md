@@ -56,6 +56,39 @@ pip install -e ".[dask,interactive,maps,all]"
 **I want to understand variable definitions:**  
 → Check [Variable Mappings](docs/variable-mappings.md)
 
+## Configuration Notes
+
+Most users only need settings under `report`, `plots`, `io`, `time`, and
+`variables` in `~/.config/elm-diagnostics/config.yaml`.
+
+Balance term definitions are intentionally kept internal (schema defaults) to
+reduce fragile user edits.
+
+### Advanced: Expert Balance Overrides
+
+Expert users can still override balance definitions via a `balances` section in
+their user config. When `balances` is present, elm-diagnostics always emits a
+warning and applies replacement semantics:
+
+- If `balances.water` is provided, that entire water block is used as-is.
+- If `balances.carbon` is provided, that entire carbon block is used as-is.
+- If `balances.energy` is provided, that entire energy block is used as-is.
+- Omitted subblocks continue using internal schema defaults.
+- Partial subblocks are rejected; each provided subblock must be complete.
+
+Example (override only water):
+
+```yaml
+balances:
+  water:
+    storages: [SOILLIQ, SOILICE, H2OSNO, H2OCAN, H2OSFC]
+    inputs: [RAIN, SNOW]
+    outputs: [QFLX_EVAP_TOT, QOVER, QDRAI, QDRAI_PERCH, QH2OSFC]
+    et_components: [QSOIL, QVEGE, QVEGT]
+    residual_against: "dS/dt"
+    frame: "water_year"
+```
+
 ## Quick Start
 
 ### Loading ELM Output

@@ -51,41 +51,6 @@ time:
   water_year_start_month: 10
   cumulative_years: "all"  # or list of ints, or "each"
 
-balances:
-  water:
-    storages: [SOILLIQ, SOILICE, H2OSNO, H2OCAN, H2OSFC]
-    inputs: [RAIN, SNOW]
-    # Total ET computed from: QSOIL + QVEGE + QVEGT if QFLX_EVAP_TOT not available
-    # QFLX_SUB_SNOW is part of QSOIL (ground evap includes sublimation)
-    outputs: [QFLX_EVAP_TOT, QOVER, QDRAI, QDRAI_PERCH, QH2OSFC]
-    # Decomposition panel shows ET components separately:
-    et_components: [QSOIL, QVEGE, QVEGT]  # Ground evap, canopy evap, transpiration
-    residual_against: "dS/dt"
-    frame: "water_year"
-
-  carbon:
-    mode: "auto"  # auto-detect BGC vs SP
-    pools: [LEAFC, LIVESTEMC, DEADSTEMC, FROOTC, LIVECROOTC, DEADCROOTC,
-            TOTSOMC, TOTLITC, CWDC]
-    fluxes: [GPP, AR, HR, ER, NEE, TOTFIRE, WOOD_HARVESTC]
-    ch4:
-      aerenchyma: [CH4_SURF_AERE_SAT, CH4_SURF_AERE_UNSAT]
-      diffusion: [CH4_SURF_DIFF_SAT, CH4_SURF_DIFF_UNSAT]
-      ebullition: [CH4_SURF_EBUL_SAT, CH4_SURF_EBUL_UNSAT]
-    residual_against: "TOTECOSYSC"
-    frame: "calendar"
-
-  energy:
-    radiation: [FSDS, FSR, FLDS, FIRE, FSA, FIRA]
-    turbulent: [FSH, EFLX_LH_TOT]
-    ground: [FGR, FGR12]
-    # Storage terms: HC (soil+snow), HCSOI (soil only) - NOT in default h0, must request
-    # These are state variables (MJ/m2), need dHC/dt for flux equivalent
-    storage: [HC, HCSOI]
-    errors: [ERRSOI, ERRSEB]  # Energy balance error diagnostics
-    frame: "calendar"
-    cumulative: false
-
 variables:
   groups:
     hydrology: [H2OSOI, QRUNOFF, QDRAI, SNOWDP, H2OSNO, H2OSFC,

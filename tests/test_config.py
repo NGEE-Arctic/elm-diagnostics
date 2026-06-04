@@ -3,6 +3,7 @@
 import tempfile
 from pathlib import Path
 
+import pytest
 import yaml
 
 from elm_diagnostics.config.schema import Config, load_config, load_defaults
@@ -10,9 +11,10 @@ from elm_diagnostics.config.schema import Config, load_config, load_defaults
 
 def test_load_defaults():
     defaults = load_defaults()
-    assert "balances" in defaults
-    assert "water" in defaults["balances"]
-    assert "RAIN" in defaults["balances"]["water"]["inputs"]
+    assert "report" in defaults
+    assert "time" in defaults
+    assert "variables" in defaults
+    assert "balances" not in defaults
 
 
 def test_default_config_validates():
@@ -47,8 +49,15 @@ def test_user_config_override():
     override = {
         "time": {"water_year_start_month": 4},
         "balances": {
-            "water": {"frame": "calendar"},
-        },
+            "water": {
+                "storages": ["SOILLIQ", "SOILICE", "H2OSNO", "H2OCAN", "H2OSFC"],
+                "inputs": ["RAIN", "SNOW"],
+                "outputs": ["QFLX_EVAP_TOT", "QOVER", "QDRAI", "QDRAI_PERCH", "QH2OSFC"],
+                "et_components": ["QSOIL", "QVEGE", "QVEGT"],
+                "residual_against": "dS/dt",
+                "frame": "calendar",
+            }
+        }
     }
     with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
         yaml.dump(override, f)
@@ -57,12 +66,50 @@ def test_user_config_override():
 
     assert config.time.water_year_start_month == 4
     assert config.balances.water.frame == "calendar"
-    # Defaults should still be present for non-overridden fields
+    # Omitted subblocks still resolve from schema defaults.
+    assert config.balances.carbon.frame == "calendar"
     assert "RAIN" in config.balances.water.inputs
 
 
+def test_option_b_rejects_partial_balance_subblock():
+    override = {
+        "balances": {
+            "water": {
+                "frame": "calendar",
+            }
+        }
+    }
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
+        yaml.dump(override, f)
+        f.flush()
+        with pytest.raises(ValueError, match="full block"):
+            load_config(path=f.name)
+
+
+def test_balances_override_always_warns():
+    override = {
+        "balances": {
+            "energy": {
+                "radiation": ["FSDS", "FSR", "FLDS", "FIRE", "FSA", "FIRA"],
+                "turbulent": ["FSH", "EFLX_LH_TOT"],
+                "ground": ["FGR", "FGR12"],
+                "storage": ["HC", "HCSOI"],
+                "errors": ["ERRSOI", "ERRSEB"],
+                "frame": "calendar",
+                "cumulative": False,
+            }
+        }
+    }
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
+        yaml.dump(override, f)
+        f.flush()
+        with pytest.warns(UserWarning, match="Advanced override detected"):
+            config = load_config(path=f.name)
+
+    assert config.balances.energy.cumulative is False
+
+
 def test_invalid_envelope_rejected():
-    import pytest
     bad = {"plots": {"climatology": {"envelope": "invalid_value"}}}
     with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
         yaml.dump(bad, f)

@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, Literal
 
+import warnings
 import yaml
 from pydantic import BaseModel, Field
 
@@ -232,5 +233,68 @@ def load_config(
         with open(_USER_CONFIG_PATH) as f:
             user_config = yaml.safe_load(f) or {}
 
+    user_balances = user_config.pop("balances", None)
     merged = _deep_merge(defaults, user_config)
+
+    # Balance definitions are internal schema defaults. Expert users may
+    # override per-balance blocks (water/carbon/energy) atomically.
+    balance_defaults = BalancesConfig().model_dump()
+    merged_balances = dict(balance_defaults)
+    if user_balances is not None:
+        warnings.warn(
+            "Advanced override detected: 'balances' in user config. "
+            "Provided balances.<type> blocks replace that entire balance definition.",
+            UserWarning,
+            stacklevel=2,
+        )
+        if not isinstance(user_balances, dict):
+            raise ValueError("'balances' must be a mapping with optional keys: water, carbon, energy")
+
+        allowed_balance_keys = {"water", "carbon", "energy"}
+        unknown_balance_keys = set(user_balances) - allowed_balance_keys
+        if unknown_balance_keys:
+            unknown = ", ".join(sorted(unknown_balance_keys))
+            raise ValueError(f"Unknown balances subblock(s): {unknown}")
+
+        required_subkeys = {
+            "water": {
+                "storages",
+                "inputs",
+                "outputs",
+                "et_components",
+                "residual_against",
+                "frame",
+            },
+            "carbon": {
+                "mode",
+                "pools",
+                "fluxes",
+                "ch4",
+                "residual_against",
+                "frame",
+            },
+            "energy": {
+                "radiation",
+                "turbulent",
+                "ground",
+                "storage",
+                "errors",
+                "frame",
+                "cumulative",
+            },
+        }
+
+        for balance_name, block in user_balances.items():
+            if not isinstance(block, dict):
+                raise ValueError(f"'balances.{balance_name}' must be a mapping")
+            missing_subkeys = required_subkeys[balance_name] - set(block)
+            if missing_subkeys:
+                missing = ", ".join(sorted(missing_subkeys))
+                raise ValueError(
+                    f"'balances.{balance_name}' must provide a full block for replacement of a balance definition. "
+                    f"Missing key(s): {missing}"
+                )
+            merged_balances[balance_name] = block
+
+    merged["balances"] = merged_balances
     return Config.model_validate(merged)
