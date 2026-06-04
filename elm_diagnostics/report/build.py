@@ -378,8 +378,7 @@ class Report:
         compute_seconds = 0.0
         plot_seconds = 0.0
         io_seconds = 0.0
-        fig1: plt.Figure | None = None
-        fig2: plt.Figure | None = None
+        figs: tuple[plt.Figure, ...] = ()
         existing_fignums = set(plt.get_fignums())
         self._announce_section_progress(section_title)
         try:
@@ -393,13 +392,22 @@ class Report:
             
             # Generate plots
             plot_start = time.perf_counter()
-            fig1, fig2 = wb.plot()
-            p1, t1 = self._save_figure(fig1, figdir, "water_cumulative")
-            p2, t2 = self._save_figure(fig2, figdir, "water_decomposition")
+            figs = wb.plot()
+            p1, t1 = self._save_figure(figs[0], figdir, "water_cumulative")
+            p2, t2 = self._save_figure(figs[1], figdir, "water_decomposition")
             sec.add_figure(p1, t1, "Cumulative water balance", "balance")
             sec.add_figure(p2, t2, "Water output decomposition", "balance")
-            plt.close(fig1)
-            plt.close(fig2)
+
+            if len(figs) >= 3:
+                p3, t3 = self._save_figure(figs[2], figdir, "water_input_decomposition")
+                sec.add_figure(p3, t3, "Water input decomposition", "balance")
+
+            if len(figs) >= 4:
+                p4, t4 = self._save_figure(figs[3], figdir, "water_storage_decomposition")
+                sec.add_figure(p4, t4, "Water storage decomposition", "balance")
+
+            for fig in figs:
+                plt.close(fig)
             plot_seconds += time.perf_counter() - plot_start
             
             # Add statistics if enabled
@@ -420,10 +428,8 @@ class Report:
         except Exception as e:
             self._record_error("Water Balance", e)
         finally:
-            if fig1 is not None:
-                plt.close(fig1)
-            if fig2 is not None:
-                plt.close(fig2)
+            for fig in figs:
+                plt.close(fig)
             self._close_new_figures(existing_fignums)
             self._record_section_timing(
                 "Water Balance",

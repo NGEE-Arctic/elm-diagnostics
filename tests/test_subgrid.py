@@ -177,16 +177,24 @@ class TestSubgridBalances:
         """Test balance.plot() creates faceted figure when by is set."""
         wb = WaterBalance(multicolumn_run, by="column")
         
-        fig_cumulative, fig_decomposition = wb.plot()
+        (
+            fig_cumulative,
+            fig_output_decomposition,
+            fig_input_decomposition,
+            fig_storage_decomposition,
+        ) = wb.plot()
         
         # Should have multiple subplots (3 columns)
-        # Note: balance plots have 2 subpanels per unit (cumulative + decomposition)
-        # But actually they create separate figures, so each fig should have facets
+        # Balance plots create separate faceted figures.
         assert len(fig_cumulative.axes) >= 1  # At least one subplot
-        assert len(fig_decomposition.axes) >= 1
+        assert len(fig_output_decomposition.axes) >= 1
+        assert len(fig_input_decomposition.axes) >= 1
+        assert len(fig_storage_decomposition.axes) >= 1
         
         plt.close(fig_cumulative)
-        plt.close(fig_decomposition)
+        plt.close(fig_output_decomposition)
+        plt.close(fig_input_decomposition)
+        plt.close(fig_storage_decomposition)
     
     def test_balance_without_subgrid_dimension_raises(self, single_point_run):
         """Test that WaterBalance with by='column' raises error for gridcell data."""

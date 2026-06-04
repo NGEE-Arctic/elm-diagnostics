@@ -132,10 +132,10 @@ class Balance(ABC):
         return self._residual_cache
 
     @abstractmethod
-    def plot(self) -> tuple[plt.Figure, plt.Figure]:
+    def plot(self) -> tuple[plt.Figure, ...]:
         """Generate balance plots.
 
-        Returns (cumulative_panel, decomposition_panel).
+        Returns a tuple of figures for this balance type.
         """
 
     def to_netcdf(self, path: str | Path) -> None:
