@@ -114,6 +114,9 @@ class Run:
         If None, streams are auto-discovered.
     chunks : dict, optional
         Passed to ``xr.open_mfdataset`` for dask-backed lazy loading.
+    strict_combine : bool, optional
+        If True, open streams using stricter multi-file combine options.
+        Defaults to False.
     """
 
     def __init__(
@@ -122,10 +125,12 @@ class Run:
         name: str | None = None,
         streams: dict[str, str] | None = None,
         chunks: dict | None = None,
+        strict_combine: bool = False,
     ):
         self.path = Path(path)
         self.name = name or _extract_casename(self.path)
         self._chunks = chunks
+        self._strict_combine = strict_combine
         self._datasets: dict[str, xr.Dataset] = {}
         self._cadence: dict[str, str | pd.Timedelta] = {}
 
@@ -145,16 +150,32 @@ class Run:
         # Sort tapes by name for deterministic ordering
         self._tape_order = sorted(self._stream_files.keys())
 
-    def _open_stream(self, tape: str) -> xr.Dataset:
+    def _open_stream(self, tape: str, strict_combine: bool | None = None) -> xr.Dataset:
         """Lazily open a stream's files as a single dataset."""
         if tape not in self._datasets:
             files = self._stream_files[tape]
             if not files:
                 raise FileNotFoundError(f"No files for stream {tape}")
+            if strict_combine is None:
+                strict_combine = self._strict_combine
             kwargs: dict = dict(
                 combine="by_coords",
                 data_vars="all",
             )
+            if strict_combine:
+                # Set options to strict choice for debugging
+                kwargs["combine"] = "by_coords"
+                kwargs["data_vars"] = "all"
+                kwargs["join"] = "override"
+                kwargs["compat"] = "equals"
+            else:
+                # Set options to the performance-oriented choice when we
+                # trust the files to be consistent
+                kwargs["combine"] = "nested"
+                kwargs["concat_dim"] = "time"
+                kwargs["data_vars"] = "minimal"
+                kwargs["join"] = "exact"
+                kwargs["compat"] = "equals"
             # Use CFDatetimeCoder for cftime decoding (xarray >= 2024)
             try:
                 coder = xr.coders.CFDatetimeCoder(use_cftime=True)

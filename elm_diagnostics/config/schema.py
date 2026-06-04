@@ -159,11 +159,16 @@ class VariableGroupsConfig(BaseModel):
     groups: dict[str, list[str]] = Field(default_factory=dict)
 
 
+class IOConfig(BaseModel):
+    strict_combine: bool = False
+
+
 class Config(BaseModel):
     """Top-level configuration."""
 
     report: ReportConfig = ReportConfig()
     plots: PlotsConfig = PlotsConfig()
+    io: IOConfig = IOConfig()
     time: TimeConfig = TimeConfig()
     balances: BalancesConfig = BalancesConfig()
     variables: VariableGroupsConfig = VariableGroupsConfig()

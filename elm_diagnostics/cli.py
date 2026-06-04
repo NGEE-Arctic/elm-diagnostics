@@ -115,6 +115,14 @@ def complete_plot_kind(incomplete: str) -> List[str]:
     return [k for k in kinds if k.startswith(incomplete)]
 
 
+def _get_run_strict_combine(config_path: str | None) -> bool:
+    """Resolve strict_combine from merged defaults/user config."""
+    from elm_diagnostics.config.schema import load_config
+
+    cfg = load_config(path=config_path) if config_path else load_config()
+    return cfg.io.strict_combine
+
+
 @app.command()
 def report(
     path: str = typer.Argument(..., help="Path to ELM history files directory."),
@@ -188,6 +196,8 @@ def report(
         if config:
             validate_config(config)
 
+        strict_combine = _get_run_strict_combine(config)
+
         # Import here to avoid slow startup
         from elm_diagnostics.io.run import Comparison, Run
         from elm_diagnostics.report.build import Report
@@ -203,13 +213,13 @@ def report(
                 transient=True,
             ) as progress:
                 task = progress.add_task("Loading ELM data...", total=None)
-                run = Run(str(elm_path))
+                run = Run(str(elm_path), strict_combine=strict_combine)
                 progress.update(task, completed=True)
                 elapsed = time.time() - start_time
                 if verbose:
                     logger.info(f"Loaded data in {elapsed:.1f}s")
         else:
-            run = Run(str(elm_path))
+            run = Run(str(elm_path), strict_combine=strict_combine)
 
         # Load comparison run if specified
         if compare:
@@ -221,11 +231,13 @@ def report(
                     transient=True,
                 ) as progress:
                     task = progress.add_task("Loading comparison data...", total=None)
-                    compare_run = Run(str(compare_path))
+                    compare_run = Run(
+                        str(compare_path), strict_combine=strict_combine
+                    )
                     source = Comparison(run, compare_run)
                     progress.update(task, completed=True)
             else:
-                compare_run = Run(str(compare_path))
+                compare_run = Run(str(compare_path), strict_combine=strict_combine)
                 source = Comparison(run, compare_run)
         else:
             source = run
@@ -324,6 +336,8 @@ def balance(
         if config:
             validate_config(config)
 
+        strict_combine = _get_run_strict_combine(config)
+
         from elm_diagnostics.balances.carbon import CarbonBalance
         from elm_diagnostics.balances.energy import EnergyBalance
         from elm_diagnostics.balances.water import WaterBalance
@@ -351,13 +365,13 @@ def balance(
                 transient=True,
             ) as progress:
                 task = progress.add_task("Loading ELM data...", total=None)
-                run = Run(str(elm_path))
+                run = Run(str(elm_path), strict_combine=strict_combine)
                 progress.update(task, completed=True)
                 elapsed = time.time() - start_time
                 if verbose:
                     logger.info(f"Loaded data in {elapsed:.1f}s")
         else:
-            run = Run(str(elm_path))
+            run = Run(str(elm_path), strict_combine=strict_combine)
 
         # Compute balance
         if not quiet:
@@ -470,6 +484,8 @@ def plot(
         if config:
             validate_config(config)
 
+        strict_combine = _get_run_strict_combine(config)
+
         from elm_diagnostics.io.run import Run
         from elm_diagnostics.plots import (
             plot_anomaly,
@@ -503,13 +519,13 @@ def plot(
                 transient=True,
             ) as progress:
                 task = progress.add_task("Loading ELM data...", total=None)
-                run = Run(str(elm_path))
+                run = Run(str(elm_path), strict_combine=strict_combine)
                 progress.update(task, completed=True)
                 elapsed = time.time() - start_time
                 if verbose:
                     logger.info(f"Loaded data in {elapsed:.1f}s")
         else:
-            run = Run(str(elm_path))
+            run = Run(str(elm_path), strict_combine=strict_combine)
 
         if verbose:
             logger.info(f"Variable: {varname}")
