@@ -140,6 +140,23 @@ def _get_run_chunk_options(
     return mode, manual_chunks, target_mb
 
 
+def _resolve_analysis_year_filter(
+    config_path: str | None,
+    year: int | None,
+    all_years: bool,
+) -> int | None:
+    """Return analysis year for early loader narrowing when safe to do so."""
+    if year is None or all_years:
+        return None
+
+    from elm_diagnostics.config.schema import load_config
+
+    cfg = load_config(path=config_path) if config_path else load_config()
+    if cfg.plots.climatology.include_climos:
+        return None
+    return year
+
+
 def _print_report_section_timings(
     timings: list[dict[str, float | str | None]],
     build_total_seconds: float | None = None,
@@ -258,6 +275,13 @@ def report(
 
         strict_combine = _get_run_strict_combine(config)
         chunk_mode, manual_chunks, chunk_target_mb = _get_run_chunk_options(config)
+        analysis_year_filter = _resolve_analysis_year_filter(config, year, all_years)
+
+        if year is not None and analysis_year_filter is None and not quiet:
+            console.print(
+                "[yellow]Note:[/yellow] Early file narrowing disabled because "
+                "climatology is enabled; full-year range remains available for climo."
+            )
 
         # Import here to avoid slow startup
         from elm_diagnostics.io.run import Comparison, Run
@@ -280,6 +304,7 @@ def report(
                     chunk_mode=chunk_mode,
                     chunks=manual_chunks,
                     chunk_target_mb=chunk_target_mb,
+                    analysis_year=analysis_year_filter,
                 )
                 progress.update(task, completed=True)
                 elapsed = time.time() - start_time
@@ -292,6 +317,7 @@ def report(
                 chunk_mode=chunk_mode,
                 chunks=manual_chunks,
                 chunk_target_mb=chunk_target_mb,
+                analysis_year=analysis_year_filter,
             )
 
         # Load comparison run if specified
@@ -310,6 +336,7 @@ def report(
                         chunk_mode=chunk_mode,
                         chunks=manual_chunks,
                         chunk_target_mb=chunk_target_mb,
+                        analysis_year=analysis_year_filter,
                     )
                     source = Comparison(run, compare_run)
                     progress.update(task, completed=True)
@@ -320,6 +347,7 @@ def report(
                     chunk_mode=chunk_mode,
                     chunks=manual_chunks,
                     chunk_target_mb=chunk_target_mb,
+                    analysis_year=analysis_year_filter,
                 )
                 source = Comparison(run, compare_run)
         else:

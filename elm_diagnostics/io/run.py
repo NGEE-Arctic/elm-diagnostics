@@ -12,6 +12,8 @@ import numpy as np
 import pandas as pd
 import xarray as xr
 
+_FILE_STAMP_PATTERN = re.compile(r"\.h\d+\.([^.]+)\.nc$")
+
 
 def _discover_streams(path: Path) -> dict[str, list[Path]]:
     """Auto-discover ELM history streams from a directory.
@@ -101,6 +103,78 @@ def _extract_casename(path: Path) -> str:
     return path.name
 
 
+def _extract_file_year(path: Path) -> int | None:
+    """Extract YYYY from an ELM history filename, if present."""
+    stamp_match = _FILE_STAMP_PATTERN.search(path.name)
+    if not stamp_match:
+        return None
+
+    # Common ELM stamps include:
+    # - YYYY-MM
+    # - YYYY-MM-DD-SSSSS
+    # - YYYY-MM-DD
+    stamp = stamp_match.group(1)
+    year_match = re.match(r"(\d{4})", stamp)
+    if not year_match:
+        return None
+
+    return int(year_match.group(1))
+
+
+def _filter_stream_files_by_year(
+    files: list[Path],
+    *,
+    year: int,
+    tolerance_years: int,
+    tape: str,
+) -> list[Path]:
+    """Return files narrowed to a year window with safe fallback behavior."""
+    parsed: list[tuple[Path, int]] = []
+    unparsed_count = 0
+    for file in files:
+        file_year = _extract_file_year(file)
+        if file_year is None:
+            unparsed_count += 1
+        else:
+            parsed.append((file, file_year))
+
+    if not parsed:
+        warnings.warn(
+            (
+                f"Stream {tape} has no parseable year tokens; "
+                "skipping early year file narrowing."
+            ),
+            RuntimeWarning,
+        )
+        return files
+
+    if unparsed_count > 0:
+        warnings.warn(
+            (
+                f"Stream {tape} has {unparsed_count} files with unparseable years; "
+                "skipping early year file narrowing for safety."
+            ),
+            RuntimeWarning,
+        )
+        return files
+
+    filtered = [
+        path for path, file_year in parsed
+        if abs(file_year - year) <= tolerance_years
+    ]
+    if filtered:
+        return filtered
+
+    warnings.warn(
+        (
+            f"Early year filter for stream {tape} matched no files for year={year}; "
+            "using all files instead."
+        ),
+        RuntimeWarning,
+    )
+    return files
+
+
 class Run:
     """Atomic unit of analysis: one ELM case's history-file streams.
 
@@ -115,6 +189,10 @@ class Run:
         If None, streams are auto-discovered.
     chunks : dict, optional
         Passed to ``xr.open_mfdataset`` for dask-backed lazy loading.
+    analysis_year : int, optional
+        Requested analysis year for early file narrowing before open.
+    analysis_year_tolerance : int, optional
+        Year-window half-width when narrowing files (0 means exact year).
     strict_combine : bool, optional
         If True, open streams using stricter multi-file combine options.
         Defaults to False.
@@ -128,6 +206,8 @@ class Run:
         chunks: dict | None = None,
         chunk_mode: Literal["off", "auto", "manual"] = "off",
         chunk_target_mb: int = 64,
+        analysis_year: int | None = None,
+        analysis_year_tolerance: int = 0,
         strict_combine: bool = False,
     ):
         self.path = Path(path)
@@ -135,6 +215,8 @@ class Run:
         self._chunks = chunks
         self._chunk_mode = chunk_mode
         self._chunk_target_mb = chunk_target_mb
+        self._analysis_year = analysis_year
+        self._analysis_year_tolerance = max(0, int(analysis_year_tolerance))
         self._strict_combine = strict_combine
         self._datasets: dict[str, xr.Dataset] = {}
         self._cadence: dict[str, str | pd.Timedelta] = {}
@@ -146,6 +228,17 @@ class Run:
                 self._stream_files[tape] = sorted(self.path.glob(pattern))
         else:
             self._stream_files = _discover_streams(self.path)
+
+        if self._analysis_year is not None:
+            self._stream_files = {
+                tape: _filter_stream_files_by_year(
+                    files,
+                    year=self._analysis_year,
+                    tolerance_years=self._analysis_year_tolerance,
+                    tape=tape,
+                )
+                for tape, files in self._stream_files.items()
+            }
 
         if not self._stream_files:
             raise FileNotFoundError(
