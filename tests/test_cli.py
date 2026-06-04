@@ -9,7 +9,7 @@ from pathlib import Path
 import pytest
 from typer.testing import CliRunner
 
-from elm_diagnostics.cli import app
+from elm_diagnostics.cli import app, _resolve_analysis_year_filter
 from tests.fixtures.synthetic_elm import (
     make_water_balance_dataset,
     make_carbon_balance_dataset,
@@ -455,6 +455,26 @@ def test_water_year_start_validation(synthetic_data_dir, temp_output_dir):
     )
     assert result.exit_code == 2  # Usage error
     assert "range" in result.output.lower() or "invalid" in result.output.lower()
+
+
+def test_analysis_year_filter_includes_previous_year_for_water_year(tmp_path):
+    """Year narrowing should include prior year for water-year framing."""
+    cfg = tmp_path / "config.yaml"
+    cfg.write_text(
+        "\n".join(
+            [
+                "time:",
+                "  water_year_start_month: 10",
+                "plots:",
+                "  climatology:",
+                "    include_climos: false",
+                "",
+            ]
+        )
+    )
+
+    lo, hi = _resolve_analysis_year_filter(str(cfg), year=2000, all_years=False)
+    assert (lo, hi) == (1999, 2000)
 
 
 # =============================================================================

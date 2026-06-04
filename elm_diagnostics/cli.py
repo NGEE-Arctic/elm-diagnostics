@@ -152,15 +152,31 @@ def _resolve_analysis_year_filter(
     from elm_diagnostics.config.schema import load_config
 
     cfg = load_config(path=config_path) if config_path else load_config()
+
+    # If any balance uses water-year framing and the water year does not
+    # begin in January, we must include the previous calendar year so the
+    # selected water year can start at the configured boundary (e.g., Oct 1).
+    balance_frames = (
+        cfg.balances.water.frame,
+        cfg.balances.carbon.frame,
+        cfg.balances.energy.frame,
+    )
+    needs_prev_year = (
+        "water_year" in balance_frames and cfg.time.water_year_start_month > 1
+    )
+
+    lo = year - 1 if needs_prev_year else year
+    hi = year
+
     if cfg.plots.climatology.include_climos:
         start = cfg.plots.climatology.climo_start_year
         end = cfg.plots.climatology.climo_end_year
         if start == -1 or end == -1:
             return None, None
-        lo = min(year, start, end)
-        hi = max(year, start, end)
+        lo = min(lo, start, end)
+        hi = max(hi, start, end)
         return lo, hi
-    return year, year
+    return lo, hi
 
 
 def _print_report_section_timings(
