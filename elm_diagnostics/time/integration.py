@@ -64,7 +64,13 @@ def _scalar_to_seconds(value: object) -> float:
     if hasattr(value, "days"):
         return float(value.days * 86400.0 + getattr(value, "seconds", 0))
     if isinstance(value, np.timedelta64):
-        return float(value / np.timedelta64(1, "s"))
+        # Convert to seconds, handling both ns and s units
+        # Older numpy/xarray may return nanoseconds
+        seconds_val = float(value / np.timedelta64(1, "s"))
+        # If value looks like nanoseconds (> 1e12), convert
+        if abs(seconds_val) > 1e12:
+            seconds_val = float(value / np.timedelta64(1, "ns")) / 1e9
+        return seconds_val
     if isinstance(value, (int, float, np.integer, np.floating)):
         fv = float(value)
         return fv if fv > 1000 else fv * 86400.0
