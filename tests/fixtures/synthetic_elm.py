@@ -8,7 +8,6 @@ noleap calendar.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Literal
 
 import cftime
 import numpy as np
@@ -27,8 +26,18 @@ def make_time_axis(
     times = []
     bounds = []
     days_in_month = {
-        1: 31, 2: 28, 3: 31, 4: 30, 5: 31, 6: 30,
-        7: 31, 8: 31, 9: 30, 10: 31, 11: 30, 12: 31,
+        1: 31,
+        2: 28,
+        3: 31,
+        4: 30,
+        5: 31,
+        6: 30,
+        7: 31,
+        8: 31,
+        9: 30,
+        10: 31,
+        11: 30,
+        12: 31,
     }
 
     year = start_year
@@ -162,10 +171,7 @@ def make_water_balance_dataset(
 
     # Compute time bounds for dt
     _, tb = make_time_axis(start_year, n_months, calendar)
-    dts = np.array([
-        (tb[i, 1] - tb[i, 0]).days * 86400.0
-        for i in range(n)
-    ])
+    dts = np.array([(tb[i, 1] - tb[i, 0]).days * 86400.0 for i in range(n)])
 
     # Cumulative storage
     ds_cumulative = np.cumsum(ds_dt_rate * dts)
@@ -182,12 +188,28 @@ def make_water_balance_dataset(
     variables = {
         "RAIN": {"data": rain, "units": "mm/s", "cell_methods": "time: mean"},
         "SNOW": {"data": snow, "units": "mm/s", "cell_methods": "time: mean"},
-        "QFLX_EVAP_TOT": {"data": evap_tot, "units": "mm/s", "cell_methods": "time: mean"},
+        "QFLX_EVAP_TOT": {
+            "data": evap_tot,
+            "units": "mm/s",
+            "cell_methods": "time: mean",
+        },
         "QOVER": {"data": qover, "units": "mm/s", "cell_methods": "time: mean"},
         "QDRAI": {"data": qdrai, "units": "mm/s", "cell_methods": "time: mean"},
-        "QDRAI_PERCH": {"data": np.zeros(n), "units": "mm/s", "cell_methods": "time: mean"},
-        "QFLX_SUB_SNOW": {"data": np.zeros(n), "units": "mm/s", "cell_methods": "time: mean"},
-        "QSNOMELT": {"data": np.zeros(n), "units": "mm/s", "cell_methods": "time: mean"},
+        "QDRAI_PERCH": {
+            "data": np.zeros(n),
+            "units": "mm/s",
+            "cell_methods": "time: mean",
+        },
+        "QFLX_SUB_SNOW": {
+            "data": np.zeros(n),
+            "units": "mm/s",
+            "cell_methods": "time: mean",
+        },
+        "QSNOMELT": {
+            "data": np.zeros(n),
+            "units": "mm/s",
+            "cell_methods": "time: mean",
+        },
         "SOILLIQ": {"data": soilliq, "units": "kg/m2", "cell_methods": "time: point"},
         "SOILICE": {"data": soilice, "units": "kg/m2", "cell_methods": "time: point"},
         "H2OSNO": {"data": h2osno, "units": "mm", "cell_methods": "time: point"},
@@ -244,7 +266,11 @@ def make_energy_balance_dataset(
         "FSA": {"data": fsa, "units": "W/m^2", "cell_methods": "time: mean"},
         "FIRA": {"data": fira, "units": "W/m^2", "cell_methods": "time: mean"},
         "FSH": {"data": fsh, "units": "W/m^2", "cell_methods": "time: mean"},
-        "EFLX_LH_TOT": {"data": eflx_lh_tot, "units": "W/m^2", "cell_methods": "time: mean"},
+        "EFLX_LH_TOT": {
+            "data": eflx_lh_tot,
+            "units": "W/m^2",
+            "cell_methods": "time: mean",
+        },
         "FGR": {"data": fgr, "units": "W/m^2", "cell_methods": "time: mean"},
     }
 
@@ -303,15 +329,43 @@ def make_carbon_balance_dataset(
         "ER": {"data": er, "units": "gC/m^2/s", "cell_methods": "time: mean"},
         "NEE": {"data": nee, "units": "gC/m^2/s", "cell_methods": "time: mean"},
         "TOTFIRE": {"data": totfire, "units": "gC/m^2/s", "cell_methods": "time: mean"},
-        "WOOD_HARVESTC": {"data": harvest, "units": "gC/m^2/s", "cell_methods": "time: mean"},
-        "TOTECOSYSC": {"data": totecosysc, "units": "gC/m^2", "cell_methods": "time: point"},
-        "TOTCOLC": {"data": totecosysc * 1.02, "units": "gC/m^2", "cell_methods": "time: point"},
+        "WOOD_HARVESTC": {
+            "data": harvest,
+            "units": "gC/m^2/s",
+            "cell_methods": "time: mean",
+        },
+        "TOTECOSYSC": {
+            "data": totecosysc,
+            "units": "gC/m^2",
+            "cell_methods": "time: point",
+        },
+        "TOTCOLC": {
+            "data": totecosysc * 1.02,
+            "units": "gC/m^2",
+            "cell_methods": "time: point",
+        },
         "LEAFC": {"data": leafc, "units": "gC/m^2", "cell_methods": "time: point"},
-        "LIVESTEMC": {"data": livestemc, "units": "gC/m^2", "cell_methods": "time: point"},
-        "DEADSTEMC": {"data": deadstemc, "units": "gC/m^2", "cell_methods": "time: point"},
+        "LIVESTEMC": {
+            "data": livestemc,
+            "units": "gC/m^2",
+            "cell_methods": "time: point",
+        },
+        "DEADSTEMC": {
+            "data": deadstemc,
+            "units": "gC/m^2",
+            "cell_methods": "time: point",
+        },
         "FROOTC": {"data": frootc, "units": "gC/m^2", "cell_methods": "time: point"},
-        "LIVECROOTC": {"data": livecrootc, "units": "gC/m^2", "cell_methods": "time: point"},
-        "DEADCROOTC": {"data": deadcrootc, "units": "gC/m^2", "cell_methods": "time: point"},
+        "LIVECROOTC": {
+            "data": livecrootc,
+            "units": "gC/m^2",
+            "cell_methods": "time: point",
+        },
+        "DEADCROOTC": {
+            "data": deadcrootc,
+            "units": "gC/m^2",
+            "cell_methods": "time: point",
+        },
         "TOTSOMC": {"data": totsomc, "units": "gC/m^2", "cell_methods": "time: point"},
         "TOTLITC": {"data": totlitc, "units": "gC/m^2", "cell_methods": "time: point"},
         "CWDC": {"data": cwdc, "units": "gC/m^2", "cell_methods": "time: point"},
@@ -333,11 +387,11 @@ def make_multicolumn_dataset(
     perfect_closure: bool = True,
 ) -> xr.Dataset:
     """Build a synthetic multi-column dataset for sub-gridcell testing.
-    
+
     Creates a dataset with sub-gridcell (column) dimension, where each
     column has independent water balance. If perfect_closure=True, the
     water balance closes exactly for each column.
-    
+
     Parameters
     ----------
     n_columns : int, default 3
@@ -347,23 +401,24 @@ def make_multicolumn_dataset(
     calendar : str, default "noleap"
     perfect_closure : bool, default True
         If True, construct water balance to close exactly per column
-    
+
     Returns
     -------
     xr.Dataset
         Dataset with 'column' dimension and water/carbon variables
     """
-    rng = np.random.RandomState(42)
     n = n_months
-    
+
     times, time_bounds_data = make_time_axis(start_year, n_months, calendar)
-    
+
     # Compute time deltas for flux integration
-    dts = np.array([
-        (time_bounds_data[i, 1] - time_bounds_data[i, 0]).days * 86400.0
-        for i in range(n)
-    ])
-    
+    dts = np.array(
+        [
+            (time_bounds_data[i, 1] - time_bounds_data[i, 0]).days * 86400.0
+            for i in range(n)
+        ]
+    )
+
     # Initialize arrays with (time, column) shape
     # Each column gets different but realistic values
     rain_all = np.zeros((n, n_columns))
@@ -377,16 +432,16 @@ def make_multicolumn_dataset(
     h2ocan_all = np.zeros((n, n_columns))
     h2osfc_all = np.zeros((n, n_columns))
     gpp_all = np.zeros((n, n_columns))
-    
+
     for col in range(n_columns):
         # Use different random seed per column for variation
         col_rng = np.random.RandomState(42 + col * 10)
-        
+
         # Inputs (mm/s) - vary by column
         rain = col_rng.uniform(1e-6, 5e-5, size=n).astype(np.float64) * (1 + col * 0.2)
         snow = col_rng.uniform(0, 1e-5, size=n).astype(np.float64) * (1 + col * 0.3)
         total_input = rain + snow
-        
+
         if perfect_closure:
             # Construct outputs to close balance exactly
             evap_frac = col_rng.uniform(0.3, 0.5, size=n)
@@ -399,11 +454,11 @@ def make_multicolumn_dataset(
             evap_frac *= scale
             runoff_frac *= scale
             drain_frac *= scale
-            
+
             evap = total_input * evap_frac
             qover = total_input * runoff_frac
             qdrai = total_input * drain_frac
-            
+
             # Storage change rate
             ds_dt_rate = total_input - evap - qover - qdrai
         else:
@@ -412,26 +467,26 @@ def make_multicolumn_dataset(
             qover = col_rng.uniform(0, 1e-5, size=n)
             qdrai = col_rng.uniform(0, 5e-6, size=n)
             ds_dt_rate = col_rng.uniform(-1e-6, 1e-6, size=n)
-        
+
         # Cumulative storage
         ds_cumulative = np.cumsum(ds_dt_rate * dts)
         initial_storage = 500.0 + col * 50.0  # Different initial storage per column
         storage_ts = initial_storage + ds_cumulative
-        
+
         # Partition storage into components
         soilliq = storage_ts * 0.6
         soilice = storage_ts * 0.2
         h2osno = storage_ts * 0.1
         h2ocan = storage_ts * 0.05
         h2osfc = storage_ts * 0.05
-        
+
         # GPP for carbon plots (just make it seasonal)
         gpp = col_rng.uniform(5e-6, 15e-6, size=n) * (1 + col * 0.1)
         # Add seasonal pattern
         month_of_year = np.arange(n) % 12
         seasonal_factor = 1 + 0.5 * np.sin(2 * np.pi * month_of_year / 12)
         gpp = gpp * seasonal_factor
-        
+
         # Store in column arrays
         rain_all[:, col] = rain
         snow_all[:, col] = snow
@@ -444,20 +499,20 @@ def make_multicolumn_dataset(
         h2ocan_all[:, col] = h2ocan
         h2osfc_all[:, col] = h2osfc
         gpp_all[:, col] = gpp
-    
+
     # Build dataset
     coords = {
         "time": times,
         "column": np.arange(1, n_columns + 1),  # 1-indexed like real ELM
         "lndgrid": [1],  # Single gridcell
     }
-    
+
     ds = xr.Dataset(coords=coords)
     ds["time_bounds"] = xr.DataArray(
         time_bounds_data,
         dims=["time", "ntb"],
     )
-    
+
     # Add variables with (time, column) dimensions
     variables = {
         "RAIN": (rain_all, "mm/s", "time: mean"),
@@ -478,7 +533,7 @@ def make_multicolumn_dataset(
         "QVEGE": (evap_all * 0.3, "mm/s", "time: mean"),
         "QVEGT": (evap_all * 0.3, "mm/s", "time: mean"),
     }
-    
+
     for name, (data, units, cell_methods) in variables.items():
         da = xr.DataArray(
             data,
@@ -487,7 +542,7 @@ def make_multicolumn_dataset(
             name=name,
         )
         ds[name] = da
-    
+
     return ds
 
 

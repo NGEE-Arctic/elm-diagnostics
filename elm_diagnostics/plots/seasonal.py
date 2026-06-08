@@ -10,6 +10,7 @@ import xarray as xr
 from elm_diagnostics.config.schema import Config, load_config
 from elm_diagnostics.io.run import Comparison, Run
 from elm_diagnostics.io.subgrid import SubgridLevel
+from elm_diagnostics.plots.climatology import compute_climo_stats
 
 
 _MONTH_LABELS = ["J", "F", "M", "A", "M", "J", "J", "A", "S", "O", "N", "D"]
@@ -26,33 +27,22 @@ def _squeeze_spatial(da: xr.DataArray) -> xr.DataArray:
 def _seasonal_stats(
     da: xr.DataArray,
     envelope: str,
-) -> tuple[xr.DataArray, xr.DataArray, xr.DataArray]:
+    climo_start_year: int = -1,
+    climo_end_year: int = -1,
+) -> tuple[xr.DataArray | None, xr.DataArray | None, xr.DataArray | None]:
     """Return (mean, lower, upper) grouped by month.
 
     Returns None values if insufficient data.
     """
-    # Need at least 12 months for meaningful seasonal cycle
-    if len(da.time) < 12:
-        return None, None, None
-
-    grouped = da.groupby("time.month")
-    mean = grouped.mean()
-
-    if envelope == "minmax":
-        lo = grouped.min()
-        hi = grouped.max()
-    elif envelope == "p10_p90":
-        lo = grouped.quantile(0.1)
-        hi = grouped.quantile(0.9)
-    elif envelope == "std":
-        std = grouped.std()
-        lo = mean - std
-        hi = mean + std
-    else:
-        lo = mean
-        hi = mean
-
-    return mean, lo, hi
+    return compute_climo_stats(
+        da,
+        groupby="time.month",
+        method=envelope,
+        climo_start_year=climo_start_year,
+        climo_end_year=climo_end_year,
+        min_points=12,
+        required_groups=12,
+    )
 
 
 def plot_seasonal(
@@ -116,7 +106,8 @@ def _plot_seasonal_single(
 ) -> plt.Figure:
     """Plot a single seasonal cycle (no faceting)."""
     style = config.plots.style
-    envelope = config.plots.climatology.envelope
+    include_climos = config.plots.climatology.include_climos
+    envelope = config.plots.climatology.envelope if include_climos else "none"
 
     if ax is None:
         fig, ax = plt.subplots(figsize=style.figsize, dpi=style.dpi)
@@ -129,8 +120,18 @@ def _plot_seasonal_single(
         da_base = _squeeze_spatial(source.base.get(varname))
         da_exp = _squeeze_spatial(source.experiment.get(varname))
 
-        mean_b, lo_b, hi_b = _seasonal_stats(da_base, envelope)
-        mean_e, lo_e, hi_e = _seasonal_stats(da_exp, envelope)
+        mean_b, lo_b, hi_b = _seasonal_stats(
+            da_base,
+            envelope,
+            config.plots.climatology.climo_start_year,
+            config.plots.climatology.climo_end_year,
+        )
+        mean_e, lo_e, hi_e = _seasonal_stats(
+            da_exp,
+            envelope,
+            config.plots.climatology.climo_start_year,
+            config.plots.climatology.climo_end_year,
+        )
 
         # Check if we have sufficient data
         if mean_b is None or mean_e is None:
@@ -145,12 +146,16 @@ def _plot_seasonal_single(
             fig.tight_layout()
             return fig
 
-        ax.fill_between(months, lo_b.values, hi_b.values, alpha=0.2, color="gray")
+        if include_climos:
+            ax.fill_between(months, lo_b.values, hi_b.values, alpha=0.2, color="gray")
         ax.plot(
             months, mean_b.values, color="gray", label=source.base.name, linewidth=2
         )
 
-        ax.fill_between(months, lo_e.values, hi_e.values, alpha=0.2, color="tab:blue")
+        if include_climos:
+            ax.fill_between(
+                months, lo_e.values, hi_e.values, alpha=0.2, color="tab:blue"
+            )
         ax.plot(
             months,
             mean_e.values,
@@ -160,9 +165,15 @@ def _plot_seasonal_single(
         )
 
         ax.legend(loc="best", fontsize="small")
+        units = da_base.attrs.get("units", "")
     else:
         da = _squeeze_spatial(source.get(varname))
-        mean, lo, hi = _seasonal_stats(da, envelope)
+        mean, lo, hi = _seasonal_stats(
+            da,
+            envelope,
+            config.plots.climatology.climo_start_year,
+            config.plots.climatology.climo_end_year,
+        )
 
         # Check if we have sufficient data
         if mean is None:
@@ -177,18 +188,14 @@ def _plot_seasonal_single(
             fig.tight_layout()
             return fig
 
-        ax.fill_between(months, lo.values, hi.values, alpha=0.2, color="tab:blue")
+        if include_climos:
+            ax.fill_between(months, lo.values, hi.values, alpha=0.2, color="tab:blue")
         ax.plot(months, mean.values, color="tab:blue", linewidth=2)
+        units = da.attrs.get("units", "")
 
     ax.set_xticks(months)
     ax.set_xticklabels(_MONTH_LABELS)
     ax.set_xlabel("Month")
-
-    units = ""
-    if isinstance(source, Comparison):
-        units = source.base.get(varname).attrs.get("units", "")
-    else:
-        units = source.get(varname).attrs.get("units", "")
     ax.set_ylabel(units)
 
     title = f"{varname} — Seasonal Cycle"
@@ -215,7 +222,8 @@ def _plot_seasonal_faceted(
     )
 
     style = config.plots.style
-    envelope = config.plots.climatology.envelope
+    include_climos = config.plots.climatology.include_climos
+    envelope = config.plots.climatology.envelope if include_climos else "none"
 
     # Get data and validate
     if isinstance(source, Comparison):
@@ -244,14 +252,25 @@ def _plot_seasonal_faceted(
             da_base_unit = _squeeze_spatial(da_base.sel({by: unit_id}))
             da_exp_unit = _squeeze_spatial(da_exp.sel({by: unit_id}))
 
-            mean_b, lo_b, hi_b = _seasonal_stats(da_base_unit, envelope)
-            mean_e, lo_e, hi_e = _seasonal_stats(da_exp_unit, envelope)
+            mean_b, lo_b, hi_b = _seasonal_stats(
+                da_base_unit,
+                envelope,
+                config.plots.climatology.climo_start_year,
+                config.plots.climatology.climo_end_year,
+            )
+            mean_e, lo_e, hi_e = _seasonal_stats(
+                da_exp_unit,
+                envelope,
+                config.plots.climatology.climo_start_year,
+                config.plots.climatology.climo_end_year,
+            )
 
             # Check if we have sufficient data
             if mean_b is not None and mean_e is not None:
-                ax_i.fill_between(
-                    months, lo_b.values, hi_b.values, alpha=0.2, color="gray"
-                )
+                if include_climos:
+                    ax_i.fill_between(
+                        months, lo_b.values, hi_b.values, alpha=0.2, color="gray"
+                    )
                 ax_i.plot(
                     months,
                     mean_b.values,
@@ -259,9 +278,10 @@ def _plot_seasonal_faceted(
                     label=source.base.name,
                     linewidth=2,
                 )
-                ax_i.fill_between(
-                    months, lo_e.values, hi_e.values, alpha=0.2, color="tab:blue"
-                )
+                if include_climos:
+                    ax_i.fill_between(
+                        months, lo_e.values, hi_e.values, alpha=0.2, color="tab:blue"
+                    )
                 ax_i.plot(
                     months,
                     mean_e.values,
@@ -274,13 +294,19 @@ def _plot_seasonal_faceted(
             units_str = da_base.attrs.get("units", "")
         else:
             da_unit = _squeeze_spatial(da.sel({by: unit_id}))
-            mean, lo, hi = _seasonal_stats(da_unit, envelope)
+            mean, lo, hi = _seasonal_stats(
+                da_unit,
+                envelope,
+                config.plots.climatology.climo_start_year,
+                config.plots.climatology.climo_end_year,
+            )
 
             # Check if we have sufficient data
             if mean is not None:
-                ax_i.fill_between(
-                    months, lo.values, hi.values, alpha=0.2, color="tab:blue"
-                )
+                if include_climos:
+                    ax_i.fill_between(
+                        months, lo.values, hi.values, alpha=0.2, color="tab:blue"
+                    )
                 ax_i.plot(months, mean.values, color="tab:blue", linewidth=2)
 
             units_str = da.attrs.get("units", "")

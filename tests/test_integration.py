@@ -1,7 +1,6 @@
 """Tests for time-bounds-aware integration."""
 
 import numpy as np
-import xarray as xr
 
 from elm_diagnostics.time.integration import (
     cumulative_integral,

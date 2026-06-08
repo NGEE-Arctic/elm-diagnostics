@@ -3,13 +3,11 @@
 from __future__ import annotations
 
 import subprocess
-import sys
-from pathlib import Path
 
 import pytest
 from typer.testing import CliRunner
 
-from elm_diagnostics.cli import app
+from elm_diagnostics.cli import app, _resolve_analysis_year_filter
 from tests.fixtures.synthetic_elm import (
     make_water_balance_dataset,
     make_carbon_balance_dataset,
@@ -25,19 +23,20 @@ def synthetic_data_dir(tmp_path):
     """Create a directory with synthetic ELM data files for all balance types."""
     data_dir = tmp_path / "elm_data"
     data_dir.mkdir()
-    
+
     # Create datasets with all needed variables
     ds_water = make_water_balance_dataset(start_year=2000, n_months=12)
     ds_carbon = make_carbon_balance_dataset(start_year=2000, n_months=12)
     ds_energy = make_energy_balance_dataset(start_year=2000, n_months=12)
-    
+
     # Merge all datasets
     import xarray as xr
+
     ds = xr.merge([ds_water, ds_carbon, ds_energy])
-    
+
     # Save to file
     save_as_elm_files(ds, data_dir, casename="test", tape="h0")
-    
+
     return data_dir
 
 
@@ -68,9 +67,12 @@ def test_report_command_help():
     result = runner.invoke(app, ["report", "--help"])
     assert result.exit_code == 0
     assert "Generate a full diagnostics report" in result.output
-    assert "--compare" in result.output
-    assert "--year" in result.output
-    assert "--all-years" in result.output
+    # Strip ANSI codes to handle CI terminal width differences
+    import re
+    output_clean = re.sub(r'\x1b\[[0-9;]*m', '', result.output)
+    assert "--compare" in output_clean
+    assert "--year" in output_clean
+    assert "--all-years" in output_clean
 
 
 def test_balance_command_help():
@@ -135,6 +137,8 @@ def test_balance_water(synthetic_data_dir, temp_output_dir):
     assert "Saved to" in result.output
     assert (temp_output_dir / "water_panel1.png").exists()
     assert (temp_output_dir / "water_panel2.png").exists()
+    assert (temp_output_dir / "water_panel3.png").exists()
+    assert (temp_output_dir / "water_panel4.png").exists()
     assert (temp_output_dir / "water_balance.nc").exists()
 
 
@@ -182,7 +186,7 @@ def test_plot_timeseries(synthetic_data_dir, temp_output_dir):
     """Test timeseries plot via CLI."""
     out_file = temp_output_dir / "gpp_timeseries.png"
     temp_output_dir.mkdir(parents=True, exist_ok=True)
-    
+
     result = runner.invoke(
         app,
         [
@@ -204,7 +208,7 @@ def test_plot_seasonal(synthetic_data_dir, temp_output_dir):
     """Test seasonal plot via CLI."""
     out_file = temp_output_dir / "rain_seasonal.png"
     temp_output_dir.mkdir(parents=True, exist_ok=True)
-    
+
     result = runner.invoke(
         app,
         [
@@ -226,7 +230,7 @@ def test_plot_histogram(synthetic_data_dir, temp_output_dir):
     """Test histogram plot via CLI."""
     out_file = temp_output_dir / "er_histogram.png"
     temp_output_dir.mkdir(parents=True, exist_ok=True)
-    
+
     result = runner.invoke(
         app,
         [
@@ -248,7 +252,7 @@ def test_plot_default_kind(synthetic_data_dir, temp_output_dir):
     """Test that default plot kind is timeseries."""
     out_file = temp_output_dir / "default.png"
     temp_output_dir.mkdir(parents=True, exist_ok=True)
-    
+
     result = runner.invoke(
         app,
         [
@@ -271,9 +275,7 @@ def test_plot_default_kind(synthetic_data_dir, temp_output_dir):
 
 def test_invalid_path():
     """Test error message for nonexistent directory."""
-    result = runner.invoke(
-        app, ["report", "/nonexistent/path/to/data", "--quiet"]
-    )
+    result = runner.invoke(app, ["report", "/nonexistent/path/to/data", "--quiet"])
     assert result.exit_code == 1
     assert "not found" in result.output.lower()
 
@@ -457,6 +459,26 @@ def test_water_year_start_validation(synthetic_data_dir, temp_output_dir):
     assert "range" in result.output.lower() or "invalid" in result.output.lower()
 
 
+def test_analysis_year_filter_includes_previous_year_for_water_year(tmp_path):
+    """Year narrowing should include prior year for water-year framing."""
+    cfg = tmp_path / "config.yaml"
+    cfg.write_text(
+        "\n".join(
+            [
+                "time:",
+                "  water_year_start_month: 10",
+                "plots:",
+                "  climatology:",
+                "    include_climos: false",
+                "",
+            ]
+        )
+    )
+
+    lo, hi = _resolve_analysis_year_filter(str(cfg), year=2000, all_years=False)
+    assert (lo, hi) == (1999, 2000)
+
+
 # =============================================================================
 # Comparison Mode Tests
 # =============================================================================
@@ -467,11 +489,11 @@ def test_report_comparison(synthetic_data_dir, tmp_path, temp_output_dir):
     # Create a second synthetic dataset
     compare_dir = tmp_path / "compare_data"
     compare_dir.mkdir()
-    
+
     # We need to import and create another dataset
     from tests.fixtures.synthetic_elm import make_single_point_dataset
     import numpy as np
-    
+
     # Create a slightly different dataset
     variables = {
         "GPP": {
@@ -487,7 +509,7 @@ def test_report_comparison(synthetic_data_dir, tmp_path, temp_output_dir):
     }
     ds2 = make_single_point_dataset(n_months=12, variables=variables)
     ds2.to_netcdf(compare_dir / "test.elm.h0.2000-01.nc")
-    
+
     result = runner.invoke(
         app,
         [
@@ -520,9 +542,7 @@ def test_success_exit_code(synthetic_data_dir, temp_output_dir):
 
 def test_error_exit_code():
     """Test that errors return exit code 1."""
-    result = runner.invoke(
-        app, ["report", "/nonexistent/path", "--quiet"]
-    )
+    result = runner.invoke(app, ["report", "/nonexistent/path", "--quiet"])
     assert result.exit_code == 1
 
 
@@ -530,7 +550,7 @@ def test_help_exit_code():
     """Test that --help returns exit code 0."""
     result = runner.invoke(app, ["--help"])
     assert result.exit_code == 0
-    
+
     result = runner.invoke(app, ["report", "--help"])
     assert result.exit_code == 0
 
@@ -605,7 +625,7 @@ plots:
     figsize: [8, 5]
     dpi: 150
 """)
-    
+
     result = runner.invoke(
         app,
         [
@@ -649,18 +669,16 @@ def test_balance_with_year(synthetic_data_dir, temp_output_dir):
 def test_keyboard_interrupt_handling(synthetic_data_dir, temp_output_dir, monkeypatch):
     """Test that KeyboardInterrupt is handled gracefully."""
     from elm_diagnostics.io.run import Run
-    
-    original_init = Run.__init__
-    
+
     def mock_init(*args, **kwargs):
         raise KeyboardInterrupt()
-    
+
     monkeypatch.setattr(Run, "__init__", mock_init)
-    
+
     result = runner.invoke(
         app,
         ["report", str(synthetic_data_dir), "--out", str(temp_output_dir), "--quiet"],
     )
-    
+
     assert result.exit_code == 1
     assert "cancelled" in result.output.lower()

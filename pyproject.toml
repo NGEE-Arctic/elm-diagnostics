@@ -38,6 +38,11 @@ dev = [
     "pytest-mpl>=0.16",
     "dask[complete]",
 ]
+docs = [
+    "sphinx>=7.0",
+    "sphinx-rtd-theme>=2.0",
+    "sphinx-autodoc-typehints>=2.0",
+]
 
 [project.scripts]
 elm-diagnostics = "elm_diagnostics.cli:app"

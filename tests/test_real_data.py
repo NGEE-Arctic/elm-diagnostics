@@ -197,7 +197,7 @@ def test_cell_methods_attributes(real_run):
 
 def test_water_balance_unit_standardization(real_run):
     """Test that all water balance components are standardized to mm with real data.
-    
+
     This test verifies that:
     1. SOILLIQ/SOILICE (kg/m² with vertical dims) are converted to mm
     2. H2OSNO/H2OCAN/H2OSFC (already mm) remain unchanged
@@ -205,52 +205,52 @@ def test_water_balance_unit_standardization(real_run):
     4. All components have consistent mm units
     """
     from elm_diagnostics.io.derived import aggregate_vertical_storage
-    
+
     # Test raw SOILLIQ has kg/m² with vertical dimension
     soilliq_raw = real_run.get("SOILLIQ")
     assert soilliq_raw.attrs.get("units") == "kg/m2"
     assert "levgrnd" in soilliq_raw.dims
     assert soilliq_raw.sizes["levgrnd"] == 15
-    
+
     # Test aggregation converts to mm
     soilliq_agg = aggregate_vertical_storage(real_run, "SOILLIQ")
     assert soilliq_agg.attrs.get("units") == "mm"
     assert "levgrnd" not in soilliq_agg.dims
-    
+
     # Test SOILICE too
     soilice_raw = real_run.get("SOILICE")
     assert soilice_raw.attrs.get("units") == "kg/m2"
     assert "levgrnd" in soilice_raw.dims
-    
+
     soilice_agg = aggregate_vertical_storage(real_run, "SOILICE")
     assert soilice_agg.attrs.get("units") == "mm"
-    
+
     # Test variables already in mm remain unchanged
     h2osno = real_run.get("H2OSNO")
     assert h2osno.attrs.get("units") == "mm"
-    
+
     h2ocan = real_run.get("H2OCAN")
     assert h2ocan.attrs.get("units") == "mm"
-    
+
     # Test full water balance has all mm units
     wb = WaterBalance(real_run)
     comps = wb.components()
-    
+
     # All components should be in mm
     for varname, da in comps.items():
         assert da.attrs.get("units") == "mm", (
             f"Component '{varname}' has units '{da.attrs.get('units')}', expected 'mm'"
         )
-    
+
     # Residual should also be mm
     res = wb.residual()
     assert res.attrs.get("units") == "mm"
-    
+
     # Verify values are reasonable (not zero, not insanely large)
     if "RAIN" in comps:
         rain_final = float(comps["RAIN"].values[-1])
         assert 0 < rain_final < 10000, f"RAIN cumulative out of range: {rain_final}"
-    
+
     if "dS" in comps:
         ds_final = float(comps["dS"].values[-1])
         assert abs(ds_final) < 5000, f"dS out of range: {ds_final}"

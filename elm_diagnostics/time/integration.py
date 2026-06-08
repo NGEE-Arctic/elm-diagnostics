@@ -48,54 +48,54 @@ def _estimate_dt_from_coords(ds: xr.Dataset, dim: str) -> xr.DataArray:
     if n < 2:
         # Single time step: assume 30 days
         dt_vals = np.array([30.0 * 86400.0])
-    else:
-        diffs = []
-        for i in range(n):
-            if i < n - 1:
-                d = times.values[i + 1] - times.values[i]
-            else:
-                d = times.values[i] - times.values[i - 1]
+        return xr.DataArray(dt_vals, coords={dim: ds[dim]}, dims=[dim])
 
-            if hasattr(d, "total_seconds"):
-                diffs.append(d.total_seconds())
-            elif hasattr(d, "days"):
-                diffs.append(d.days * 86400.0)
-            elif isinstance(d, np.timedelta64):
-                diffs.append(d / np.timedelta64(1, "s"))
-            else:
-                diffs.append(float(d) * 86400.0)
+    diffs = times.diff(dim)
+    last_diff = diffs.isel({dim: -1})
+    dt_raw = xr.concat([diffs, last_diff], dim=dim)
+    dt_raw = dt_raw.assign_coords({dim: ds[dim]})
+    return _to_seconds(dt_raw, dim)
 
-        dt_vals = np.array(diffs)
 
-    return xr.DataArray(dt_vals, coords={dim: ds[dim]}, dims=[dim])
+def _scalar_to_seconds(value: object) -> float:
+    """Convert one raw time delta value to seconds."""
+    if hasattr(value, "total_seconds"):
+        return float(value.total_seconds())
+    if hasattr(value, "days"):
+        return float(value.days * 86400.0 + getattr(value, "seconds", 0))
+    if isinstance(value, np.timedelta64):
+        return float(value / np.timedelta64(1, "s"))
+    if isinstance(value, (int, float, np.integer, np.floating)):
+        fv = float(value)
+        return fv if fv > 1000 else fv * 86400.0
+    return float(value) * 86400.0
 
 
 def _to_seconds(dt_raw: xr.DataArray, dim: str) -> xr.DataArray:
-    """Convert raw time deltas to seconds."""
-    vals = dt_raw.values
-    n = len(vals)
-    seconds = np.empty(n, dtype=np.float64)
+    """Convert raw time deltas to seconds.
 
-    for i in range(n):
-        v = vals[i]
-        if hasattr(v, "total_seconds"):
-            seconds[i] = v.total_seconds()
-        elif hasattr(v, "days"):
-            seconds[i] = v.days * 86400.0 + getattr(v, "seconds", 0)
-        elif isinstance(v, np.timedelta64):
-            seconds[i] = v / np.timedelta64(1, "s")
-        elif isinstance(v, (int, float, np.integer, np.floating)):
-            # Assume already in days if large enough
-            fv = float(v)
-            if fv > 1000:
-                seconds[i] = fv  # already seconds
-            else:
-                seconds[i] = fv * 86400.0
-        else:
-            seconds[i] = float(v) * 86400.0
-
+    Dispatches on dtype at the array level so timedelta64 arrays get
+    a unit-aware numpy division instead of per-scalar vectorize, which
+    can unwrap timedelta64 to raw int64 ns counts on some numpy/xarray
+    versions (Python 3.10 CI).
+    """
+    if np.issubdtype(dt_raw.dtype, np.timedelta64):
+        seconds = (dt_raw / np.timedelta64(1, "s")).astype(np.float64)
+    elif np.issubdtype(dt_raw.dtype, np.floating) or np.issubdtype(
+        dt_raw.dtype, np.integer
+    ):
+        seconds = xr.where(np.abs(dt_raw) > 1000, dt_raw, dt_raw * 86400.0)
+        seconds = seconds.astype(np.float64)
+    else:
+        seconds = xr.apply_ufunc(
+            _scalar_to_seconds,
+            dt_raw,
+            vectorize=True,
+            dask="parallelized",
+            output_dtypes=[np.float64],
+        )
     coords = {dim: dt_raw[dim]} if dim in dt_raw.dims else {}
-    return xr.DataArray(seconds, coords=coords, dims=dt_raw.dims)
+    return seconds.assign_coords(coords)
 
 
 def cumulative_integral(

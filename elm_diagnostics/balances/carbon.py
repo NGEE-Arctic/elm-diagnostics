@@ -51,7 +51,7 @@ class CarbonBalance(Balance):
                 return False
         return True
 
-    def components(self) -> dict[str, xr.DataArray]:
+    def _compute_components(self) -> dict[str, xr.DataArray]:
         """Return carbon balance components.
 
         Fluxes are cumulative-integrated to gC/m2.
@@ -106,7 +106,7 @@ class CarbonBalance(Balance):
 
         return result
 
-    def residual(self) -> xr.DataArray:
+    def _compute_residual(self) -> xr.DataArray:
         """Compute carbon closure residual.
 
         residual = cumul(GPP) - cumul(ER) - cumul(TOTFIRE)

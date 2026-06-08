@@ -2,7 +2,14 @@
 
 from __future__ import annotations
 
+import getpass
+import os
 import re
+import socket
+import subprocess
+import sys
+import threading
+import time
 import traceback
 from datetime import datetime
 from pathlib import Path
@@ -12,7 +19,9 @@ import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 import xarray as xr
+import yaml
 from jinja2 import Environment, FileSystemLoader
+from PIL import Image
 
 from elm_diagnostics.balances.carbon import CarbonBalance
 from elm_diagnostics.balances.energy import EnergyBalance
@@ -29,6 +38,10 @@ from elm_diagnostics.plots import (
 
 _TEMPLATE_DIR = Path(__file__).parent / "templates"
 _ASSETS_DIR = Path(__file__).parent / "assets"
+_DEFAULT_USER_CONFIG_PATH = Path.home() / ".config" / "elm-diagnostics" / "config.yaml"
+
+_RESAMPLING = getattr(Image, "Resampling", Image)
+_PNG_PIL_KWARGS = {"compress_level": 1, "optimize": False}
 
 
 class _Section:
@@ -39,7 +52,9 @@ class _Section:
         self.id = re.sub(r"[^a-z0-9]+", "-", title.lower()).strip("-")
         self.description = description
         self.figures: list[dict[str, str]] = []
-        self.statistics: dict[str, Any] = {}
+        self.statistics: Any = {}
+        self.extra_tables: list[dict[str, Any]] = []
+        self.extra_text_blocks: list[dict[str, str]] = []
 
     def add_figure(
         self, path: str, thumb_path: str, caption: str, plot_type: str = ""
@@ -66,9 +81,23 @@ class _Section:
             }
         )
 
-    def add_statistics(self, stats: dict[str, Any]) -> None:
+    def add_statistics(self, stats: Any) -> None:
         """Add statistics table data to section."""
         self.statistics = stats
+
+    def add_table(self, title: str, columns: list[str], rows: list[list[str]]) -> None:
+        """Add an additional table to render beneath the primary statistics."""
+        self.extra_tables.append(
+            {
+                "title": title,
+                "columns": columns,
+                "rows": rows,
+            }
+        )
+
+    def add_text_block(self, title: str, content: str) -> None:
+        """Add a preformatted text block beneath section tables."""
+        self.extra_text_blocks.append({"title": title, "content": content})
 
 
 class Report:
@@ -87,17 +116,74 @@ class Report:
         source: Run | Comparison,
         config: Config | str | Path | None = None,
         year: int | None = None,
+        invocation_command: str | None = None,
+        config_path: str | Path | None = None,
     ):
         self.source = source
         self.year = year
         self._errors: list[dict[str, str]] = []
         self._warnings: list[str] = []
         self._generation_time = datetime.now()
+        self._section_timings: list[dict[str, Any]] = []
+        self._rendered_section_titles: list[str] = []
+        self._build_total_seconds: float | None = None
+        self._progress_section_index = 0
+        self._progress_total_sections = 0
+        self._invocation_command = invocation_command or "Unavailable"
+        self._git_version = self._detect_git_version()
+        self._working_directory = os.getcwd()
+        self._user = getpass.getuser()
+        self._machine = socket.gethostname()
+        self._config_source_path: Path | None = None
+
+        if config_path is not None:
+            self._config_source_path = Path(config_path).expanduser().resolve()
+        elif isinstance(config, (str, Path)):
+            self._config_source_path = Path(config).expanduser().resolve()
+        elif config is None and _DEFAULT_USER_CONFIG_PATH.exists():
+            self._config_source_path = _DEFAULT_USER_CONFIG_PATH
 
         if config is None or isinstance(config, (str, Path)):
             self.config = load_config(config)
         else:
             self.config = config
+
+    def _detect_git_version(self) -> str:
+        """Return repository git describe string, or 'Unavailable'."""
+        repo_root = Path(__file__).resolve().parents[2]
+        try:
+            result = subprocess.run(
+                [
+                    "git",
+                    "-C",
+                    str(repo_root),
+                    "describe",
+                    "--always",
+                    "--dirty",
+                    "--tags",
+                ],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            version = result.stdout.strip()
+            return version or "Unavailable"
+        except Exception:
+            return "Unavailable"
+
+    def _diagnostics_config_yaml(self) -> tuple[str, str]:
+        """Return a title/content pair for reported config YAML."""
+        if self._config_source_path is not None and self._config_source_path.exists():
+            try:
+                return (
+                    f"Configuration file contents ({self._config_source_path})",
+                    self._config_source_path.read_text(),
+                )
+            except Exception:
+                pass
+
+        merged_yaml = yaml.safe_dump(self.config.model_dump(), sort_keys=False)
+        return ("Configuration (merged)", merged_yaml)
 
     @property
     def _run(self) -> Run:
@@ -127,16 +213,38 @@ class Report:
         full_path = figdir / f"{basename}.png"
         thumb_path = figdir / f"{basename}_thumb.png"
 
-        # Save full resolution
-        fig.savefig(full_path, bbox_inches="tight", dpi=self.config.plots.style.dpi)
+        # Save full resolution with faster PNG settings when supported.
+        savefig_kwargs = {
+            "bbox_inches": "tight",
+            "dpi": self.config.plots.style.dpi,
+            "pil_kwargs": _PNG_PIL_KWARGS,
+        }
+        try:
+            fig.savefig(full_path, **savefig_kwargs)
+        except TypeError:
+            savefig_kwargs.pop("pil_kwargs", None)
+            fig.savefig(full_path, **savefig_kwargs)
 
-        # Save thumbnail if enabled
+        # Save thumbnail by resizing the already-written full image.
         if self.config.report.thumbnails.enabled:
-            fig.savefig(
-                thumb_path,
-                bbox_inches="tight",
-                dpi=self.config.report.thumbnails.dpi,
-            )
+            thumb_size = tuple(self.config.report.thumbnails.size)
+            try:
+                with Image.open(full_path) as image:
+                    thumb = image.copy()
+                    thumb.thumbnail(thumb_size, _RESAMPLING.LANCZOS)
+                    thumb.save(thumb_path, **_PNG_PIL_KWARGS)
+            except Exception:
+                # Fall back to legacy behavior if image resize fails.
+                fallback_kwargs = {
+                    "bbox_inches": "tight",
+                    "dpi": self.config.report.thumbnails.dpi,
+                    "pil_kwargs": _PNG_PIL_KWARGS,
+                }
+                try:
+                    fig.savefig(thumb_path, **fallback_kwargs)
+                except TypeError:
+                    fallback_kwargs.pop("pil_kwargs", None)
+                    fig.savefig(thumb_path, **fallback_kwargs)
         else:
             # If thumbnails disabled, use same file for both
             thumb_path = full_path
@@ -158,6 +266,70 @@ class Report:
         """Add a warning message."""
         self._warnings.append(message)
 
+    def _announce_section_progress(self, title: str) -> None:
+        """Write a one-line section progress message to stdout immediately."""
+        self._progress_section_index += 1
+        total = self._progress_total_sections
+        print(
+            f"[report {self._progress_section_index}/{total}] {title}",
+            flush=True,
+        )
+
+    def _planned_progress_sections(self) -> list[str]:
+        """Return configured section titles announced during report generation."""
+        return [
+            "Water Balance",
+            "Energy Balance",
+            "Carbon Balance",
+            *[
+                group_name.replace("_", " ").title()
+                for group_name in self.config.variables.groups
+            ],
+            "Diagnostics",
+        ]
+
+    def _record_section_timing(
+        self,
+        title: str,
+        start_time: float,
+        *,
+        io_seconds: float | None = None,
+        compute_seconds: float | None = None,
+        plot_seconds: float | None = None,
+    ) -> None:
+        """Record timing information for a report section."""
+        self._section_timings.append(
+            {
+                "title": title,
+                "total_seconds": time.perf_counter() - start_time,
+                "io_seconds": io_seconds,
+                "compute_seconds": compute_seconds,
+                "plot_seconds": plot_seconds,
+            }
+        )
+
+    @property
+    def section_timings(self) -> list[dict[str, Any]]:
+        """Return section timing summaries in report order."""
+        if not self._rendered_section_titles:
+            return list(self._section_timings)
+
+        ordered: list[dict[str, Any]] = []
+        remaining = list(self._section_timings)
+        for title in self._rendered_section_titles:
+            for idx, entry in enumerate(remaining):
+                if entry["title"] == title:
+                    ordered.append(entry)
+                    remaining.pop(idx)
+                    break
+        ordered.extend(remaining)
+        return ordered
+
+    @property
+    def build_total_seconds(self) -> float | None:
+        """Return the total elapsed time for Report.build()."""
+        return self._build_total_seconds
+
     def build(self, outdir: str | Path) -> Path:
         """Generate the full report.
 
@@ -175,53 +347,81 @@ class Report:
         datadir = outdir / "data"
         figdir.mkdir(parents=True, exist_ok=True)
         datadir.mkdir(parents=True, exist_ok=True)
+        self._section_timings = []
+        self._rendered_section_titles = []
+        self._build_total_seconds = None
+        self._progress_section_index = 0
+        self._progress_total_sections = len(self._planned_progress_sections())
+        build_start = time.perf_counter()
+
+        # Patch threading.excepthook to tolerate C-extension threads that
+        # don't call Thread.__init__() (Python 3.14 incompatibility with
+        # matplotlib/netCDF4 background threads).
+        _orig_excepthook = threading.excepthook
+
+        def _resilient_excepthook(args):
+            try:
+                _orig_excepthook(args)
+            except AssertionError:
+                print(
+                    f"Unhandled exception in background thread: {args.exc_value}",
+                    file=sys.stderr,
+                )
+
+        threading.excepthook = _resilient_excepthook
 
         prev_backend = matplotlib.get_backend()
         matplotlib.use("Agg")
 
         sections: list[_Section] = []
+        try:
+            # --- Metadata section ---
+            if self.config.report.metadata.show_run_info:
+                sections.append(self._build_metadata_section())
 
-        # --- Metadata section ---
-        if self.config.report.metadata.show_run_info:
-            sections.append(self._build_metadata_section())
+            # --- Balance sections ---
+            sections.extend(self._build_balance_sections(figdir, datadir))
 
-        # --- Balance sections ---
-        sections.extend(self._build_balance_sections(figdir, datadir))
+            # --- Variable group sections ---
+            sections.extend(self._build_variable_sections(figdir))
 
-        # --- Variable group sections ---
-        sections.extend(self._build_variable_sections(figdir))
-
-        # --- Error diagnostics section ---
-        if self._errors or self._warnings:
+            # --- Diagnostics section ---
             sections.append(self._build_diagnostics_section())
-
-        matplotlib.use(prev_backend)
-        plt.close("all")
+        finally:
+            matplotlib.use(prev_backend)
+            plt.close("all")
+            threading.excepthook = _orig_excepthook
 
         # Render HTML
+        self._rendered_section_titles = [section.title for section in sections]
         html_path = self._render_html(outdir, sections)
+        self._build_total_seconds = time.perf_counter() - build_start
         return html_path
 
     def _build_metadata_section(self) -> _Section:
         """Build metadata section with run information."""
+        start_time = time.perf_counter()
         sec = _Section("Run Information", "Metadata about the ELM simulation(s).")
 
         run = self._run
+        streams = run.streams
 
         # Collect metadata
         metadata = {}
         metadata["Case Name"] = run.name
 
         # Get time range from first stream
-        if run.streams:
-            first_stream = list(run.streams.values())[0]
-            time = first_stream.time
-            metadata["Time Range"] = f"{time[0].values} to {time[-1].values}"
-            metadata["Number of Time Steps"] = len(time)
+        if streams:
+            first_stream = next(iter(streams.values()))
+            time_coord = first_stream.time
+            metadata["Time Range"] = (
+                f"{time_coord[0].values} to {time_coord[-1].values}"
+            )
+            metadata["Number of Time Steps"] = len(time_coord)
 
         # List available streams
-        if run.streams:
-            metadata["History Streams"] = ", ".join(run.streams.keys())
+        if streams:
+            metadata["History Streams"] = ", ".join(streams.keys())
 
         # Add comparison info if applicable
         if self._is_comparison:
@@ -237,6 +437,11 @@ class Report:
             )
 
         sec.add_statistics(metadata)
+        self._record_section_timing(
+            "Run Information",
+            start_time,
+            io_seconds=time.perf_counter() - start_time,
+        )
         return sec
 
     def _build_balance_sections(self, figdir: Path, datadir: Path) -> list[_Section]:
@@ -244,41 +449,97 @@ class Report:
         run = self._run
 
         # Water Balance
+        section_title = "Water Balance"
+        section_start = time.perf_counter()
+        compute_seconds = 0.0
+        plot_seconds = 0.0
+        io_seconds = 0.0
+        figs: tuple[plt.Figure, ...] = ()
+        existing_fignums = set(plt.get_fignums())
+        self._announce_section_progress(section_title)
         try:
+            compute_start = time.perf_counter()
             wb = WaterBalance(run, year=self.year, config=self.config)
-            sec = _Section("Water Balance", "Column water budget closure.")
+            sec = _Section(section_title, "Column water budget closure.")
+            if self.config.report.balance_sections.show_statistics_table:
+                wb.components()
+                wb.residual()
+            compute_seconds += time.perf_counter() - compute_start
 
             # Generate plots
-            fig1, fig2 = wb.plot()
-            p1, t1 = self._save_figure(fig1, figdir, "water_cumulative")
-            p2, t2 = self._save_figure(fig2, figdir, "water_decomposition")
+            plot_start = time.perf_counter()
+            figs = wb.plot()
+            p1, t1 = self._save_figure(figs[0], figdir, "water_cumulative")
+            p2, t2 = self._save_figure(figs[1], figdir, "water_decomposition")
             sec.add_figure(p1, t1, "Cumulative water balance", "balance")
             sec.add_figure(p2, t2, "Water output decomposition", "balance")
-            plt.close(fig1)
-            plt.close(fig2)
+
+            if len(figs) >= 3:
+                p3, t3 = self._save_figure(figs[2], figdir, "water_input_decomposition")
+                sec.add_figure(p3, t3, "Water input decomposition", "balance")
+
+            if len(figs) >= 4:
+                p4, t4 = self._save_figure(
+                    figs[3], figdir, "water_storage_decomposition"
+                )
+                sec.add_figure(p4, t4, "Water storage decomposition", "balance")
+
+            for fig in figs:
+                plt.close(fig)
+            plot_seconds += time.perf_counter() - plot_start
 
             # Add statistics if enabled
             if self.config.report.balance_sections.show_statistics_table:
+                compute_start = time.perf_counter()
                 stats = self._compute_water_balance_stats(wb)
                 sec.add_statistics(stats)
+                compute_seconds += time.perf_counter() - compute_start
 
             # Save NetCDF data
             if "netcdf" in self.config.report.output_formats:
+                io_start = time.perf_counter()
                 nc_file = (
                     datadir
                     / f"water_balance{'_' + str(self.year) if self.year else ''}.nc"
                 )
                 wb.to_netcdf(nc_file)
+                io_seconds += time.perf_counter() - io_start
 
             sections.append(sec)
         except Exception as e:
             self._record_error("Water Balance", e)
+        finally:
+            for fig in figs:
+                plt.close(fig)
+            self._close_new_figures(existing_fignums)
+            self._record_section_timing(
+                "Water Balance",
+                section_start,
+                io_seconds=io_seconds,
+                compute_seconds=compute_seconds,
+                plot_seconds=plot_seconds,
+            )
 
         # Energy Balance
+        section_title = "Energy Balance"
+        section_start = time.perf_counter()
+        compute_seconds = 0.0
+        plot_seconds = 0.0
+        io_seconds = 0.0
+        fig1 = None
+        fig2 = None
+        existing_fignums = set(plt.get_fignums())
+        self._announce_section_progress(section_title)
         try:
+            compute_start = time.perf_counter()
             eb = EnergyBalance(run, year=self.year, config=self.config)
-            sec = _Section("Energy Balance", "Surface energy budget closure.")
+            sec = _Section(section_title, "Surface energy budget closure.")
+            if self.config.report.balance_sections.show_statistics_table:
+                eb.components()
+                eb.residual()
+            compute_seconds += time.perf_counter() - compute_start
 
+            plot_start = time.perf_counter()
             fig1, fig2 = eb.plot()
             p1, t1 = self._save_figure(fig1, figdir, "energy_fluxes")
             p2, t2 = self._save_figure(fig2, figdir, "energy_residual")
@@ -286,11 +547,14 @@ class Report:
             sec.add_figure(p2, t2, "Energy balance residual", "balance")
             plt.close(fig1)
             plt.close(fig2)
+            plot_seconds += time.perf_counter() - plot_start
 
             # Add statistics if enabled
             if self.config.report.balance_sections.show_statistics_table:
+                compute_start = time.perf_counter()
                 stats = self._compute_energy_balance_stats(eb)
                 sec.add_statistics(stats)
+                compute_seconds += time.perf_counter() - compute_start
 
             # Save NetCDF data
             if "netcdf" in self.config.report.output_formats:
@@ -300,22 +564,52 @@ class Report:
                 )
                 # Energy balance doesn't have to_netcdf yet, save components directly
                 try:
+                    io_start = time.perf_counter()
                     components_ds = xr.Dataset(
                         {k: v for k, v in eb.components().items()}
                     )
                     components_ds.to_netcdf(nc_file)
+                    io_seconds += time.perf_counter() - io_start
                 except Exception:
                     pass  # Skip if can't save
 
             sections.append(sec)
         except Exception as e:
             self._record_error("Energy Balance", e)
+        finally:
+            if fig1 is not None:
+                plt.close(fig1)
+            if fig2 is not None:
+                plt.close(fig2)
+            self._close_new_figures(existing_fignums)
+            self._record_section_timing(
+                "Energy Balance",
+                section_start,
+                io_seconds=io_seconds,
+                compute_seconds=compute_seconds,
+                plot_seconds=plot_seconds,
+            )
 
         # Carbon Balance
+        section_title = "Carbon Balance"
+        section_start = time.perf_counter()
+        compute_seconds = 0.0
+        plot_seconds = 0.0
+        io_seconds = 0.0
+        fig1 = None
+        fig2 = None
+        existing_fignums = set(plt.get_fignums())
+        self._announce_section_progress(section_title)
         try:
+            compute_start = time.perf_counter()
             cb = CarbonBalance(run, year=self.year, config=self.config)
-            sec = _Section("Carbon Balance", "Ecosystem carbon budget closure.")
+            sec = _Section(section_title, "Ecosystem carbon budget closure.")
+            if self.config.report.balance_sections.show_statistics_table:
+                cb.components()
+                cb.residual()
+            compute_seconds += time.perf_counter() - compute_start
 
+            plot_start = time.perf_counter()
             fig1, fig2 = cb.plot()
             p1, t1 = self._save_figure(fig1, figdir, "carbon_cumulative")
             p2, t2 = self._save_figure(fig2, figdir, "carbon_pools")
@@ -323,11 +617,14 @@ class Report:
             sec.add_figure(p2, t2, "Carbon pools", "balance")
             plt.close(fig1)
             plt.close(fig2)
+            plot_seconds += time.perf_counter() - plot_start
 
             # Add statistics if enabled
             if self.config.report.balance_sections.show_statistics_table:
+                compute_start = time.perf_counter()
                 stats = self._compute_carbon_balance_stats(cb)
                 sec.add_statistics(stats)
+                compute_seconds += time.perf_counter() - compute_start
 
             # Save NetCDF data
             if "netcdf" in self.config.report.output_formats:
@@ -337,95 +634,306 @@ class Report:
                 )
                 # Carbon balance doesn't have to_netcdf yet, save components directly
                 try:
+                    io_start = time.perf_counter()
                     components_ds = xr.Dataset(
                         {k: v for k, v in cb.components().items()}
                     )
                     components_ds.to_netcdf(nc_file)
+                    io_seconds += time.perf_counter() - io_start
                 except Exception:
                     pass  # Skip if can't save
 
             sections.append(sec)
         except Exception as e:
             self._record_error("Carbon Balance", e)
+        finally:
+            if fig1 is not None:
+                plt.close(fig1)
+            if fig2 is not None:
+                plt.close(fig2)
+            self._close_new_figures(existing_fignums)
+            self._record_section_timing(
+                "Carbon Balance",
+                section_start,
+                io_seconds=io_seconds,
+                compute_seconds=compute_seconds,
+                plot_seconds=plot_seconds,
+            )
 
         return sections
 
     def _compute_water_balance_stats(self, wb: WaterBalance) -> dict[str, Any]:
         """Compute statistics for water balance section."""
-        stats = {}
+        stats: dict[str, Any] = {"table_kind": "balance_grouped", "rows": []}
         try:
             components = wb.components()
-            residual = wb.residual()
+            reduced_components = {
+                name: self._reduce_non_time_dims(da) for name, da in components.items()
+            }
+            residual = self._reduce_non_time_dims(wb.residual())
+            storage_components = {
+                name: self._reduce_non_time_dims(da)
+                for name, da in wb._storage_decomposition_components().items()
+            }
+            rows: list[dict[str, Any]] = []
 
-            # Get final cumulative values
-            for name, da in components.items():
-                if len(da.dims) > 1:
-                    # Spatial mean if needed
-                    da = da.mean(dim=[d for d in da.dims if d != "time"])
-                final_val = float(da.isel(time=-1).values)
-                stats[name] = f"{final_val:.2f} mm"
+            def _add_group(
+                title: str,
+                keys: list[str],
+                source: dict[str, xr.DataArray],
+                units: str,
+            ) -> None:
+                available = [(k, source[k]) for k in keys if k in source]
+                if not available:
+                    return
 
-            # Add residual info
-            if len(residual.dims) > 1:
-                residual = residual.mean(dim=[d for d in residual.dims if d != "time"])
-            final_residual = float(residual.isel(time=-1).values)
-            stats["Residual"] = f"{final_residual:.2f} mm"
+                subtotal = sum(self._final_scalar(da) for _, da in available)
+                rows.append(
+                    self._make_stats_row(
+                        metric=f"{title} (subtotal)",
+                        long_name="",
+                        value=f"{subtotal:.2f} {units}",
+                        kind="group",
+                        indent=0,
+                    )
+                )
+                for key, da in available:
+                    rows.append(
+                        self._make_stats_row(
+                            metric=key,
+                            long_name=self._long_name_from_da(da),
+                            value=f"{self._final_scalar(da):.2f} {units}",
+                            kind="item",
+                            indent=1,
+                        )
+                    )
+
+            bc = wb._balance_config
+            _add_group("Inputs", bc.inputs, reduced_components, "mm")
+            _add_group("Outputs", bc.outputs, reduced_components, "mm")
+
+            if "dS" in reduced_components:
+                ds_da = reduced_components["dS"]
+                rows.append(
+                    self._make_stats_row(
+                        metric="Change in Storage (subtotal)",
+                        long_name="",
+                        value=f"{self._final_scalar(ds_da):.2f} mm",
+                        kind="group",
+                        indent=0,
+                    )
+                )
+                rows.append(
+                    self._make_stats_row(
+                        metric="dS",
+                        long_name=self._long_name_from_da(ds_da),
+                        value=f"{self._final_scalar(ds_da):.2f} mm",
+                        kind="item",
+                        indent=1,
+                    )
+                )
+                for storage_name in bc.storages:
+                    if storage_name in storage_components:
+                        da = storage_components[storage_name]
+                        rows.append(
+                            self._make_stats_row(
+                                metric=storage_name,
+                                long_name=self._long_name_from_da(da),
+                                value=f"{self._final_scalar(da):.2f} mm",
+                                kind="item",
+                                indent=2,
+                            )
+                        )
+
+            final_residual = self._final_scalar(residual)
+            rows.append(
+                self._make_stats_row(
+                    metric="Residual",
+                    long_name=self._long_name_from_da(residual),
+                    value=f"{final_residual:.2f} mm",
+                    kind="summary",
+                    indent=0,
+                )
+            )
 
             # Calculate percentage if requested
             if self.config.report.balance_sections.show_residual_percentage:
                 # Compute as percentage of inputs
-                total_input = 0
+                total_input = 0.0
                 for key in ["RAIN", "SNOW"]:
-                    if key in components:
-                        val = components[key]
-                        if len(val.dims) > 1:
-                            val = val.mean(dim=[d for d in val.dims if d != "time"])
-                        total_input += abs(float(val.isel(time=-1).values))
+                    if key in reduced_components:
+                        total_input += abs(self._final_scalar(reduced_components[key]))
                 if total_input > 0:
                     pct = (abs(final_residual) / total_input) * 100
-                    stats["Residual (%)"] = f"{pct:.2f}%"
+                    rows.append(
+                        self._make_stats_row(
+                            metric="Residual (%)",
+                            long_name="",
+                            value=f"{pct:.2f}%",
+                            kind="summary",
+                            indent=0,
+                        )
+                    )
+            stats["rows"] = rows
         except Exception as e:
-            stats["Error"] = str(e)
+            stats = {
+                "table_kind": "balance_flat",
+                "rows": [
+                    self._make_stats_row(
+                        metric="Error",
+                        long_name="",
+                        value=str(e),
+                        kind="summary",
+                        indent=0,
+                    )
+                ],
+            }
 
         return stats
 
     def _compute_energy_balance_stats(self, eb: EnergyBalance) -> dict[str, Any]:
         """Compute statistics for energy balance section."""
-        stats = {}
+        stats: dict[str, Any] = {"table_kind": "balance_flat", "rows": []}
         try:
-            components = eb.components()
+            components = {
+                name: self._reduce_non_time_dims(da)
+                for name, da in eb.components().items()
+            }
 
             # Get mean flux values
             for name, da in components.items():
-                if len(da.dims) > 1:
-                    da = da.mean(dim=[d for d in da.dims if d != "time"])
-                mean_val = float(da.mean().values)
-                stats[name] = f"{mean_val:.2f} W/m²"
+                mean_val = self._mean_scalar(da)
+                stats["rows"].append(
+                    self._make_stats_row(
+                        metric=name,
+                        long_name=self._long_name_from_da(da),
+                        value=f"{mean_val:.2f} W/m²",
+                        kind="item",
+                        indent=0,
+                    )
+                )
         except Exception as e:
-            stats["Error"] = str(e)
+            stats = {
+                "table_kind": "balance_flat",
+                "rows": [
+                    self._make_stats_row(
+                        metric="Error",
+                        long_name="",
+                        value=str(e),
+                        kind="summary",
+                        indent=0,
+                    )
+                ],
+            }
 
         return stats
 
     def _compute_carbon_balance_stats(self, cb: CarbonBalance) -> dict[str, Any]:
         """Compute statistics for carbon balance section."""
-        stats = {}
+        stats: dict[str, Any] = {"table_kind": "balance_flat", "rows": []}
         try:
-            components = cb.components()
+            components = {
+                name: self._reduce_non_time_dims(da)
+                for name, da in cb.components().items()
+            }
 
             # Get final cumulative or mean values
             for name, da in components.items():
-                if len(da.dims) > 1:
-                    da = da.mean(dim=[d for d in da.dims if d != "time"])
                 if "cumulative" in name.lower() or name in ["GPP", "NEE", "HR"]:
-                    final_val = float(da.isel(time=-1).values)
-                    stats[name] = f"{final_val:.2f} gC/m²"
+                    final_val = self._final_scalar(da)
+                    stats["rows"].append(
+                        self._make_stats_row(
+                            metric=name,
+                            long_name=self._long_name_from_da(da),
+                            value=f"{final_val:.2f} gC/m²",
+                            kind="item",
+                            indent=0,
+                        )
+                    )
                 else:
-                    mean_val = float(da.mean().values)
-                    stats[name] = f"{mean_val:.2f} gC/m²"
+                    mean_val = self._mean_scalar(da)
+                    stats["rows"].append(
+                        self._make_stats_row(
+                            metric=name,
+                            long_name=self._long_name_from_da(da),
+                            value=f"{mean_val:.2f} gC/m²",
+                            kind="item",
+                            indent=0,
+                        )
+                    )
         except Exception as e:
-            stats["Error"] = str(e)
+            stats = {
+                "table_kind": "balance_flat",
+                "rows": [
+                    self._make_stats_row(
+                        metric="Error",
+                        long_name="",
+                        value=str(e),
+                        kind="summary",
+                        indent=0,
+                    )
+                ],
+            }
 
         return stats
+
+    @staticmethod
+    def _reduce_non_time_dims(da: xr.DataArray) -> xr.DataArray:
+        """Average over non-time dimensions so report stats use one time series."""
+        reduce_dims = [dim for dim in da.dims if dim != "time"]
+        if reduce_dims:
+            return da.mean(dim=reduce_dims)
+        return da
+
+    @staticmethod
+    def _final_scalar(da: xr.DataArray) -> float:
+        """Return the final time-step value as a Python float."""
+        return float(da.isel(time=-1).values)
+
+    @staticmethod
+    def _mean_scalar(da: xr.DataArray) -> float:
+        """Return the time mean as a Python float."""
+        return float(da.mean().values)
+
+    @staticmethod
+    def _long_name_from_da(da: xr.DataArray | None) -> str:
+        """Return best-available descriptive name for a variable."""
+        if da is None:
+            return ""
+
+        for attr_name in ("long_name", "description", "standard_name"):
+            raw = da.attrs.get(attr_name)
+            if raw:
+                description = " ".join(str(raw).split())
+                if "__tmp" in description:
+                    description = description.replace("__tmp", "total water storage")
+                return description
+
+        return ""
+
+    @staticmethod
+    def _make_stats_row(
+        metric: str,
+        long_name: str,
+        value: str,
+        *,
+        kind: str,
+        indent: int,
+    ) -> dict[str, Any]:
+        """Create a normalized row for report statistics tables."""
+        return {
+            "metric": metric,
+            "long_name": long_name,
+            "value": value,
+            "kind": kind,
+            "indent": indent,
+        }
+
+    @staticmethod
+    def _close_new_figures(existing_fignums: set[int]) -> None:
+        """Close figures opened after a snapshot, including leaked ones on errors."""
+        for fignum in set(plt.get_fignums()) - existing_fignums:
+            plt.close(fignum)
 
     def _build_variable_sections(self, figdir: Path) -> list[_Section]:
         sections = []
@@ -435,7 +943,13 @@ class Report:
         max_vars = self.config.report.variable_sections.max_variables_per_group
 
         for group_name, varnames in groups.items():
-            sec = _Section(group_name.replace("_", " ").title())
+            section_start = time.perf_counter()
+            io_seconds = 0.0
+            compute_seconds = 0.0
+            plot_seconds = 0.0
+            section_title = group_name.replace("_", " ").title()
+            sec = _Section(section_title)
+            self._announce_section_progress(section_title)
 
             # Limit number of variables if configured
             varnames_to_plot = varnames[:max_vars]
@@ -445,79 +959,149 @@ class Report:
                 )
 
             for varname in varnames_to_plot:
-                if not run.has(varname):
+                compute_start = time.perf_counter()
+                has_var = run.has(varname)
+                compute_seconds += time.perf_counter() - compute_start
+                if not has_var:
                     continue
 
                 # Try each plot type
                 for plot_type in plot_types:
+                    fig: plt.Figure | None = None
+                    existing_fignums = set(plt.get_fignums())
                     try:
-                        fig = self._create_plot(plot_type, varname)
+                        fig, plot_compute_seconds, plot_render_seconds = (
+                            self._create_plot(
+                                plot_type,
+                                varname,
+                            )
+                        )
+                        compute_seconds += plot_compute_seconds
+                        plot_seconds += plot_render_seconds
                         if fig is not None:
                             basename = f"{group_name}_{varname}_{plot_type}"
+                            io_start = time.perf_counter()
                             full_path, thumb_path = self._save_figure(
                                 fig, figdir, basename
                             )
+                            io_seconds += time.perf_counter() - io_start
                             caption = f"{varname} ({plot_type})"
                             sec.add_figure(full_path, thumb_path, caption, plot_type)
-                            plt.close(fig)
                     except Exception:
                         # Silently skip individual plot failures
                         # (e.g., diurnal for monthly data, seasonal for insufficient data)
                         pass
+                    finally:
+                        if fig is not None:
+                            plt.close(fig)
+                        self._close_new_figures(existing_fignums)
 
             if sec.figures:
                 sections.append(sec)
 
+            self._record_section_timing(
+                sec.title,
+                section_start,
+                io_seconds=io_seconds,
+                compute_seconds=compute_seconds,
+                plot_seconds=plot_seconds,
+            )
+
         return sections
 
-    def _create_plot(self, plot_type: str, varname: str) -> plt.Figure | None:
-        """Create a specific type of plot for a variable.
+    def _create_plot(
+        self,
+        plot_type: str,
+        varname: str,
+    ) -> tuple[plt.Figure | None, float, float]:
+        """Create one plot and return aggregated compute and render timings.
 
         Returns
         -------
-        Figure or None if plot type should be skipped.
+        Tuple of ``(figure, compute_seconds, plot_seconds)``.
         """
         if plot_type == "timeseries":
-            return plot_timeseries(self.source, varname, config=self.config)
+            plot_start = time.perf_counter()
+            return (
+                plot_timeseries(self.source, varname, config=self.config),
+                0.0,
+                time.perf_counter() - plot_start,
+            )
         elif plot_type == "seasonal":
             # Check if we have enough data
+            compute_start = time.perf_counter()
             run = self._run
             var = run.get(varname)
             if len(var.time) < 12:
-                return None
-            return plot_seasonal(self.source, varname, config=self.config)
+                return None, time.perf_counter() - compute_start, 0.0
+            compute_seconds = time.perf_counter() - compute_start
+            plot_start = time.perf_counter()
+            return (
+                plot_seasonal(self.source, varname, config=self.config),
+                compute_seconds,
+                time.perf_counter() - plot_start,
+            )
         elif plot_type == "anomaly":
             # Check if we have enough data (need at least 2 years)
+            compute_start = time.perf_counter()
             run = self._run
             var = run.get(varname)
             if len(var.time) < 24:  # Rough approximation
-                return None
-            return plot_anomaly(self.source, varname, config=self.config)
+                return None, time.perf_counter() - compute_start, 0.0
+            compute_seconds = time.perf_counter() - compute_start
+            plot_start = time.perf_counter()
+            return (
+                plot_anomaly(self.source, varname, config=self.config),
+                compute_seconds,
+                time.perf_counter() - plot_start,
+            )
         elif plot_type == "histogram":
-            return plot_histogram(self.source, varname, config=self.config)
+            plot_start = time.perf_counter()
+            return (
+                plot_histogram(self.source, varname, config=self.config),
+                0.0,
+                time.perf_counter() - plot_start,
+            )
         elif plot_type == "diurnal":
             # Check if data is sub-daily
+            compute_start = time.perf_counter()
             run = self._run
             var = run.get(varname)
             if len(var.time) < 24:
-                return None
+                return None, time.perf_counter() - compute_start, 0.0
             # Check time resolution
             time_diff = np.diff(var.time.values).astype("timedelta64[h]").astype(int)
             median_hours = np.median(time_diff)
             if median_hours >= 24:
-                return None  # Not sub-daily
-            return plot_diurnal(self.source, varname, config=self.config)
+                return None, time.perf_counter() - compute_start, 0.0  # Not sub-daily
+            compute_seconds = time.perf_counter() - compute_start
+            plot_start = time.perf_counter()
+            return (
+                plot_diurnal(self.source, varname, config=self.config),
+                compute_seconds,
+                time.perf_counter() - plot_start,
+            )
         else:
-            return None
+            return None, 0.0, 0.0
 
     def _build_diagnostics_section(self) -> _Section:
         """Build diagnostics section showing errors and warnings."""
+        section_title = "Diagnostics"
+        start_time = time.perf_counter()
+        self._announce_section_progress(section_title)
         sec = _Section(
-            "Diagnostics", "Errors and warnings encountered during report generation."
+            section_title, "Errors and warnings encountered during report generation."
         )
 
         # Format errors and warnings for display
-        diagnostics = {}
+        diagnostics = {
+            "Git version": self._git_version,
+            "Invocation command": self._invocation_command,
+            "Analysis run at": self._generation_time.strftime("%Y-%m-%d %H:%M:%S"),
+            "Working directory": self._working_directory,
+            "User": self._user,
+            "Machine": self._machine,
+        }
 
         if self._errors:
             diagnostics["Errors"] = [
@@ -528,7 +1112,58 @@ class Report:
         if self._warnings:
             diagnostics["Warnings"] = self._warnings
 
+        timings = list(self._section_timings)
+        diagnostics_elapsed = time.perf_counter() - start_time
+        timings.append(
+            {
+                "title": section_title,
+                "total_seconds": diagnostics_elapsed,
+                "io_seconds": None,
+                "compute_seconds": None,
+                "plot_seconds": None,
+            }
+        )
+        attributed_total = sum(float(entry["total_seconds"]) for entry in timings)
+        timing_rows: list[list[str]] = []
+        for entry in timings:
+            total = float(entry["total_seconds"])
+            pct = 100.0 * total / attributed_total if attributed_total > 0 else 0.0
+            timing_rows.append(
+                [
+                    str(entry["title"]),
+                    f"{total:.2f}",
+                    f"{pct:.1f}%",
+                    ""
+                    if entry.get("io_seconds") is None
+                    else f"{float(entry['io_seconds']):.2f}",
+                    ""
+                    if entry.get("compute_seconds") is None
+                    else f"{float(entry['compute_seconds']):.2f}",
+                    ""
+                    if entry.get("plot_seconds") is None
+                    else f"{float(entry['plot_seconds']):.2f}",
+                ]
+            )
+        timing_rows.append(
+            ["Grand total", f"{attributed_total:.2f}", "100.0%", "", "", ""]
+        )
+
         sec.add_statistics(diagnostics)
+        sec.add_table(
+            title="Section timings",
+            columns=[
+                "Section",
+                "Total (s)",
+                "% of attributed",
+                "Export/Write (s)",
+                "Prep/Checks (s)",
+                "Plot Build (s)",
+            ],
+            rows=timing_rows,
+        )
+        config_title, config_yaml = self._diagnostics_config_yaml()
+        sec.add_text_block(config_title, config_yaml)
+        self._record_section_timing(section_title, start_time)
         return sec
 
     def _render_html(self, outdir: Path, sections: list[_Section]) -> Path:
@@ -591,6 +1226,8 @@ class Report:
                     "description": s.description,
                     "figures": s.figures,
                     "statistics": s.statistics,
+                    "extra_tables": s.extra_tables,
+                    "extra_text_blocks": s.extra_text_blocks,
                 }
                 for s in sections
             ],

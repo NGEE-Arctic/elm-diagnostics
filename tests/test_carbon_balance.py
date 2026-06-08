@@ -4,7 +4,6 @@ import tempfile
 from pathlib import Path
 
 import matplotlib
-import numpy as np
 import pytest
 
 matplotlib.use("Agg")
@@ -57,4 +56,5 @@ def test_carbon_plot(carbon_run):
     assert fig1 is not None
     assert fig2 is not None
     import matplotlib.pyplot as plt
+
     plt.close("all")
