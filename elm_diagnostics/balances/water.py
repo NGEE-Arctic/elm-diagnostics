@@ -24,11 +24,12 @@ class WaterBalance(Balance):
         residual = cumul(inputs) - cumul(outputs) - dS
 
     where:
-        inputs  = RAIN + SNOW
-        outputs = QFLX_EVAP_TOT + QOVER + QDRAI + QDRAI_PERCH
-                  (QFLX_EVAP_TOT = QSOIL + QVEGE + QVEGT if not available)
-        dS      = change in (SOILLIQ + SOILICE + H2OSNO + H2OCAN + H2OSFC)
-                  (SOILLIQ and SOILICE are summed over vertical levels)
+
+    - inputs  = RAIN + SNOW
+    - outputs = QFLX_EVAP_TOT + QOVER + QDRAI + QDRAI_PERCH
+      (QFLX_EVAP_TOT = QSOIL + QVEGE + QVEGT if not available)
+    - dS      = change in (SOILLIQ + SOILICE + H2OSNO + H2OCAN + H2OSFC)
+      (SOILLIQ and SOILICE are summed over vertical levels)
     """
 
     def _get_balance_config(self) -> WaterBalanceConfig:
