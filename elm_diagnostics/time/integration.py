@@ -64,13 +64,7 @@ def _scalar_to_seconds(value: object) -> float:
     if hasattr(value, "days"):
         return float(value.days * 86400.0 + getattr(value, "seconds", 0))
     if isinstance(value, np.timedelta64):
-        # Convert to seconds, handling both ns and s units
-        # Older numpy/xarray may return nanoseconds
-        seconds_val = float(value / np.timedelta64(1, "s"))
-        # If value looks like nanoseconds (> 1e12), convert
-        if abs(seconds_val) > 1e12:
-            seconds_val = float(value / np.timedelta64(1, "ns")) / 1e9
-        return seconds_val
+        return float(value / np.timedelta64(1, "s"))
     if isinstance(value, (int, float, np.integer, np.floating)):
         fv = float(value)
         return fv if fv > 1000 else fv * 86400.0
@@ -78,14 +72,28 @@ def _scalar_to_seconds(value: object) -> float:
 
 
 def _to_seconds(dt_raw: xr.DataArray, dim: str) -> xr.DataArray:
-    """Convert raw time deltas to seconds."""
-    seconds = xr.apply_ufunc(
-        _scalar_to_seconds,
-        dt_raw,
-        vectorize=True,
-        dask="parallelized",
-        output_dtypes=[np.float64],
-    )
+    """Convert raw time deltas to seconds.
+
+    Dispatches on dtype at the array level so timedelta64 arrays get
+    a unit-aware numpy division instead of per-scalar vectorize, which
+    can unwrap timedelta64 to raw int64 ns counts on some numpy/xarray
+    versions (Python 3.10 CI).
+    """
+    if np.issubdtype(dt_raw.dtype, np.timedelta64):
+        seconds = (dt_raw / np.timedelta64(1, "s")).astype(np.float64)
+    elif np.issubdtype(dt_raw.dtype, np.floating) or np.issubdtype(
+        dt_raw.dtype, np.integer
+    ):
+        seconds = xr.where(np.abs(dt_raw) > 1000, dt_raw, dt_raw * 86400.0)
+        seconds = seconds.astype(np.float64)
+    else:
+        seconds = xr.apply_ufunc(
+            _scalar_to_seconds,
+            dt_raw,
+            vectorize=True,
+            dask="parallelized",
+            output_dtypes=[np.float64],
+        )
     coords = {dim: dt_raw[dim]} if dim in dt_raw.dims else {}
     return seconds.assign_coords(coords)
 
