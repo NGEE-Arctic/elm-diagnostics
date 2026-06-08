@@ -88,4 +88,7 @@ doctest_global_setup = """
 import numpy as np
 import xarray as xr
 from elm_diagnostics import Run, WaterBalance, CarbonBalance, EnergyBalance
+from elm_diagnostics.io.units import convert_flux_to_cumulative_units, convert_water_to_mm
+from elm_diagnostics.plots import plot_timeseries
+from elm_diagnostics.plots.subgrid_helpers import calculate_facet_layout, format_subgrid_title
 """

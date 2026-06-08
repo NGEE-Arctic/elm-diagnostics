@@ -63,9 +63,9 @@ def plot_timeseries(
     --------
     >>> from elm_diagnostics import Run
     >>> from elm_diagnostics.plots import plot_timeseries
-    >>> run = Run("/path/to/output")
-    >>> fig = plot_timeseries(run, "GPP")  # Single plot
-    >>> fig = plot_timeseries(run, "GPP", by="column")  # Faceted by column
+    >>> run = Run("/path/to/output")  # doctest: +SKIP
+    >>> fig = plot_timeseries(run, "GPP")  # doctest: +SKIP
+    >>> fig = plot_timeseries(run, "GPP", by="column")  # doctest: +SKIP
     """
     cfg = config or load_config()
 

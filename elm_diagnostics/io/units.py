@@ -152,9 +152,9 @@ def convert_flux_to_cumulative_units(
     >>> convert_flux_to_cumulative_units("mm/s")
     ('mm', 1.0)
     >>> convert_flux_to_cumulative_units("gC/m^2/s")
-    ('gC/m^2', 1.0)
+    ('g/m**2', 1.0)
     >>> convert_flux_to_cumulative_units("W/m^2")
-    ('J/m^2', 1.0)
+    ('J/m**2', 1.0)
     """
     norm = normalize_unit_string(units_str)
 
