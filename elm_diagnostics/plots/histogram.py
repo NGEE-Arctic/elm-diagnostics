@@ -190,7 +190,9 @@ def _plot_histogram_faceted(
     # Plot each subgrid unit
     for unit_id, ax_i in zip(units, axes.flat):
         if isinstance(source, Comparison):
-            vals_b = _flatten_finite_values(_squeeze_spatial(da_base.sel({by: unit_id})))
+            vals_b = _flatten_finite_values(
+                _squeeze_spatial(da_base.sel({by: unit_id}))
+            )
             vals_e = _flatten_finite_values(_squeeze_spatial(da_exp.sel({by: unit_id})))
 
             # Shared bins

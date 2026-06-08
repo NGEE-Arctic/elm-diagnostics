@@ -59,7 +59,7 @@ class Balance(ABC):
         self._components_cache_key: tuple[Any, ...] | None = None
         self._residual_cache: xr.DataArray | None = None
         self._residual_cache_key: tuple[Any, ...] | None = None
-        
+
         # Validate sub-gridcell dimension if requested
         if by is not None:
             from elm_diagnostics.io.subgrid import validate_by_keyword

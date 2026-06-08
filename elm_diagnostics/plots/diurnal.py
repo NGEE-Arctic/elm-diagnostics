@@ -49,7 +49,9 @@ def _median_time_step_hours(da: xr.DataArray) -> float | None:
             return float(diff_hours.median().item())
 
         diff_seconds = xr.apply_ufunc(
-            lambda x: float(x.total_seconds()) if hasattr(x, "total_seconds") else np.nan,
+            lambda x: (
+                float(x.total_seconds()) if hasattr(x, "total_seconds") else np.nan
+            ),
             diffs,
             vectorize=True,
             dask="parallelized",
@@ -199,7 +201,11 @@ def _plot_diurnal_single(
 
         if include_climos:
             ax.fill_between(
-                mean_e.hour.values, lo_e.values, hi_e.values, alpha=0.2, color="tab:blue"
+                mean_e.hour.values,
+                lo_e.values,
+                hi_e.values,
+                alpha=0.2,
+                color="tab:blue",
             )
         ax.plot(
             mean_e.hour.values,
@@ -338,7 +344,11 @@ def _plot_diurnal_faceted(
 
                 if include_climos:
                     ax_i.fill_between(
-                        mean_b.hour.values, lo_b.values, hi_b.values, alpha=0.2, color="gray"
+                        mean_b.hour.values,
+                        lo_b.values,
+                        hi_b.values,
+                        alpha=0.2,
+                        color="gray",
                     )
                 ax_i.plot(
                     mean_b.hour.values,
@@ -349,7 +359,11 @@ def _plot_diurnal_faceted(
                 )
                 if include_climos:
                     ax_i.fill_between(
-                        mean_e.hour.values, lo_e.values, hi_e.values, alpha=0.2, color="tab:blue"
+                        mean_e.hour.values,
+                        lo_e.values,
+                        hi_e.values,
+                        alpha=0.2,
+                        color="tab:blue",
                     )
                 ax_i.plot(
                     mean_e.hour.values,
@@ -378,7 +392,11 @@ def _plot_diurnal_faceted(
 
                 if include_climos:
                     ax_i.fill_between(
-                        mean.hour.values, lo.values, hi.values, alpha=0.2, color="tab:blue"
+                        mean.hour.values,
+                        lo.values,
+                        hi.values,
+                        alpha=0.2,
+                        color="tab:blue",
                     )
                 ax_i.plot(mean.hour.values, mean.values, color="tab:blue", linewidth=2)
 

@@ -33,7 +33,7 @@ def comparison_runs():
     """Create two runs for comparison testing."""
     ds_base = make_water_balance_dataset(start_year=2000, n_months=12)
     ds_exp = make_water_balance_dataset(start_year=2001, n_months=12)
-    
+
     with tempfile.TemporaryDirectory() as tmpdir1:
         with tempfile.TemporaryDirectory() as tmpdir2:
             save_as_elm_files(ds_base, Path(tmpdir1), casename="base", tape="h0")
@@ -143,7 +143,7 @@ def test_report_multiple_plot_types(report_run):
     with tempfile.TemporaryDirectory() as outdir:
         rpt.build(outdir)
         figdir = Path(outdir) / "figures"
-        
+
         # Check for different plot type names in filenames
         all_files = [f.name for f in figdir.glob("*.png")]
         plot_types_found = set()
@@ -154,7 +154,7 @@ def test_report_multiple_plot_types(report_run):
                 plot_types_found.add("seasonal")
             if "histogram" in fname:
                 plot_types_found.add("histogram")
-        
+
         # Should have at least timeseries
         assert "timeseries" in plot_types_found
 
@@ -187,12 +187,12 @@ def test_report_comparison_mode(comparison_runs):
 def test_report_config_customization(report_run):
     """Test that config options are respected."""
     from elm_diagnostics.config.schema import Config, ReportConfig, ThumbnailConfig
-    
+
     # Create custom config with thumbnails disabled
     config = Config()
     config.report = ReportConfig()
     config.report.thumbnails = ThumbnailConfig(enabled=False)
-    
+
     rpt = Report(report_run, config=config)
     with tempfile.TemporaryDirectory() as outdir:
         rpt.build(outdir)
@@ -207,16 +207,16 @@ def test_report_with_subgrid_data():
         # Save the dataset
         file_path = Path(tmpdir) / "test.elm.h0.2000-01.nc"
         ds.to_netcdf(file_path)
-        
+
         run = Run(tmpdir, name="multicolumn_test")
         rpt = Report(run)
-        
+
         with tempfile.TemporaryDirectory() as outdir:
             html_path = rpt.build(outdir)
             assert html_path.exists()
             content = html_path.read_text()
             assert "multicolumn_test" in content
-        
+
         run.close()
 
 
@@ -250,6 +250,7 @@ def test_report_generation_timestamp(report_run):
         content = html_path.read_text()
         # Should have a date/time mention
         import datetime
+
         current_year = str(datetime.datetime.now().year)
         assert current_year in content
 

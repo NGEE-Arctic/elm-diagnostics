@@ -95,12 +95,7 @@ class WaterBalanceConfig(BaseModel):
             # water in unconfined aquifer is missing
         ]
     )
-    inputs: list[str] = Field(
-        default_factory=lambda: [
-            "RAIN",
-            "SNOW"
-        ]
-    )
+    inputs: list[str] = Field(default_factory=lambda: ["RAIN", "SNOW"])
     outputs: list[str] = Field(
         default_factory=lambda: [
             "QFLX_EVAP_TOT",
@@ -261,7 +256,9 @@ def load_config(
             stacklevel=2,
         )
         if not isinstance(user_balances, dict):
-            raise ValueError("'balances' must be a mapping with optional keys: water, carbon, energy")
+            raise ValueError(
+                "'balances' must be a mapping with optional keys: water, carbon, energy"
+            )
 
         allowed_balance_keys = {"water", "carbon", "energy"}
         unknown_balance_keys = set(user_balances) - allowed_balance_keys

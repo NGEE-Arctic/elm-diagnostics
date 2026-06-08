@@ -160,9 +160,9 @@ class TestWaterBalanceUnitStandardization:
 
         # Check that all have mm units
         for varname, da in comps.items():
-            assert (
-                da.attrs.get("units") == "mm"
-            ), f"{varname} has units {da.attrs.get('units')}, expected 'mm'"
+            assert da.attrs.get("units") == "mm", (
+                f"{varname} has units {da.attrs.get('units')}, expected 'mm'"
+            )
 
     def test_water_balance_residual_has_mm_units(self, water_run_with_mixed_units):
         """Test that residual has mm units."""
@@ -189,10 +189,10 @@ class TestWaterBalanceUnitStandardization:
         # Get raw SOILLIQ (should have kg/m² units from synthetic data)
         soilliq_raw = run.get("SOILLIQ")
         assert soilliq_raw.attrs.get("units") == "kg/m2"
-        
+
         # Note: Simple synthetic data doesn't have vertical dimensions
         # This is tested separately with real data in test_real_data.py
-        
+
         # Aggregate should still work and convert to mm
         soilliq_agg = aggregate_vertical_storage(run, "SOILLIQ")
         assert soilliq_agg.attrs.get("units") == "mm"
@@ -218,4 +218,3 @@ class TestWaterBalanceUnitStandardization:
         np.testing.assert_allclose(
             soilliq_agg.values, expected.values, rtol=1e-10, atol=1e-10
         )
-

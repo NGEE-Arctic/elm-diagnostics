@@ -192,7 +192,10 @@ def _print_report_section_timings(
     grand_total = sum(float(entry["total_seconds"]) for entry in timings)
     title_width = max(len(str(entry["title"])) for entry in timings)
     show_phase_breakdown = any(
-        any(entry.get(key) is not None for key in ("io_seconds", "compute_seconds", "plot_seconds"))
+        any(
+            entry.get(key) is not None
+            for key in ("io_seconds", "compute_seconds", "plot_seconds")
+        )
         for entry in timings
     )
 
@@ -214,10 +217,14 @@ def _print_report_section_timings(
                 line += "  (" + ", ".join(parts) + ")"
         console.print(line)
 
-    console.print(f"  {'Grand total':<{title_width}}  total {grand_total:6.2f}s  100.0%")
+    console.print(
+        f"  {'Grand total':<{title_width}}  total {grand_total:6.2f}s  100.0%"
+    )
     if build_total_seconds is not None:
         overhead = build_total_seconds - grand_total
-        console.print(f"  {'Report build total':<{title_width}}  total {build_total_seconds:6.2f}s")
+        console.print(
+            f"  {'Report build total':<{title_width}}  total {build_total_seconds:6.2f}s"
+        )
         if abs(overhead) >= 0.01:
             console.print(
                 f"  {'Unattributed overhead':<{title_width}}  total {overhead:6.2f}s"
@@ -503,9 +510,7 @@ def balance(
         if kind not in balance_classes:
             console.print(f"[red]Error:[/red] Unknown balance type: {kind}\n")
             console.print(f"Valid options: {', '.join(balance_classes.keys())}")
-            console.print(
-                "\nExample: elm-diagnostics balance water /path/to/output"
-            )
+            console.print("\nExample: elm-diagnostics balance water /path/to/output")
             raise typer.Exit(code=1)
 
         # Load data

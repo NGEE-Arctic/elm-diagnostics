@@ -66,7 +66,9 @@ class WaterBalance(Balance):
                 da = self._get_var(varname)
                 da = self._select_year(da)
                 result[varname] = cumulative_integral(da, parent_ds)
-                logger.info("Output variable '%s' included in balance components.", varname)
+                logger.info(
+                    "Output variable '%s' included in balance components.", varname
+                )
             except KeyError:
                 logger.warning("Missing expected water output variable '%s'", varname)
 
@@ -143,7 +145,9 @@ class WaterBalance(Balance):
                 da = convert_water_to_mm(da)
                 da = self._select_year(da)
                 storage_components[varname] = storage_change(da)
-                logger.info("Storage component '%s' included in storage decomposition.", varname)
+                logger.info(
+                    "Storage component '%s' included in storage decomposition.", varname
+                )
             except KeyError:
                 logger.warning("Missing expected water storage variable '%s'", varname)
 
@@ -174,7 +178,7 @@ class WaterBalance(Balance):
             return self._plot_faceted(comps, storage_comps, bc, style)
         else:
             return self._plot_single(comps, storage_comps, bc, style)
-    
+
     def _plot_single(
         self,
         comps: dict[str, xr.DataArray],
@@ -290,7 +294,7 @@ class WaterBalance(Balance):
         fig4.tight_layout()
 
         return fig1, fig2, fig3, fig4
-    
+
     def _plot_faceted(
         self,
         comps: dict[str, xr.DataArray],
@@ -314,7 +318,7 @@ class WaterBalance(Balance):
         fig2, axes2 = create_facet_figure(len(units), style)
         fig3, axes3 = create_facet_figure(len(units), style)
         fig4, axes4 = create_facet_figure(len(units), style)
-        
+
         # Plot each subgrid unit
         for unit_id, ax1, ax2, ax3, ax4 in zip(
             units,
@@ -326,10 +330,9 @@ class WaterBalance(Balance):
             # Select this unit from all components
             comps_unit = {k: v.sel({self.by: unit_id}) for k, v in comps.items()}
             storage_unit = {
-                k: v.sel({self.by: unit_id})
-                for k, v in storage_comps.items()
+                k: v.sel({self.by: unit_id}) for k, v in storage_comps.items()
             }
-            
+
             # --- Cumulative panel ---
             inputs_available = [v for v in bc.inputs if v in comps_unit]
             if inputs_available:
@@ -436,30 +439,39 @@ class WaterBalance(Balance):
             ax4.legend(loc="best", fontsize="x-small")
             ax4.axhline(0, color="gray", linewidth=0.5)
             ax4.tick_params(labelsize="small")
-        
+
         # Hide unused subplots
         for ax1 in axes1.flat[len(units) :]:
             ax1.set_visible(False)
         for ax2 in axes2.flat[len(units) :]:
             ax2.set_visible(False)
-        for ax3 in axes3.flat[len(units):]:
+        for ax3 in axes3.flat[len(units) :]:
             ax3.set_visible(False)
-        for ax4 in axes4.flat[len(units):]:
+        for ax4 in axes4.flat[len(units) :]:
             ax4.set_visible(False)
-        
+
         # Overall titles
         title_base = f"Water Balance — {self.run.name}"
         if self.year:
             title_base += f" ({self.frame} {self.year})"
 
         fig1.suptitle(f"{title_base} by {self.by}", fontsize="large")
-        fig2.suptitle(f"Water Output Decomposition — {self.run.name} by {self.by}", fontsize="large")
-        fig3.suptitle(f"Water Input Decomposition — {self.run.name} by {self.by}", fontsize="large")
-        fig4.suptitle(f"Water Storage Decomposition — {self.run.name} by {self.by}", fontsize="large")
-        
+        fig2.suptitle(
+            f"Water Output Decomposition — {self.run.name} by {self.by}",
+            fontsize="large",
+        )
+        fig3.suptitle(
+            f"Water Input Decomposition — {self.run.name} by {self.by}",
+            fontsize="large",
+        )
+        fig4.suptitle(
+            f"Water Storage Decomposition — {self.run.name} by {self.by}",
+            fontsize="large",
+        )
+
         fig1.tight_layout()
         fig2.tight_layout()
         fig3.tight_layout()
         fig4.tight_layout()
-        
+
         return fig1, fig2, fig3, fig4

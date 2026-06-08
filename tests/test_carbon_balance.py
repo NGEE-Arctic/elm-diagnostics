@@ -56,4 +56,5 @@ def test_carbon_plot(carbon_run):
     assert fig1 is not None
     assert fig2 is not None
     import matplotlib.pyplot as plt
+
     plt.close("all")

@@ -160,7 +160,8 @@ def _filter_stream_files_by_year(
         return files
 
     filtered = [
-        path for path, file_year in parsed
+        path
+        for path, file_year in parsed
         if (year_min - tolerance_years) <= file_year <= (year_max + tolerance_years)
     ]
     if filtered:
@@ -223,12 +224,19 @@ class Run:
         self._chunks = chunks
         self._chunk_mode = chunk_mode
         self._chunk_target_mb = chunk_target_mb
-        if analysis_year_min is None and analysis_year_max is None and analysis_year is not None:
+        if (
+            analysis_year_min is None
+            and analysis_year_max is None
+            and analysis_year is not None
+        ):
             analysis_year_min = analysis_year
             analysis_year_max = analysis_year
         if analysis_year_min is not None and analysis_year_max is not None:
             if analysis_year_min > analysis_year_max:
-                analysis_year_min, analysis_year_max = analysis_year_max, analysis_year_min
+                analysis_year_min, analysis_year_max = (
+                    analysis_year_max,
+                    analysis_year_min,
+                )
         self._analysis_year_min = analysis_year_min
         self._analysis_year_max = analysis_year_max
         self._analysis_year_tolerance = max(0, int(analysis_year_tolerance))

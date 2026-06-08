@@ -51,12 +51,18 @@ def test_user_config_override():
             "water": {
                 "storages": ["SOILLIQ", "SOILICE", "H2OSNO", "H2OCAN", "H2OSFC"],
                 "inputs": ["RAIN", "SNOW"],
-                "outputs": ["QFLX_EVAP_TOT", "QOVER", "QDRAI", "QDRAI_PERCH", "QH2OSFC"],
+                "outputs": [
+                    "QFLX_EVAP_TOT",
+                    "QOVER",
+                    "QDRAI",
+                    "QDRAI_PERCH",
+                    "QH2OSFC",
+                ],
                 "et_components": ["QSOIL", "QVEGE", "QVEGT"],
                 "residual_against": "dS/dt",
                 "frame": "calendar",
             }
-        }
+        },
     }
     with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
         yaml.dump(override, f)

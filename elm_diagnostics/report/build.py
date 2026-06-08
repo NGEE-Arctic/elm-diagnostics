@@ -153,7 +153,15 @@ class Report:
         repo_root = Path(__file__).resolve().parents[2]
         try:
             result = subprocess.run(
-                ["git", "-C", str(repo_root), "describe", "--always", "--dirty", "--tags"],
+                [
+                    "git",
+                    "-C",
+                    str(repo_root),
+                    "describe",
+                    "--always",
+                    "--dirty",
+                    "--tags",
+                ],
                 check=True,
                 capture_output=True,
                 text=True,
@@ -204,7 +212,7 @@ class Report:
         """
         full_path = figdir / f"{basename}.png"
         thumb_path = figdir / f"{basename}_thumb.png"
-        
+
         # Save full resolution with faster PNG settings when supported.
         savefig_kwargs = {
             "bbox_inches": "tight",
@@ -216,7 +224,7 @@ class Report:
         except TypeError:
             savefig_kwargs.pop("pil_kwargs", None)
             fig.savefig(full_path, **savefig_kwargs)
-        
+
         # Save thumbnail by resizing the already-written full image.
         if self.config.report.thumbnails.enabled:
             thumb_size = tuple(self.config.report.thumbnails.size)
@@ -273,7 +281,10 @@ class Report:
             "Water Balance",
             "Energy Balance",
             "Carbon Balance",
-            *[group_name.replace("_", " ").title() for group_name in self.config.variables.groups],
+            *[
+                group_name.replace("_", " ").title()
+                for group_name in self.config.variables.groups
+            ],
             "Diagnostics",
         ]
 
@@ -421,7 +432,9 @@ class Report:
 
         # Generation info
         if self.config.report.metadata.show_generation_timestamp:
-            metadata["Report Generated"] = self._generation_time.strftime("%Y-%m-%d %H:%M:%S")
+            metadata["Report Generated"] = self._generation_time.strftime(
+                "%Y-%m-%d %H:%M:%S"
+            )
 
         sec.add_statistics(metadata)
         self._record_section_timing(
@@ -452,7 +465,7 @@ class Report:
                 wb.components()
                 wb.residual()
             compute_seconds += time.perf_counter() - compute_start
-            
+
             # Generate plots
             plot_start = time.perf_counter()
             figs = wb.plot()
@@ -466,27 +479,32 @@ class Report:
                 sec.add_figure(p3, t3, "Water input decomposition", "balance")
 
             if len(figs) >= 4:
-                p4, t4 = self._save_figure(figs[3], figdir, "water_storage_decomposition")
+                p4, t4 = self._save_figure(
+                    figs[3], figdir, "water_storage_decomposition"
+                )
                 sec.add_figure(p4, t4, "Water storage decomposition", "balance")
 
             for fig in figs:
                 plt.close(fig)
             plot_seconds += time.perf_counter() - plot_start
-            
+
             # Add statistics if enabled
             if self.config.report.balance_sections.show_statistics_table:
                 compute_start = time.perf_counter()
                 stats = self._compute_water_balance_stats(wb)
                 sec.add_statistics(stats)
                 compute_seconds += time.perf_counter() - compute_start
-            
+
             # Save NetCDF data
             if "netcdf" in self.config.report.output_formats:
                 io_start = time.perf_counter()
-                nc_file = datadir / f"water_balance{'_' + str(self.year) if self.year else ''}.nc"
+                nc_file = (
+                    datadir
+                    / f"water_balance{'_' + str(self.year) if self.year else ''}.nc"
+                )
                 wb.to_netcdf(nc_file)
                 io_seconds += time.perf_counter() - io_start
-            
+
             sections.append(sec)
         except Exception as e:
             self._record_error("Water Balance", e)
@@ -520,7 +538,7 @@ class Report:
                 eb.components()
                 eb.residual()
             compute_seconds += time.perf_counter() - compute_start
-            
+
             plot_start = time.perf_counter()
             fig1, fig2 = eb.plot()
             p1, t1 = self._save_figure(fig1, figdir, "energy_fluxes")
@@ -530,14 +548,14 @@ class Report:
             plt.close(fig1)
             plt.close(fig2)
             plot_seconds += time.perf_counter() - plot_start
-            
+
             # Add statistics if enabled
             if self.config.report.balance_sections.show_statistics_table:
                 compute_start = time.perf_counter()
                 stats = self._compute_energy_balance_stats(eb)
                 sec.add_statistics(stats)
                 compute_seconds += time.perf_counter() - compute_start
-            
+
             # Save NetCDF data
             if "netcdf" in self.config.report.output_formats:
                 nc_file = (
@@ -547,7 +565,9 @@ class Report:
                 # Energy balance doesn't have to_netcdf yet, save components directly
                 try:
                     io_start = time.perf_counter()
-                    components_ds = xr.Dataset({k: v for k, v in eb.components().items()})
+                    components_ds = xr.Dataset(
+                        {k: v for k, v in eb.components().items()}
+                    )
                     components_ds.to_netcdf(nc_file)
                     io_seconds += time.perf_counter() - io_start
                 except Exception:
@@ -588,7 +608,7 @@ class Report:
                 cb.components()
                 cb.residual()
             compute_seconds += time.perf_counter() - compute_start
-            
+
             plot_start = time.perf_counter()
             fig1, fig2 = cb.plot()
             p1, t1 = self._save_figure(fig1, figdir, "carbon_cumulative")
@@ -598,14 +618,14 @@ class Report:
             plt.close(fig1)
             plt.close(fig2)
             plot_seconds += time.perf_counter() - plot_start
-            
+
             # Add statistics if enabled
             if self.config.report.balance_sections.show_statistics_table:
                 compute_start = time.perf_counter()
                 stats = self._compute_carbon_balance_stats(cb)
                 sec.add_statistics(stats)
                 compute_seconds += time.perf_counter() - compute_start
-            
+
             # Save NetCDF data
             if "netcdf" in self.config.report.output_formats:
                 nc_file = (
@@ -615,7 +635,9 @@ class Report:
                 # Carbon balance doesn't have to_netcdf yet, save components directly
                 try:
                     io_start = time.perf_counter()
-                    components_ds = xr.Dataset({k: v for k, v in cb.components().items()})
+                    components_ds = xr.Dataset(
+                        {k: v for k, v in cb.components().items()}
+                    )
                     components_ds.to_netcdf(nc_file)
                     io_seconds += time.perf_counter() - io_start
                 except Exception:
@@ -646,8 +668,7 @@ class Report:
         try:
             components = wb.components()
             reduced_components = {
-                name: self._reduce_non_time_dims(da)
-                for name, da in components.items()
+                name: self._reduce_non_time_dims(da) for name, da in components.items()
             }
             residual = self._reduce_non_time_dims(wb.residual())
             storage_components = {
@@ -767,7 +788,7 @@ class Report:
                     )
                 ],
             }
-        
+
         return stats
 
     def _compute_energy_balance_stats(self, eb: EnergyBalance) -> dict[str, Any]:
@@ -929,7 +950,7 @@ class Report:
             section_title = group_name.replace("_", " ").title()
             sec = _Section(section_title)
             self._announce_section_progress(section_title)
-            
+
             # Limit number of variables if configured
             varnames_to_plot = varnames[:max_vars]
             if len(varnames) > max_vars:
@@ -949,16 +970,20 @@ class Report:
                     fig: plt.Figure | None = None
                     existing_fignums = set(plt.get_fignums())
                     try:
-                        fig, plot_compute_seconds, plot_render_seconds = self._create_plot(
-                            plot_type,
-                            varname,
+                        fig, plot_compute_seconds, plot_render_seconds = (
+                            self._create_plot(
+                                plot_type,
+                                varname,
+                            )
                         )
                         compute_seconds += plot_compute_seconds
                         plot_seconds += plot_render_seconds
                         if fig is not None:
                             basename = f"{group_name}_{varname}_{plot_type}"
                             io_start = time.perf_counter()
-                            full_path, thumb_path = self._save_figure(fig, figdir, basename)
+                            full_path, thumb_path = self._save_figure(
+                                fig, figdir, basename
+                            )
                             io_seconds += time.perf_counter() - io_start
                             caption = f"{varname} ({plot_type})"
                             sec.add_figure(full_path, thumb_path, caption, plot_type)
@@ -970,7 +995,7 @@ class Report:
                         if fig is not None:
                             plt.close(fig)
                         self._close_new_figures(existing_fignums)
-            
+
             if sec.figures:
                 sections.append(sec)
 
@@ -990,7 +1015,7 @@ class Report:
         varname: str,
     ) -> tuple[plt.Figure | None, float, float]:
         """Create one plot and return aggregated compute and render timings.
-        
+
         Returns
         -------
         Tuple of ``(figure, compute_seconds, plot_seconds)``.
@@ -1065,8 +1090,7 @@ class Report:
         start_time = time.perf_counter()
         self._announce_section_progress(section_title)
         sec = _Section(
-            section_title,
-            "Errors and warnings encountered during report generation."
+            section_title, "Errors and warnings encountered during report generation."
         )
 
         # Format errors and warnings for display
@@ -1078,7 +1102,7 @@ class Report:
             "User": self._user,
             "Machine": self._machine,
         }
-        
+
         if self._errors:
             diagnostics["Errors"] = [
                 f"{err['section']}: {err['type']} - {err['error']}"
@@ -1109,13 +1133,21 @@ class Report:
                     str(entry["title"]),
                     f"{total:.2f}",
                     f"{pct:.1f}%",
-                    "" if entry.get("io_seconds") is None else f"{float(entry['io_seconds']):.2f}",
-                    "" if entry.get("compute_seconds") is None else f"{float(entry['compute_seconds']):.2f}",
-                    "" if entry.get("plot_seconds") is None else f"{float(entry['plot_seconds']):.2f}",
+                    ""
+                    if entry.get("io_seconds") is None
+                    else f"{float(entry['io_seconds']):.2f}",
+                    ""
+                    if entry.get("compute_seconds") is None
+                    else f"{float(entry['compute_seconds']):.2f}",
+                    ""
+                    if entry.get("plot_seconds") is None
+                    else f"{float(entry['plot_seconds']):.2f}",
                 ]
             )
-        timing_rows.append(["Grand total", f"{attributed_total:.2f}", "100.0%", "", "", ""])
-        
+        timing_rows.append(
+            ["Grand total", f"{attributed_total:.2f}", "100.0%", "", "", ""]
+        )
+
         sec.add_statistics(diagnostics)
         sec.add_table(
             title="Section timings",

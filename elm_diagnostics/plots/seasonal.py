@@ -153,7 +153,9 @@ def _plot_seasonal_single(
         )
 
         if include_climos:
-            ax.fill_between(months, lo_e.values, hi_e.values, alpha=0.2, color="tab:blue")
+            ax.fill_between(
+                months, lo_e.values, hi_e.values, alpha=0.2, color="tab:blue"
+            )
         ax.plot(
             months,
             mean_e.values,
@@ -266,12 +268,20 @@ def _plot_seasonal_faceted(
             # Check if we have sufficient data
             if mean_b is not None and mean_e is not None:
                 if include_climos:
-                    ax_i.fill_between(months, lo_b.values, hi_b.values, alpha=0.2, color="gray")
+                    ax_i.fill_between(
+                        months, lo_b.values, hi_b.values, alpha=0.2, color="gray"
+                    )
                 ax_i.plot(
-                    months, mean_b.values, color="gray", label=source.base.name, linewidth=2
+                    months,
+                    mean_b.values,
+                    color="gray",
+                    label=source.base.name,
+                    linewidth=2,
                 )
                 if include_climos:
-                    ax_i.fill_between(months, lo_e.values, hi_e.values, alpha=0.2, color="tab:blue")
+                    ax_i.fill_between(
+                        months, lo_e.values, hi_e.values, alpha=0.2, color="tab:blue"
+                    )
                 ax_i.plot(
                     months,
                     mean_e.values,
@@ -294,7 +304,9 @@ def _plot_seasonal_faceted(
             # Check if we have sufficient data
             if mean is not None:
                 if include_climos:
-                    ax_i.fill_between(months, lo.values, hi.values, alpha=0.2, color="tab:blue")
+                    ax_i.fill_between(
+                        months, lo.values, hi.values, alpha=0.2, color="tab:blue"
+                    )
                 ax_i.plot(months, mean.values, color="tab:blue", linewidth=2)
 
             units_str = da.attrs.get("units", "")
