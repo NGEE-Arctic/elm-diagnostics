@@ -962,7 +962,7 @@ class Report:
                             io_seconds += time.perf_counter() - io_start
                             caption = f"{varname} ({plot_type})"
                             sec.add_figure(full_path, thumb_path, caption, plot_type)
-                    except Exception as e:
+                    except Exception:
                         # Silently skip individual plot failures
                         # (e.g., diurnal for monthly data, seasonal for insufficient data)
                         pass

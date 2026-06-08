@@ -196,8 +196,6 @@ def test_report_config_customization(report_run):
     rpt = Report(report_run, config=config)
     with tempfile.TemporaryDirectory() as outdir:
         rpt.build(outdir)
-        figdir = Path(outdir) / "figures"
-        thumbs = list(figdir.glob("*_thumb.png"))
         # When thumbnails disabled, may still have files but they should be same as originals
         # or none at all - implementation detail
 

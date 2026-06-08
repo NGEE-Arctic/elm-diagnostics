@@ -45,7 +45,7 @@ for varname, description in test_vars.items():
             output_dir / f"{varname}_timeseries.png", dpi=150, bbox_inches="tight"
         )
         plt.close(fig)
-        print(f"      ✓ Timeseries plot saved")
+        print("      ✓ Timeseries plot saved")
 
         # 2. Seasonal cycle
         fig = plot_seasonal(run, varname)
@@ -53,7 +53,7 @@ for varname, description in test_vars.items():
             output_dir / f"{varname}_seasonal.png", dpi=150, bbox_inches="tight"
         )
         plt.close(fig)
-        print(f"      ✓ Seasonal plot saved")
+        print("      ✓ Seasonal plot saved")
 
         # 3. Anomaly (needs multiple years, will skip for single month)
         try:
@@ -62,9 +62,9 @@ for varname, description in test_vars.items():
                 output_dir / f"{varname}_anomaly.png", dpi=150, bbox_inches="tight"
             )
             plt.close(fig)
-            print(f"      ✓ Anomaly plot saved")
-        except:
-            print(f"      ⏭ Anomaly plot skipped (need multiple years)")
+            print("      ✓ Anomaly plot saved")
+        except Exception:
+            print("      ⏭ Anomaly plot skipped (need multiple years)")
 
         # 4. Histogram
         fig = plot_histogram(run, varname, bins=30)
@@ -72,13 +72,13 @@ for varname, description in test_vars.items():
             output_dir / f"{varname}_histogram.png", dpi=150, bbox_inches="tight"
         )
         plt.close(fig)
-        print(f"      ✓ Histogram saved")
+        print("      ✓ Histogram saved")
 
         # 5. Diurnal (will show message if not sub-daily)
         fig = plot_diurnal(run, varname)
         fig.savefig(output_dir / f"{varname}_diurnal.png", dpi=150, bbox_inches="tight")
         plt.close(fig)
-        print(f"      ✓ Diurnal plot saved (may show 'not sub-daily' message)")
+        print("      ✓ Diurnal plot saved (may show 'not sub-daily' message)")
 
         print()
 

@@ -4,7 +4,6 @@ import tempfile
 from pathlib import Path
 
 import matplotlib
-import numpy as np
 import pytest
 
 matplotlib.use("Agg")

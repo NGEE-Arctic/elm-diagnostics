@@ -503,7 +503,9 @@ def balance(
         if kind not in balance_classes:
             console.print(f"[red]Error:[/red] Unknown balance type: {kind}\n")
             console.print(f"Valid options: {', '.join(balance_classes.keys())}")
-            console.print("\nExample: elm-diagnostics balance water /path/to/output")
+            console.print(
+                "\nExample: elm-diagnostics balance water /path/to/output"
+            )
             raise typer.Exit(code=1)
 
         # Load data

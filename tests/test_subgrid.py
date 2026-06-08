@@ -3,7 +3,6 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import pytest
-import xarray as xr
 
 from elm_diagnostics import Run, WaterBalance
 from elm_diagnostics.plots import (
@@ -25,7 +24,7 @@ def multicolumn_dataset():
 @pytest.fixture
 def multicolumn_run(tmp_path, multicolumn_dataset):
     """Create a Run object from multi-column dataset."""
-    files = save_as_elm_files(multicolumn_dataset, tmp_path, casename="multicolumn", tape="h0")
+    save_as_elm_files(multicolumn_dataset, tmp_path, casename="multicolumn", tape="h0")
     return Run(str(tmp_path))
 
 
@@ -37,7 +36,7 @@ def single_point_run(tmp_path):
     ds = make_single_point_dataset(n_months=12, variables={
         "GPP": {"data": np.random.rand(12), "units": "gC/m^2/s"},
     })
-    files = save_as_elm_files(ds, tmp_path, casename="single_point", tape="h0")
+    save_as_elm_files(ds, tmp_path, casename="single_point", tape="h0")
     return Run(str(tmp_path))
 
 
@@ -239,7 +238,7 @@ class TestFacetLayoutEdgeCases:
     def test_single_column(self, tmp_path):
         """Test plotting with just 1 column (edge case)."""
         ds = make_multicolumn_dataset(n_columns=1, n_months=12)
-        files = save_as_elm_files(ds, tmp_path, casename="single_col", tape="h0")
+        save_as_elm_files(ds, tmp_path, casename="single_col", tape="h0")
         run = Run(str(tmp_path))
         
         # Should raise error (size 1)
@@ -249,7 +248,7 @@ class TestFacetLayoutEdgeCases:
     def test_many_columns_warns(self, tmp_path):
         """Test that many columns triggers warning."""
         ds = make_multicolumn_dataset(n_columns=20, n_months=12)
-        files = save_as_elm_files(ds, tmp_path, casename="many_cols", tape="h0")
+        save_as_elm_files(ds, tmp_path, casename="many_cols", tape="h0")
         run = Run(str(tmp_path))
         
         # Should warn about many facets

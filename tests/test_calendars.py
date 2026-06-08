@@ -1,7 +1,6 @@
 """Tests for calendar and water-year utilities."""
 
 import cftime
-import numpy as np
 
 from elm_diagnostics.time.calendars import (
     add_water_year_coord,

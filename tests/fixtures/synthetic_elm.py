@@ -8,7 +8,6 @@ noleap calendar.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Literal
 
 import cftime
 import numpy as np
@@ -353,7 +352,6 @@ def make_multicolumn_dataset(
     xr.Dataset
         Dataset with 'column' dimension and water/carbon variables
     """
-    rng = np.random.RandomState(42)
     n = n_months
     
     times, time_bounds_data = make_time_axis(start_year, n_months, calendar)

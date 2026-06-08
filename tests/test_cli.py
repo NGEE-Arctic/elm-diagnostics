@@ -3,8 +3,6 @@
 from __future__ import annotations
 
 import subprocess
-import sys
-from pathlib import Path
 
 import pytest
 from typer.testing import CliRunner
@@ -669,9 +667,7 @@ def test_balance_with_year(synthetic_data_dir, temp_output_dir):
 def test_keyboard_interrupt_handling(synthetic_data_dir, temp_output_dir, monkeypatch):
     """Test that KeyboardInterrupt is handled gracefully."""
     from elm_diagnostics.io.run import Run
-    
-    original_init = Run.__init__
-    
+
     def mock_init(*args, **kwargs):
         raise KeyboardInterrupt()
     
