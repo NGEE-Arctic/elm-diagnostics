@@ -134,10 +134,8 @@ def _plot_diurnal_single(
             else:
                 median_hours = np.median(time_diffs).total_seconds() / 3600
             return median_hours < 24
-        except:
+        except Exception:
             return False
-
-    hours = np.arange(0, 24)
 
     if isinstance(source, Comparison):
         da_base = _squeeze_spatial(source.base.get(varname))
@@ -157,10 +155,6 @@ def _plot_diurnal_single(
 
         mean_b, lo_b, hi_b = _diurnal_stats(da_base, envelope)
         mean_e, lo_e, hi_e = _diurnal_stats(da_exp, envelope)
-
-        # Pad to 24 hours if needed
-        all_hours_b = np.arange(0, 24)
-        all_hours_e = np.arange(0, 24)
 
         ax.fill_between(
             mean_b.hour.values, lo_b.values, hi_b.values, alpha=0.2, color="gray"
@@ -279,7 +273,7 @@ def _plot_diurnal_faceted(
             else:
                 median_hours = np.median(time_diffs).total_seconds() / 3600
             return median_hours < 24
-        except:
+        except Exception:
             return False
 
     # Plot each subgrid unit
@@ -293,7 +287,11 @@ def _plot_diurnal_faceted(
                 mean_e, lo_e, hi_e = _diurnal_stats(da_exp_unit, envelope)
 
                 ax_i.fill_between(
-                    mean_b.hour.values, lo_b.values, hi_b.values, alpha=0.2, color="gray"
+                    mean_b.hour.values,
+                    lo_b.values,
+                    hi_b.values,
+                    alpha=0.2,
+                    color="gray",
                 )
                 ax_i.plot(
                     mean_b.hour.values,
@@ -303,7 +301,11 @@ def _plot_diurnal_faceted(
                     linewidth=2,
                 )
                 ax_i.fill_between(
-                    mean_e.hour.values, lo_e.values, hi_e.values, alpha=0.2, color="tab:blue"
+                    mean_e.hour.values,
+                    lo_e.values,
+                    hi_e.values,
+                    alpha=0.2,
+                    color="tab:blue",
                 )
                 ax_i.plot(
                     mean_e.hour.values,
@@ -337,7 +339,7 @@ def _plot_diurnal_faceted(
         ax_i.grid(True, alpha=0.3)
 
     # Hide unused subplots
-    for ax_i in axes.flat[len(units):]:
+    for ax_i in axes.flat[len(units) :]:
         ax_i.set_visible(False)
 
     # Overall title
@@ -347,7 +349,9 @@ def _plot_diurnal_faceted(
             fontsize="large",
         )
     else:
-        fig.suptitle(f"{varname} — Diurnal Cycle by {by} — {source.name}", fontsize="large")
+        fig.suptitle(
+            f"{varname} — Diurnal Cycle by {by} — {source.name}", fontsize="large"
+        )
 
     fig.tight_layout()
     return fig

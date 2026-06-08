@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from typing import Literal
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -212,7 +211,7 @@ def _plot_timeseries_faceted(
         ax_i.tick_params(labelsize="small")
 
     # Hide unused subplots
-    for ax_i in axes.flat[len(units):]:
+    for ax_i in axes.flat[len(units) :]:
         ax_i.set_visible(False)
 
     # Overall title

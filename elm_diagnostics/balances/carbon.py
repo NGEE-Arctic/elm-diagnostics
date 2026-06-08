@@ -2,15 +2,13 @@
 
 from __future__ import annotations
 
-from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
 import xarray as xr
 
 from elm_diagnostics.balances.base import Balance, _plot_time
-from elm_diagnostics.config.schema import CarbonBalanceConfig, Config
-from elm_diagnostics.io.run import Run
+from elm_diagnostics.config.schema import CarbonBalanceConfig
 from elm_diagnostics.time.integration import cumulative_integral, storage_change
 
 
@@ -144,24 +142,42 @@ class CarbonBalance(Balance):
         # --- Cumulative flux panel ---
         fig1, ax1 = plt.subplots(figsize=style.figsize, dpi=style.dpi)
 
-        flux_colors = {"GPP": "green", "ER": "red", "HR": "orange",
-                       "AR": "salmon", "NEE": "purple", "TOTFIRE": "gray",
-                       "WOOD_HARVESTC": "brown"}
+        flux_colors = {
+            "GPP": "green",
+            "ER": "red",
+            "HR": "orange",
+            "AR": "salmon",
+            "NEE": "purple",
+            "TOTFIRE": "gray",
+            "WOOD_HARVESTC": "brown",
+        }
 
         for varname in bc.fluxes:
             if varname in comps:
                 c = flux_colors.get(varname, None)
-                ax1.plot(_plot_time(comps[varname]), comps[varname],
-                         label=varname, color=c)
+                ax1.plot(
+                    _plot_time(comps[varname]), comps[varname], label=varname, color=c
+                )
 
         if "dTOTECOSYSC" in comps:
-            ax1.plot(_plot_time(comps["dTOTECOSYSC"]), comps["dTOTECOSYSC"],
-                     label="dTOTECOSYSC", color="black", linestyle="--")
+            ax1.plot(
+                _plot_time(comps["dTOTECOSYSC"]),
+                comps["dTOTECOSYSC"],
+                label="dTOTECOSYSC",
+                color="black",
+                linestyle="--",
+            )
 
         res = self.residual()
         if isinstance(res, xr.DataArray):
-            ax1.plot(_plot_time(res), res, label="Residual", color="black",
-                     linestyle=":", linewidth=2)
+            ax1.plot(
+                _plot_time(res),
+                res,
+                label="Residual",
+                color="black",
+                linestyle=":",
+                linewidth=2,
+            )
 
         ax1.set_xlabel("Time")
         ax1.set_ylabel("Cumulative (gC/m²)")
@@ -179,8 +195,12 @@ class CarbonBalance(Balance):
         pool_colors = plt.cm.Set2.colors
         for i, varname in enumerate(bc.pools):
             if varname in comps:
-                ax2.plot(_plot_time(comps[varname]), comps[varname],
-                         label=varname, color=pool_colors[i % len(pool_colors)])
+                ax2.plot(
+                    _plot_time(comps[varname]),
+                    comps[varname],
+                    label=varname,
+                    color=pool_colors[i % len(pool_colors)],
+                )
 
         ax2.set_xlabel("Time")
         ax2.set_ylabel("gC/m²")

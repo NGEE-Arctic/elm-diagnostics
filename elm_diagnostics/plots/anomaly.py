@@ -211,7 +211,7 @@ def _plot_anomaly_faceted(
         ax_i.axhline(0, color="gray", linewidth=0.5)
 
     # Hide unused subplots
-    for ax_i in axes.flat[len(units):]:
+    for ax_i in axes.flat[len(units) :]:
         ax_i.set_visible(False)
 
     # Overall title
@@ -221,7 +221,9 @@ def _plot_anomaly_faceted(
             fontsize="large",
         )
     else:
-        fig.suptitle(f"{varname} — Annual Anomaly by {by} — {source.name}", fontsize="large")
+        fig.suptitle(
+            f"{varname} — Annual Anomaly by {by} — {source.name}", fontsize="large"
+        )
 
     fig.tight_layout()
     return fig

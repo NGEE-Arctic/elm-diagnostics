@@ -123,8 +123,7 @@ def day_of_year(time_val, start_month: int = 1) -> int:
         abs_doy = time_val.timetuple().tm_yday
     else:
         abs_doy = (
-            np.datetime64(time_val, "D")
-            - np.datetime64(f"{year}-01-01", "D")
+            np.datetime64(time_val, "D") - np.datetime64(f"{year}-01-01", "D")
         ).astype(int) + 1
 
     if start_month == 1:
@@ -137,8 +136,9 @@ def day_of_year(time_val, start_month: int = 1) -> int:
         cal = "standard"
 
     try:
-        year_start = cftime.datetime(year if month >= start_month else year - 1,
-                                     start_month, 1, calendar=cal)
+        year_start = cftime.datetime(
+            year if month >= start_month else year - 1, start_month, 1, calendar=cal
+        )
         if hasattr(time_val, "toordinal"):
             delta = time_val.toordinal() - year_start.toordinal()
         else:

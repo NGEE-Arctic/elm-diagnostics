@@ -104,6 +104,7 @@ def aggregate_vertical_storage(
         # No vertical dimension - convert units and return
         if varname in ["SOILLIQ", "SOILICE"]:
             from elm_diagnostics.io.units import convert_water_to_mm
+
             da = convert_water_to_mm(da)
         return da
 
@@ -111,10 +112,11 @@ def aggregate_vertical_storage(
     total = da.sum(dim=vdim, keep_attrs=True)
     total.attrs["long_name"] = f"column total {da.attrs.get('long_name', varname)}"
     total.attrs["aggregation"] = f"sum over {vdim}"
-    
+
     # Convert water storage to mm for consistency (kg/m² → mm)
     if varname in ["SOILLIQ", "SOILICE"]:
         from elm_diagnostics.io.units import convert_water_to_mm
+
         total = convert_water_to_mm(total)
 
     return total

@@ -2,19 +2,14 @@
 
 from __future__ import annotations
 
-from pathlib import Path
 
 import matplotlib.pyplot as plt
-import numpy as np
 import xarray as xr
 
 from elm_diagnostics.balances.base import Balance, _plot_time
-from elm_diagnostics.config.schema import Config, WaterBalanceConfig
-from elm_diagnostics.io.derived import aggregate_vertical_storage
-from elm_diagnostics.io.run import Run
+from elm_diagnostics.config.schema import WaterBalanceConfig
 from elm_diagnostics.time.integration import (
     cumulative_integral,
-    get_time_deltas,
     storage_change,
 )
 
@@ -79,11 +74,12 @@ class WaterBalance(Balance):
                 if "levgrnd" in da.dims or "levsoi" in da.dims:
                     vdim = "levgrnd" if "levgrnd" in da.dims else "levsoi"
                     da = da.sum(dim=vdim, keep_attrs=True)
-                
+
                 # Convert storage to mm for consistency (kg/m² → mm for water)
                 from elm_diagnostics.io.units import convert_water_to_mm
+
                 da = convert_water_to_mm(da)
-                
+
                 da = self._select_year(da)
                 if total_storage is None:
                     total_storage = da.copy()
@@ -118,7 +114,7 @@ class WaterBalance(Balance):
 
     def plot(self) -> tuple[plt.Figure, plt.Figure]:
         """Generate water balance plots.
-        
+
         If by parameter is set, creates faceted plots with one panel per
         sub-gridcell unit.
 
@@ -137,7 +133,7 @@ class WaterBalance(Balance):
             return self._plot_faceted(comps, bc, style)
         else:
             return self._plot_single(comps, bc, style)
-    
+
     def _plot_single(
         self, comps: dict[str, xr.DataArray], bc: WaterBalanceConfig, style
     ) -> tuple[plt.Figure, plt.Figure]:
@@ -203,7 +199,7 @@ class WaterBalance(Balance):
         fig2.tight_layout()
 
         return fig1, fig2
-    
+
     def _plot_faceted(
         self, comps: dict[str, xr.DataArray], bc: WaterBalanceConfig, style
     ) -> tuple[plt.Figure, plt.Figure]:
@@ -213,20 +209,20 @@ class WaterBalance(Balance):
             format_subgrid_title,
             get_subgrid_units,
         )
-        
+
         # Get subgrid units from first component
         first_comp = list(comps.values())[0]
         units = get_subgrid_units(first_comp, self.by)
-        
+
         # Create faceted figures
         fig1, axes1 = create_facet_figure(len(units), style)
         fig2, axes2 = create_facet_figure(len(units), style)
-        
+
         # Plot each subgrid unit
         for unit_id, ax1, ax2 in zip(units, axes1.flat, axes2.flat):
             # Select this unit from all components
             comps_unit = {k: v.sel({self.by: unit_id}) for k, v in comps.items()}
-            
+
             # --- Cumulative panel ---
             inputs_available = [v for v in bc.inputs if v in comps_unit]
             if inputs_available:
@@ -234,14 +230,18 @@ class WaterBalance(Balance):
                 ax1.plot(
                     _plot_time(total_in), total_in, label="P", color="blue", linewidth=1
                 )
-            
+
             outputs_available = [v for v in bc.outputs if v in comps_unit]
             if outputs_available:
                 total_out = sum(comps_unit[v] for v in outputs_available)
                 ax1.plot(
-                    _plot_time(total_out), total_out, label="Out", color="red", linewidth=1
+                    _plot_time(total_out),
+                    total_out,
+                    label="Out",
+                    color="red",
+                    linewidth=1,
                 )
-            
+
             if "dS" in comps_unit:
                 ax1.plot(
                     _plot_time(comps_unit["dS"]),
@@ -250,18 +250,25 @@ class WaterBalance(Balance):
                     color="green",
                     linewidth=1,
                 )
-            
+
             # Residual for this unit
             res_unit = self.residual().sel({self.by: unit_id})
-            ax1.plot(_plot_time(res_unit), res_unit, label="Res", color="black", linestyle="--", linewidth=1)
-            
+            ax1.plot(
+                _plot_time(res_unit),
+                res_unit,
+                label="Res",
+                color="black",
+                linestyle="--",
+                linewidth=1,
+            )
+
             ax1.set_xlabel("Time", fontsize="small")
             ax1.set_ylabel("Cumulative (mm)", fontsize="small")
             ax1.set_title(format_subgrid_title(self.by, unit_id), fontsize="medium")
             ax1.legend(loc="best", fontsize="x-small")
             ax1.axhline(0, color="gray", linewidth=0.5)
             ax1.tick_params(labelsize="small")
-            
+
             # --- Decomposition panel ---
             colors = plt.cm.tab10.colors
             for i, varname in enumerate(outputs_available):
@@ -272,28 +279,31 @@ class WaterBalance(Balance):
                     color=colors[i % len(colors)],
                     linewidth=1,
                 )
-            
+
             ax2.set_xlabel("Time", fontsize="small")
             ax2.set_ylabel("Cumulative (mm)", fontsize="small")
             ax2.set_title(format_subgrid_title(self.by, unit_id), fontsize="medium")
             ax2.legend(loc="best", fontsize="x-small")
             ax2.tick_params(labelsize="small")
-        
+
         # Hide unused subplots
-        for ax1 in axes1.flat[len(units):]:
+        for ax1 in axes1.flat[len(units) :]:
             ax1.set_visible(False)
-        for ax2 in axes2.flat[len(units):]:
+        for ax2 in axes2.flat[len(units) :]:
             ax2.set_visible(False)
-        
+
         # Overall titles
         title_base = f"Water Balance — {self.run.name}"
         if self.year:
             title_base += f" ({self.frame} {self.year})"
-        
+
         fig1.suptitle(f"{title_base} by {self.by}", fontsize="large")
-        fig2.suptitle(f"Water Output Decomposition — {self.run.name} by {self.by}", fontsize="large")
-        
+        fig2.suptitle(
+            f"Water Output Decomposition — {self.run.name} by {self.by}",
+            fontsize="large",
+        )
+
         fig1.tight_layout()
         fig2.tight_layout()
-        
+
         return fig1, fig2

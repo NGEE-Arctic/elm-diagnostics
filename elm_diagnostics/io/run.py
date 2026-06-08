@@ -65,7 +65,6 @@ def _infer_cadence(ds: xr.Dataset) -> str | pd.Timedelta:
 
     # Sample first few time steps
     sample = min(len(dts), 12)
-    first_val = dts.values.flat[0]
 
     import datetime
 

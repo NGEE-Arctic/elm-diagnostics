@@ -10,7 +10,7 @@ from typing import List, Optional
 import typer
 from rich.console import Console
 from rich.logging import RichHandler
-from rich.progress import BarColumn, Progress, SpinnerColumn, TextColumn, TimeElapsedColumn
+from rich.progress import Progress, SpinnerColumn, TextColumn
 
 console = Console()
 
@@ -66,7 +66,7 @@ def validate_path(path: str, require_elm_files: bool = True) -> Path:
         console.print("  • Path is spelled correctly")
         console.print("  • You have permission to access it")
         console.print(f"  • Current directory: {Path.cwd()}\n")
-        console.print(f"Example: elm-diagnostics report /path/to/elm/output")
+        console.print("Example: elm-diagnostics report /path/to/elm/output")
         raise typer.Exit(code=1)
 
     if require_elm_files:
@@ -123,7 +123,9 @@ def report(
     ),
     out: str = typer.Option("elm_report", "--out", help="Output directory."),
     config: Optional[str] = typer.Option(None, "--config", help="Path to config YAML."),
-    year: Optional[int] = typer.Option(None, "--year", help="Specific year to analyze."),
+    year: Optional[int] = typer.Option(
+        None, "--year", help="Specific year to analyze."
+    ),
     all_years: bool = typer.Option(
         False, "--all-years", help="Generate report for all available years."
     ),
@@ -135,8 +137,12 @@ def report(
         max=12,
     ),
     verbose: bool = typer.Option(False, "--verbose", "-v", help="Verbose output."),
-    debug: bool = typer.Option(False, "--debug", help="Debug mode with full tracebacks."),
-    quiet: bool = typer.Option(False, "--quiet", "-q", help="Suppress progress output."),
+    debug: bool = typer.Option(
+        False, "--debug", help="Debug mode with full tracebacks."
+    ),
+    quiet: bool = typer.Option(
+        False, "--quiet", "-q", help="Suppress progress output."
+    ),
 ) -> None:
     """
     Generate a full diagnostics report.
@@ -231,13 +237,13 @@ def report(
             # This would need to be passed to Report or set in config
             # For now, log a warning that this needs config support
             console.print(
-                f"[yellow]Note:[/yellow] Water year start override "
-                f"requires config file support (not yet implemented)"
+                "[yellow]Note:[/yellow] Water year start override "
+                "requires config file support (not yet implemented)"
             )
 
         # Build report
         if not quiet:
-            console.print(f"\n[bold]Building diagnostics report...[/bold]")
+            console.print("\n[bold]Building diagnostics report...[/bold]")
             start_time = time.time()
 
         rpt = Report(source, config=config, year=year)
@@ -281,8 +287,12 @@ def balance(
     ),
     config: Optional[str] = typer.Option(None, "--config", help="Path to config YAML."),
     verbose: bool = typer.Option(False, "--verbose", "-v", help="Verbose output."),
-    debug: bool = typer.Option(False, "--debug", help="Debug mode with full tracebacks."),
-    quiet: bool = typer.Option(False, "--quiet", "-q", help="Suppress progress output."),
+    debug: bool = typer.Option(
+        False, "--debug", help="Debug mode with full tracebacks."
+    ),
+    quiet: bool = typer.Option(
+        False, "--quiet", "-q", help="Suppress progress output."
+    ),
 ) -> None:
     """
     Compute and plot a single budget balance.
@@ -328,9 +338,7 @@ def balance(
         if kind not in balance_classes:
             console.print(f"[red]Error:[/red] Unknown balance type: {kind}\n")
             console.print(f"Valid options: {', '.join(balance_classes.keys())}")
-            console.print(
-                f"\nExample: elm-diagnostics balance water /path/to/output"
-            )
+            console.print("\nExample: elm-diagnostics balance water /path/to/output")
             raise typer.Exit(code=1)
 
         # Load data
@@ -359,9 +367,7 @@ def balance(
                 console=console,
                 transient=True,
             ) as progress:
-                task = progress.add_task(
-                    f"Computing {kind} balance...", total=None
-                )
+                task = progress.add_task(f"Computing {kind} balance...", total=None)
                 bal = balance_classes[kind](run, year=year, config=config)
                 progress.update(task, completed=True)
         else:
@@ -424,8 +430,12 @@ def plot(
     ),
     config: Optional[str] = typer.Option(None, "--config", help="Path to config YAML."),
     verbose: bool = typer.Option(False, "--verbose", "-v", help="Verbose output."),
-    debug: bool = typer.Option(False, "--debug", help="Debug mode with full tracebacks."),
-    quiet: bool = typer.Option(False, "--quiet", "-q", help="Suppress progress output."),
+    debug: bool = typer.Option(
+        False, "--debug", help="Debug mode with full tracebacks."
+    ),
+    quiet: bool = typer.Option(
+        False, "--quiet", "-q", help="Suppress progress output."
+    ),
 ) -> None:
     """
     Plot a single variable.
@@ -479,7 +489,7 @@ def plot(
             console.print(f"[red]Error:[/red] Unknown plot kind: {kind}\n")
             console.print(f"Valid options: {', '.join(plot_funcs.keys())}")
             console.print(
-                f"\nExample: elm-diagnostics plot GPP /path/to/output --kind seasonal"
+                "\nExample: elm-diagnostics plot GPP /path/to/output --kind seasonal"
             )
             raise typer.Exit(code=1)
 

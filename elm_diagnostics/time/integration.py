@@ -173,7 +173,5 @@ def storage_change(
     result = da - initial
 
     result.attrs = dict(da.attrs)
-    result.attrs["long_name"] = (
-        f"change in {da.attrs.get('long_name', da.name or '')}"
-    )
+    result.attrs["long_name"] = f"change in {da.attrs.get('long_name', da.name or '')}"
     return result

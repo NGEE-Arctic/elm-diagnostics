@@ -2,15 +2,12 @@
 
 from __future__ import annotations
 
-from pathlib import Path
 
 import matplotlib.pyplot as plt
-import numpy as np
 import xarray as xr
 
 from elm_diagnostics.balances.base import Balance, _plot_time
-from elm_diagnostics.config.schema import Config, EnergyBalanceConfig
-from elm_diagnostics.io.run import Run
+from elm_diagnostics.config.schema import EnergyBalanceConfig
 
 
 class EnergyBalance(Balance):

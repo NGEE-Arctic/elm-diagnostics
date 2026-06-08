@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from typing import Literal
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -250,11 +249,19 @@ def _plot_seasonal_faceted(
 
             # Check if we have sufficient data
             if mean_b is not None and mean_e is not None:
-                ax_i.fill_between(months, lo_b.values, hi_b.values, alpha=0.2, color="gray")
-                ax_i.plot(
-                    months, mean_b.values, color="gray", label=source.base.name, linewidth=2
+                ax_i.fill_between(
+                    months, lo_b.values, hi_b.values, alpha=0.2, color="gray"
                 )
-                ax_i.fill_between(months, lo_e.values, hi_e.values, alpha=0.2, color="tab:blue")
+                ax_i.plot(
+                    months,
+                    mean_b.values,
+                    color="gray",
+                    label=source.base.name,
+                    linewidth=2,
+                )
+                ax_i.fill_between(
+                    months, lo_e.values, hi_e.values, alpha=0.2, color="tab:blue"
+                )
                 ax_i.plot(
                     months,
                     mean_e.values,
@@ -271,7 +278,9 @@ def _plot_seasonal_faceted(
 
             # Check if we have sufficient data
             if mean is not None:
-                ax_i.fill_between(months, lo.values, hi.values, alpha=0.2, color="tab:blue")
+                ax_i.fill_between(
+                    months, lo.values, hi.values, alpha=0.2, color="tab:blue"
+                )
                 ax_i.plot(months, mean.values, color="tab:blue", linewidth=2)
 
             units_str = da.attrs.get("units", "")
@@ -285,7 +294,7 @@ def _plot_seasonal_faceted(
         ax_i.tick_params(labelsize="small")
 
     # Hide unused subplots
-    for ax_i in axes.flat[len(units):]:
+    for ax_i in axes.flat[len(units) :]:
         ax_i.set_visible(False)
 
     # Overall title
@@ -295,7 +304,9 @@ def _plot_seasonal_faceted(
             fontsize="large",
         )
     else:
-        fig.suptitle(f"{varname} — Seasonal Cycle by {by} — {source.name}", fontsize="large")
+        fig.suptitle(
+            f"{varname} — Seasonal Cycle by {by} — {source.name}", fontsize="large"
+        )
 
     fig.tight_layout()
     return fig

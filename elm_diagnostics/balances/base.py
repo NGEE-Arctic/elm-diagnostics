@@ -8,21 +8,14 @@ from typing import Any
 
 import cftime
 import matplotlib.pyplot as plt
-import numpy as np
 import xarray as xr
 
 from elm_diagnostics.config.schema import Config, load_config
 from elm_diagnostics.io.run import Run
 from elm_diagnostics.io.subgrid import SubgridLevel
 from elm_diagnostics.time.calendars import (
-    add_water_year_coord,
     get_available_years,
     select_year,
-)
-from elm_diagnostics.time.integration import (
-    cumulative_integral,
-    get_time_deltas,
-    storage_change,
 )
 
 
@@ -62,10 +55,11 @@ class Balance(ABC):
             self.config = config
 
         self._balance_config = self._get_balance_config()
-        
+
         # Validate sub-gridcell dimension if requested
         if by is not None:
             from elm_diagnostics.io.subgrid import validate_by_keyword
+
             # Get first stream to check
             first_stream = self.run._open_stream(self.run._tape_order[0])
             validate_by_keyword(first_stream, by)
@@ -80,7 +74,7 @@ class Balance(ABC):
 
     def _get_var(self, varname: str) -> xr.DataArray:
         """Retrieve a variable from the run, squeezing spatial singletons.
-        
+
         Preserves the sub-gridcell dimension specified by self.by if set.
         """
         da = self.run.get(varname)

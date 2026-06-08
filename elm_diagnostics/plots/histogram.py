@@ -224,7 +224,7 @@ def _plot_histogram_faceted(
         ax_i.tick_params(labelsize="small")
 
     # Hide unused subplots
-    for ax_i in axes.flat[len(units):]:
+    for ax_i in axes.flat[len(units) :]:
         ax_i.set_visible(False)
 
     # Overall title
@@ -234,7 +234,9 @@ def _plot_histogram_faceted(
             fontsize="large",
         )
     else:
-        fig.suptitle(f"{varname} — Distribution by {by} — {source.name}", fontsize="large")
+        fig.suptitle(
+            f"{varname} — Distribution by {by} — {source.name}", fontsize="large"
+        )
 
     fig.tight_layout()
     return fig

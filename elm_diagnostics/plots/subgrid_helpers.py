@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import warnings
-from typing import Literal
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -18,20 +17,20 @@ _MAX_FACETS_NO_WARNING = 16
 
 def calculate_facet_layout(n_units: int) -> tuple[int, int]:
     """Calculate optimal (nrows, ncols) layout for n subgrid units.
-    
+
     The layout aims for a roughly square grid, with preference for
     wider-than-tall layouts for better use of screen space.
-    
+
     Parameters
     ----------
     n_units : int
         Number of sub-gridcell units to plot
-    
+
     Returns
     -------
     tuple[int, int]
         (nrows, ncols) for subplot layout
-    
+
     Examples
     --------
     >>> calculate_facet_layout(1)
@@ -47,7 +46,7 @@ def calculate_facet_layout(n_units: int) -> tuple[int, int]:
     """
     if n_units <= 0:
         raise ValueError(f"n_units must be positive, got {n_units}")
-    
+
     if n_units == 1:
         return (1, 1)
     elif n_units == 2:
@@ -74,7 +73,7 @@ def create_facet_figure(
     sharey: bool = True,
 ) -> tuple[plt.Figure, np.ndarray]:
     """Create figure with subplots for faceting by sub-gridcell units.
-    
+
     Parameters
     ----------
     n_units : int
@@ -85,7 +84,7 @@ def create_facet_figure(
         Share x-axis across subplots
     sharey : bool, default True
         Share y-axis across subplots
-    
+
     Returns
     -------
     fig : matplotlib.figure.Figure
@@ -93,7 +92,7 @@ def create_facet_figure(
         Flattened array of axes (1D), with length ≥ n_units.
         Unused axes (if grid is larger than n_units) should be hidden
         by the caller.
-    
+
     Warnings
     --------
     Issues a warning if n_units > 16 (large figures may be slow to render
@@ -108,15 +107,15 @@ def create_facet_figure(
             UserWarning,
             stacklevel=3,
         )
-    
+
     nrows, ncols = calculate_facet_layout(n_units)
-    
+
     # Scale figure size based on layout
     # Base figsize is for a single plot; scale proportionally
     base_width, base_height = style.figsize
     fig_width = base_width * ncols / 1.5  # Slightly compressed horizontally
     fig_height = base_height * nrows / 1.5  # Slightly compressed vertically
-    
+
     fig, axes = plt.subplots(
         nrows,
         ncols,
@@ -126,10 +125,10 @@ def create_facet_figure(
         sharey=sharey,
         squeeze=False,  # Always return 2D array
     )
-    
+
     # Flatten axes to 1D for easier iteration
     axes_flat = axes.flatten()
-    
+
     return fig, axes_flat
 
 
@@ -139,7 +138,7 @@ def validate_variable_for_subgrid(
     varname: str,
 ) -> None:
     """Validate that a variable has the requested sub-gridcell dimension.
-    
+
     Parameters
     ----------
     da : xr.DataArray
@@ -148,7 +147,7 @@ def validate_variable_for_subgrid(
         Requested sub-gridcell dimension
     varname : str
         Variable name (for error message)
-    
+
     Raises
     ------
     ValueError
@@ -170,7 +169,7 @@ def validate_variable_for_subgrid(
                 f"It may be gridcell-averaged. Remove the 'by' parameter or select "
                 f"a variable with sub-gridcell output."
             )
-    
+
     # Check dimension size
     size = da.sizes[by]
     if size <= 1:
@@ -182,14 +181,14 @@ def validate_variable_for_subgrid(
 
 def get_subgrid_units(da: xr.DataArray, by: SubgridLevel) -> list[int]:
     """Extract list of sub-gridcell unit indices from a DataArray.
-    
+
     Parameters
     ----------
     da : xr.DataArray
         Data array with sub-gridcell dimension
     by : {"column", "pft", "landunit"}
         Sub-gridcell dimension name
-    
+
     Returns
     -------
     list[int]
@@ -201,19 +200,19 @@ def get_subgrid_units(da: xr.DataArray, by: SubgridLevel) -> list[int]:
 
 def format_subgrid_title(by: SubgridLevel, unit_id: int) -> str:
     """Format a subplot title for a sub-gridcell unit.
-    
+
     Parameters
     ----------
     by : {"column", "pft", "landunit"}
         Sub-gridcell level
     unit_id : int
         Unit index/ID
-    
+
     Returns
     -------
     str
         Formatted title (e.g., "Column 1", "PFT 12", "Landunit 3")
-    
+
     Examples
     --------
     >>> format_subgrid_title("column", 1)
