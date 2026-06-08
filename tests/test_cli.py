@@ -67,9 +67,12 @@ def test_report_command_help():
     result = runner.invoke(app, ["report", "--help"])
     assert result.exit_code == 0
     assert "Generate a full diagnostics report" in result.output
-    assert "--compare" in result.output
-    assert "--year" in result.output
-    assert "--all-years" in result.output
+    # Strip ANSI codes to handle CI terminal width differences
+    import re
+    output_clean = re.sub(r'\x1b\[[0-9;]*m', '', result.output)
+    assert "--compare" in output_clean
+    assert "--year" in output_clean
+    assert "--all-years" in output_clean
 
 
 def test_balance_command_help():
