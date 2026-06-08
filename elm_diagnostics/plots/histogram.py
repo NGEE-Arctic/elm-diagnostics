@@ -13,6 +13,9 @@ from elm_diagnostics.io.subgrid import SubgridLevel
 
 def _squeeze_spatial(da: xr.DataArray) -> xr.DataArray:
     """Squeeze singleton spatial dims (lat/lon/lndgrid/gridcell)."""
+    # Compute dask arrays before drop=True to avoid KeyError
+    if hasattr(da, "chunks") and da.chunks is not None:
+        da = da.compute()
     for dim in ("lat", "lon", "lndgrid", "gridcell"):
         if dim in da.dims and da.sizes[dim] == 1:
             da = da.squeeze(dim, drop=True)
@@ -26,6 +29,9 @@ def _flatten_finite_values(da: xr.DataArray) -> np.ndarray:
     materialization step, which is friendlier to chunked arrays than
     immediately calling ``.values.ravel()``.
     """
+    # Compute dask arrays before boolean indexing to avoid KeyError
+    if hasattr(da, "chunks") and da.chunks is not None:
+        da = da.compute()
     stacked = da.stack(sample=da.dims)
     finite = stacked.where(np.isfinite(stacked), drop=True)
     return finite.values

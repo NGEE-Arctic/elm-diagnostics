@@ -495,6 +495,11 @@ def balance(
 
         strict_combine = _get_run_strict_combine(config)
         chunk_mode, manual_chunks, chunk_target_mb = _get_run_chunk_options(config)
+        analysis_year_min, analysis_year_max = _resolve_analysis_year_filter(
+            config,
+            year,
+            False,  # all_years not available in balance command
+        )
 
         from elm_diagnostics.balances.carbon import CarbonBalance
         from elm_diagnostics.balances.energy import EnergyBalance
@@ -529,6 +534,8 @@ def balance(
                     chunk_mode=chunk_mode,
                     chunks=manual_chunks,
                     chunk_target_mb=chunk_target_mb,
+                    analysis_year_min=analysis_year_min,
+                    analysis_year_max=analysis_year_max,
                 )
                 progress.update(task, completed=True)
                 elapsed = time.time() - start_time
@@ -541,6 +548,8 @@ def balance(
                 chunk_mode=chunk_mode,
                 chunks=manual_chunks,
                 chunk_target_mb=chunk_target_mb,
+                analysis_year_min=analysis_year_min,
+                analysis_year_max=analysis_year_max,
             )
 
         # Compute balance
@@ -566,24 +575,27 @@ def balance(
         if not quiet:
             console.print("Generating plots...")
 
-        fig1, fig2 = bal.plot()
+        figures = bal.plot()
 
         if out:
             outdir = Path(out)
             outdir.mkdir(parents=True, exist_ok=True)
-            fig1.savefig(outdir / f"{kind}_panel1.png", bbox_inches="tight", dpi=150)
-            fig2.savefig(outdir / f"{kind}_panel2.png", bbox_inches="tight", dpi=150)
+            for i, fig in enumerate(figures, start=1):
+                fig.savefig(
+                    outdir / f"{kind}_panel{i}.png", bbox_inches="tight", dpi=150
+                )
             bal.to_netcdf(outdir / f"{kind}_balance.nc")
 
             console.print(f"[green]✓[/green] Saved to {outdir.resolve()}/")
             if verbose:
-                logger.info(f"  - {kind}_panel1.png")
-                logger.info(f"  - {kind}_panel2.png")
+                for i in range(1, len(figures) + 1):
+                    logger.info(f"  - {kind}_panel{i}.png")
                 logger.info(f"  - {kind}_balance.nc")
         else:
             import matplotlib.pyplot as plt
 
-            console.print("Displaying plots...")
+            if not quiet:
+                console.print("Displaying plots...")
             plt.show()
 
         run.close()
@@ -657,6 +669,7 @@ def plot(
         strict_combine = _get_run_strict_combine(config)
         chunk_mode, manual_chunks, chunk_target_mb = _get_run_chunk_options(config)
 
+        from elm_diagnostics.config.schema import load_config as load_config_obj
         from elm_diagnostics.io.run import Run
         from elm_diagnostics.plots import (
             plot_anomaly,
@@ -679,6 +692,9 @@ def plot(
                 "\nExample: elm-diagnostics plot GPP /path/to/output --kind seasonal"
             )
             raise typer.Exit(code=1)
+
+        # Load config object
+        cfg = load_config_obj(path=config) if config else load_config_obj()
 
         # Load data
         start_time = time.time()
@@ -718,7 +734,7 @@ def plot(
         if not quiet:
             console.print(f"Generating {kind} plot for {varname}...")
 
-        fig = plot_funcs[kind](run, varname, config=config)
+        fig = plot_funcs[kind](run, varname, config=cfg)
 
         if out:
             fig.savefig(out, bbox_inches="tight", dpi=150)

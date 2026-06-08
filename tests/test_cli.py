@@ -134,6 +134,8 @@ def test_balance_water(synthetic_data_dir, temp_output_dir):
     assert "Saved to" in result.output
     assert (temp_output_dir / "water_panel1.png").exists()
     assert (temp_output_dir / "water_panel2.png").exists()
+    assert (temp_output_dir / "water_panel3.png").exists()
+    assert (temp_output_dir / "water_panel4.png").exists()
     assert (temp_output_dir / "water_balance.nc").exists()
 
 
