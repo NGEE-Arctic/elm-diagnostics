@@ -7,10 +7,11 @@ name = "elm-diagnostics"
 version = "0.1.0"
 description = "Diagnostics and budget-closure tools for E3SM's ELM land model"
 readme = "README.md"
-license = "BSD-3-Clause"
+license = "MIT"
 requires-python = ">=3.10"
 authors = [
     { name = "Rich Fiorella" },
+    { name = "Matthew Hoffman" },
 ]
 dependencies = [
     "xarray>=2023.1",
