@@ -20,6 +20,81 @@ from elm_diagnostics.plots.dimension_helpers import (
 _DEPTH_DIMS = {"levgrnd", "levsoi"}
 
 
+def _is_index_like(values: np.ndarray) -> bool:
+    if values.ndim != 1 or values.size == 0:
+        return False
+    if not np.issubdtype(values.dtype, np.number):
+        return False
+    idx = np.arange(values.size)
+    return np.allclose(values.astype(float), idx.astype(float), rtol=0.0, atol=1e-12)
+
+
+def _max_depth_mask(
+    yvals: np.ndarray,
+    *,
+    max_depth_m: float | None,
+    dim: str,
+    is_index_based_axis: bool,
+) -> np.ndarray | None:
+    """Return a boolean mask for max-depth clipping, or None if not applicable."""
+    if max_depth_m is None:
+        return None
+
+    if is_index_based_axis:
+        warnings.warn(
+            (
+                f"plots.hovmuller.max_depth_m={max_depth_m} ignored for dimension "
+                f"'{dim}' because no coordinate variable was available to convert "
+                "indices to physical depth/height."
+            ),
+            UserWarning,
+            stacklevel=3,
+        )
+        return None
+
+    values = np.asarray(yvals)
+    if values.ndim != 1 or not np.issubdtype(values.dtype, np.number):
+        warnings.warn(
+            (
+                f"plots.hovmuller.max_depth_m={max_depth_m} ignored for dimension "
+                f"'{dim}' because the axis values are non-numeric."
+            ),
+            UserWarning,
+            stacklevel=3,
+        )
+        return None
+
+    mask = np.isfinite(values) & (values <= float(max_depth_m))
+    if not np.any(mask):
+        warnings.warn(
+            (
+                f"plots.hovmuller.max_depth_m={max_depth_m} selected no levels "
+                f"for dimension '{dim}'; using full extent instead."
+            ),
+            UserWarning,
+            stacklevel=3,
+        )
+        return None
+
+    if np.all(mask):
+        return None
+
+    return mask
+
+
+def _apply_max_depth_limit(
+    yvals: np.ndarray,
+    field: np.ndarray,
+    *,
+    mask: np.ndarray | None,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Optionally clip vertical axis and field to a maximum depth/height."""
+    if mask is None:
+        return yvals, field
+    values = np.asarray(yvals)
+    return values[mask], field[mask, :]
+
+
 def _enforce_depth_convention(
     dim: str,
     yvals: np.ndarray,
@@ -76,10 +151,11 @@ def _plot_hovmuller_run(
         )
 
     da2 = da.transpose("time", dim)
-    yvals, _, _, level_units, is_depth_like = resolve_dimension_axis(da2, dim)
+    yvals_raw, axis_label_raw, _, level_units, is_depth_like = resolve_dimension_axis(da2, dim)
+    is_index_based_axis = axis_label_raw == f"{dim} index" or _is_index_like(np.asarray(yvals_raw))
     yvals, ylab, is_depth_like = _enforce_depth_convention(
         dim,
-        yvals,
+        yvals_raw,
         units=level_units,
         is_depth_like=is_depth_like,
     )
@@ -96,6 +172,17 @@ def _plot_hovmuller_run(
             stacklevel=3,
         )
     field = da2.transpose(dim, "time").values
+    mask = _max_depth_mask(
+        yvals,
+        max_depth_m=config.plots.hovmuller.max_depth_m,
+        dim=dim,
+        is_index_based_axis=is_index_based_axis,
+    )
+    yvals, field = _apply_max_depth_limit(
+        yvals,
+        field,
+        mask=mask,
+    )
 
     mesh = ax.pcolormesh(_plot_time(da2), yvals, field, shading="auto", cmap="viridis")
     cbar = fig.colorbar(mesh, ax=ax)
@@ -131,10 +218,11 @@ def _plot_hovmuller_comparison(
 
     base2 = da_base.transpose("time", dim)
     exp2 = da_exp.transpose("time", dim)
-    yvals, _, _, level_units, is_depth_like = resolve_dimension_axis(exp2, dim)
+    yvals_raw, axis_label_raw, _, level_units, is_depth_like = resolve_dimension_axis(exp2, dim)
+    is_index_based_axis = axis_label_raw == f"{dim} index" or _is_index_like(np.asarray(yvals_raw))
     yvals, ylab, is_depth_like = _enforce_depth_convention(
         dim,
-        yvals,
+        yvals_raw,
         units=level_units,
         is_depth_like=is_depth_like,
     )
@@ -153,6 +241,23 @@ def _plot_hovmuller_comparison(
 
     base_field = base2.transpose(dim, "time").values
     exp_field = exp2.transpose(dim, "time").values
+    mask = _max_depth_mask(
+        yvals,
+        max_depth_m=config.plots.hovmuller.max_depth_m,
+        dim=dim,
+        is_index_based_axis=is_index_based_axis,
+    )
+    yvals_full = yvals
+    yvals, base_field = _apply_max_depth_limit(
+        yvals_full,
+        base_field,
+        mask=mask,
+    )
+    _, exp_field = _apply_max_depth_limit(
+        yvals_full,
+        exp_field,
+        mask=mask,
+    )
     vmin = min(float(np.nanmin(base_field)), float(np.nanmin(exp_field)))
     vmax = max(float(np.nanmax(base_field)), float(np.nanmax(exp_field)))
 

@@ -349,6 +349,11 @@ report:
   metadata:
     show_run_info: true
     show_generation_timestamp: true
+
+plots:
+  hovmuller:
+    max_depth_m: null  # null keeps full vertical extent from source variable
+                      # set a float (meters) to cap plotted depth/height
 ```
 
 ## Command-Line Interface

@@ -6,9 +6,11 @@ from pathlib import Path
 import matplotlib
 import numpy as np
 import pytest
+import yaml
 
 matplotlib.use("Agg")
 
+from elm_diagnostics.config.schema import load_config
 from elm_diagnostics.io.run import Run
 from elm_diagnostics.plots import (
     plot_anomaly,
@@ -267,6 +269,79 @@ def test_hovmuller_levgrnd_index_fallback_still_depth_oriented():
         assert "Depth" in ax.get_ylabel()
         y0, y1 = ax.get_ylim()
         assert y0 > y1
+
+        run.close()
+
+    import matplotlib.pyplot as plt
+
+    plt.close("all")
+
+
+def test_hovmuller_max_depth_m_clips_when_coordinate_available():
+    """Configured max_depth_m should clip Hovmuller extent with physical coordinates."""
+    ds = make_vertical_profile_dataset(n_months=24, n_levels=10)
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        save_as_elm_files(ds, Path(tmpdir), casename="hov_max_depth_test", tape="h0")
+        run = Run(tmpdir)
+
+        cfg_default = load_config()
+        fig_full = plot_hovmuller(run, "SOILLIQ", config=cfg_default)
+        deep_full = max(fig_full.axes[0].get_ylim())
+
+        cfg_path = Path(tmpdir) / "cfg.yaml"
+        cfg_path.write_text(yaml.safe_dump({"plots": {"hovmuller": {"max_depth_m": 0.6}}}))
+        cfg_limited = load_config(path=cfg_path)
+        fig_limited = plot_hovmuller(run, "SOILLIQ", config=cfg_limited)
+        deep_limited = max(fig_limited.axes[0].get_ylim())
+
+        assert deep_limited < deep_full
+        assert deep_limited < 1.2
+
+        run.close()
+
+    import matplotlib.pyplot as plt
+
+    plt.close("all")
+
+
+def test_hovmuller_max_depth_m_warns_and_ignored_for_index_axis():
+    """Configured max_depth_m is ignored with warning when only index-like axis exists."""
+    n_months = 24
+    n_levels = 8
+    phase = np.linspace(0.0, 2.0 * np.pi, n_months)
+    profile = np.linspace(0.4, 1.2, n_levels)
+    data = np.sin(phase)[:, None] * profile[None, :]
+
+    ds = make_single_point_dataset(
+        start_year=2000,
+        n_months=n_months,
+        variables={
+            "SOILLIQ": {
+                "data": data,
+                "units": "kg/m2",
+                "cell_methods": "time: point",
+            }
+        },
+    )
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        save_as_elm_files(ds, Path(tmpdir), casename="hov_index_max_depth_test", tape="h0")
+        run = Run(tmpdir)
+
+        cfg_default = load_config()
+        fig_full = plot_hovmuller(run, "SOILLIQ", config=cfg_default)
+        deep_full = max(fig_full.axes[0].get_ylim())
+
+        cfg_path = Path(tmpdir) / "cfg.yaml"
+        cfg_path.write_text(yaml.safe_dump({"plots": {"hovmuller": {"max_depth_m": 0.3}}}))
+        cfg_limited = load_config(path=cfg_path)
+
+        with pytest.warns(UserWarning, match="max_depth_m=.*ignored"):
+            fig_limited = plot_hovmuller(run, "SOILLIQ", config=cfg_limited)
+        deep_limited = max(fig_limited.axes[0].get_ylim())
+
+        assert deep_limited == pytest.approx(deep_full)
 
         run.close()
 

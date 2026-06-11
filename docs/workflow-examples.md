@@ -148,6 +148,17 @@ run = Run("tests/fixtures/data")
 fig = plot_hovmuller(run, "SOILLIQ")
 fig.savefig("soilliq_hovmuller.png", dpi=300, bbox_inches="tight")
 ```
+
+Optional config to cap plotted depth/height extent:
+
+```yaml
+plots:
+    hovmuller:
+        max_depth_m: 3.0
+```
+
+If the plotted vertical axis is index-based (no coordinate variable to convert
+indices to physical depth/height), this setting is ignored with a warning.
 ax.legend()
 ax.grid(True, alpha=0.3)
 fig.savefig("gpp_trend.png", dpi=300, bbox_inches="tight")

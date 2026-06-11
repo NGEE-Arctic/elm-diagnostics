@@ -121,3 +121,18 @@ def test_invalid_envelope_rejected():
         f.flush()
         with pytest.raises(Exception):
             load_config(path=f.name)
+
+
+def test_hovmuller_max_depth_default_none():
+    config = load_config()
+    assert config.plots.hovmuller.max_depth_m is None
+
+
+def test_hovmuller_max_depth_override():
+    override = {"plots": {"hovmuller": {"max_depth_m": 2.5}}}
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
+        yaml.dump(override, f)
+        f.flush()
+        config = load_config(path=f.name)
+
+    assert config.plots.hovmuller.max_depth_m == 2.5

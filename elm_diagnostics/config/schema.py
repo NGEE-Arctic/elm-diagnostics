@@ -31,9 +31,14 @@ class ClimatologyConfig(BaseModel):
     envelope: Literal["minmax", "p10_p90", "std"] = "minmax"
 
 
+class HovmullerConfig(BaseModel):
+    max_depth_m: float | None = None
+
+
 class PlotsConfig(BaseModel):
     style: PlotStyleConfig = PlotStyleConfig()
     climatology: ClimatologyConfig = ClimatologyConfig()
+    hovmuller: HovmullerConfig = HovmullerConfig()
 
 
 class ThumbnailConfig(BaseModel):
