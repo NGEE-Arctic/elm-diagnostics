@@ -11,7 +11,7 @@ import yaml
 matplotlib.use("Agg")
 
 from elm_diagnostics.config.schema import load_config
-from elm_diagnostics.io.run import Run
+from elm_diagnostics.io.run import Comparison, Run
 from elm_diagnostics.plots import (
     plot_anomaly,
     plot_diurnal,
@@ -502,6 +502,197 @@ def test_hovmuller_title_includes_long_name_second_line():
         assert "\n" in ax_hov.get_title()
 
         run.close()
+
+    import matplotlib.pyplot as plt
+
+    plt.close("all")
+
+
+def test_hovmuller_color_limit_quantile_reduces_outlier_influence():
+    """Quantile color limits should reduce outlier-driven vmax."""
+    n_months = 24
+    n_levels = 10
+    phase = np.linspace(0.0, 2.0 * np.pi, n_months)
+    profile = np.linspace(0.5, 1.5, n_levels)
+    data = np.sin(phase)[:, None] * profile[None, :]
+    data[0, 0] = 500.0
+
+    ds = make_single_point_dataset(
+        start_year=2000,
+        n_months=n_months,
+        variables={
+            "SOILLIQ": {
+                "data": data,
+                "units": "kg/m2",
+                "cell_methods": "time: point",
+            }
+        },
+    )
+    ds = ds.assign_coords(levgrnd=np.linspace(0.02, 3.0, n_levels))
+    ds["levgrnd"].attrs["units"] = "m"
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        save_as_elm_files(ds, Path(tmpdir), casename="hov_quantile_color_test", tape="h0")
+        run = Run(tmpdir)
+
+        fig_full = plot_hovmuller(run, "SOILLIQ", config=load_config())
+        vmax_full = fig_full.axes[0].collections[0].get_clim()[1]
+
+        cfg_path = Path(tmpdir) / "cfg_quantile.yaml"
+        cfg_path.write_text(
+            yaml.safe_dump(
+                {
+                    "plots": {
+                        "hovmuller": {
+                            "color_limit_method": "quantile",
+                            "color_limit_quantile_low": 2.0,
+                            "color_limit_quantile_high": 98.0,
+                        }
+                    }
+                }
+            )
+        )
+        cfg_quantile = load_config(path=cfg_path)
+        fig_quantile = plot_hovmuller(run, "SOILLIQ", config=cfg_quantile)
+        vmax_quantile = fig_quantile.axes[0].collections[0].get_clim()[1]
+
+        assert vmax_quantile < vmax_full
+
+        run.close()
+
+    import matplotlib.pyplot as plt
+
+    plt.close("all")
+
+
+def test_hovmuller_color_limit_sigma_clip_reduces_outlier_influence():
+    """Sigma-clip color limits should reduce outlier-driven vmax."""
+    n_months = 24
+    n_levels = 10
+    phase = np.linspace(0.0, 2.0 * np.pi, n_months)
+    profile = np.linspace(0.5, 1.5, n_levels)
+    data = np.sin(phase)[:, None] * profile[None, :]
+    data[0, 0] = 500.0
+
+    ds = make_single_point_dataset(
+        start_year=2000,
+        n_months=n_months,
+        variables={
+            "SOILLIQ": {
+                "data": data,
+                "units": "kg/m2",
+                "cell_methods": "time: point",
+            }
+        },
+    )
+    ds = ds.assign_coords(levgrnd=np.linspace(0.02, 3.0, n_levels))
+    ds["levgrnd"].attrs["units"] = "m"
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        save_as_elm_files(ds, Path(tmpdir), casename="hov_sigma_color_test", tape="h0")
+        run = Run(tmpdir)
+
+        fig_full = plot_hovmuller(run, "SOILLIQ", config=load_config())
+        vmax_full = fig_full.axes[0].collections[0].get_clim()[1]
+
+        cfg_path = Path(tmpdir) / "cfg_sigma.yaml"
+        cfg_path.write_text(
+            yaml.safe_dump(
+                {
+                    "plots": {
+                        "hovmuller": {
+                            "color_limit_method": "sigma_clip",
+                            "color_limit_sigma": 2.0,
+                        }
+                    }
+                }
+            )
+        )
+        cfg_sigma = load_config(path=cfg_path)
+        fig_sigma = plot_hovmuller(run, "SOILLIQ", config=cfg_sigma)
+        vmax_sigma = fig_sigma.axes[0].collections[0].get_clim()[1]
+
+        assert vmax_sigma < vmax_full
+
+        run.close()
+
+    import matplotlib.pyplot as plt
+
+    plt.close("all")
+
+
+def test_hovmuller_comparison_uses_shared_color_limits_with_robust_method():
+    """Comparison Hovmuller panels should share vmin/vmax under robust scaling."""
+    n_months = 24
+    n_levels = 10
+    phase = np.linspace(0.0, 2.0 * np.pi, n_months)
+    profile = np.linspace(0.5, 1.5, n_levels)
+    base_data = np.sin(phase)[:, None] * profile[None, :]
+    exp_data = 1.2 * base_data
+    exp_data[1, 1] = 700.0
+
+    base_ds = make_single_point_dataset(
+        start_year=2000,
+        n_months=n_months,
+        variables={
+            "SOILLIQ": {
+                "data": base_data,
+                "units": "kg/m2",
+                "cell_methods": "time: point",
+            }
+        },
+    )
+    exp_ds = make_single_point_dataset(
+        start_year=2000,
+        n_months=n_months,
+        variables={
+            "SOILLIQ": {
+                "data": exp_data,
+                "units": "kg/m2",
+                "cell_methods": "time: point",
+            }
+        },
+    )
+    lev = np.linspace(0.02, 3.0, n_levels)
+    base_ds = base_ds.assign_coords(levgrnd=lev)
+    exp_ds = exp_ds.assign_coords(levgrnd=lev)
+    base_ds["levgrnd"].attrs["units"] = "m"
+    exp_ds["levgrnd"].attrs["units"] = "m"
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        base_dir = Path(tmpdir) / "base"
+        exp_dir = Path(tmpdir) / "exp"
+        save_as_elm_files(base_ds, base_dir, casename="base_case", tape="h0")
+        save_as_elm_files(exp_ds, exp_dir, casename="exp_case", tape="h0")
+
+        base_run = Run(base_dir)
+        exp_run = Run(exp_dir)
+        comp = Comparison(base_run, exp_run)
+
+        cfg_path = Path(tmpdir) / "cfg_comp_quantile.yaml"
+        cfg_path.write_text(
+            yaml.safe_dump(
+                {
+                    "plots": {
+                        "hovmuller": {
+                            "color_limit_method": "quantile",
+                            "color_limit_quantile_low": 2.0,
+                            "color_limit_quantile_high": 98.0,
+                        }
+                    }
+                }
+            )
+        )
+        cfg_quantile = load_config(path=cfg_path)
+
+        fig = plot_hovmuller(comp, "SOILLIQ", config=cfg_quantile)
+        clim_base = fig.axes[0].collections[0].get_clim()
+        clim_exp = fig.axes[1].collections[0].get_clim()
+
+        assert clim_base == pytest.approx(clim_exp)
+
+        base_run.close()
+        exp_run.close()
 
     import matplotlib.pyplot as plt
 

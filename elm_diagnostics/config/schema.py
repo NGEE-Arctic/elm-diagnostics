@@ -33,6 +33,10 @@ class ClimatologyConfig(BaseModel):
 
 class HovmullerConfig(BaseModel):
     max_depth_m: float | None = None
+    color_limit_method: Literal["full_range", "quantile", "sigma_clip"] = "full_range"
+    color_limit_quantile_low: float = Field(default=2.0, ge=0.0, le=100.0)
+    color_limit_quantile_high: float = Field(default=98.0, ge=0.0, le=100.0)
+    color_limit_sigma: float = Field(default=2.0, gt=0.0)
 
 
 class PlotsConfig(BaseModel):

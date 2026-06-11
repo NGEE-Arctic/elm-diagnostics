@@ -36,6 +36,70 @@ def _is_index_like(values: np.ndarray) -> bool:
     return np.allclose(values.astype(float), idx.astype(float), rtol=0.0, atol=1e-12)
 
 
+def _compute_color_limits(
+    values: np.ndarray,
+    *,
+    method: str,
+    q_low: float,
+    q_high: float,
+    sigma_count: float,
+) -> tuple[float, float] | None:
+    """Compute vmin/vmax using the configured color-limit method."""
+    arr = np.asarray(values, dtype=float).ravel()
+    finite = arr[np.isfinite(arr)]
+    if finite.size == 0:
+        return None
+
+    vmin_full = float(np.min(finite))
+    vmax_full = float(np.max(finite))
+    if not np.isfinite(vmin_full) or not np.isfinite(vmax_full) or vmin_full == vmax_full:
+        return None
+
+    if method == "full_range":
+        return vmin_full, vmax_full
+
+    if method == "quantile":
+        if q_low >= q_high:
+            warnings.warn(
+                (
+                    "plots.hovmuller.color_limit_quantile_low must be less than "
+                    "color_limit_quantile_high; using full_range instead."
+                ),
+                UserWarning,
+                stacklevel=3,
+            )
+            return vmin_full, vmax_full
+        vmin = float(np.nanpercentile(finite, q_low))
+        vmax = float(np.nanpercentile(finite, q_high))
+    elif method == "sigma_clip":
+        mean = float(np.nanmean(finite))
+        std = float(np.nanstd(finite))
+        if not np.isfinite(std) or std <= 0.0:
+            return vmin_full, vmax_full
+        vmin = mean - float(sigma_count) * std
+        vmax = mean + float(sigma_count) * std
+    else:
+        warnings.warn(
+            f"Unknown plots.hovmuller.color_limit_method='{method}'; using full_range.",
+            UserWarning,
+            stacklevel=3,
+        )
+        return vmin_full, vmax_full
+
+    if not np.isfinite(vmin) or not np.isfinite(vmax) or vmin >= vmax:
+        warnings.warn(
+            (
+                f"Unable to compute valid Hovmuller color limits using method '{method}'; "
+                "using full_range instead."
+            ),
+            UserWarning,
+            stacklevel=3,
+        )
+        return vmin_full, vmax_full
+
+    return float(vmin), float(vmax)
+
+
 def _max_depth_mask(
     yvals: np.ndarray,
     *,
@@ -191,7 +255,19 @@ def _plot_hovmuller_run(
         mask=mask,
     )
 
-    mesh = ax.pcolormesh(_plot_time(da2), yvals, field, shading="auto", cmap="viridis")
+    clim = _compute_color_limits(
+        field,
+        method=config.plots.hovmuller.color_limit_method,
+        q_low=config.plots.hovmuller.color_limit_quantile_low,
+        q_high=config.plots.hovmuller.color_limit_quantile_high,
+        sigma_count=config.plots.hovmuller.color_limit_sigma,
+    )
+    mesh_kwargs = {"shading": "auto", "cmap": "viridis"}
+    if clim is not None:
+        mesh_kwargs["vmin"] = clim[0]
+        mesh_kwargs["vmax"] = clim[1]
+
+    mesh = ax.pcolormesh(_plot_time(da2), yvals, field, **mesh_kwargs)
     cbar = fig.colorbar(mesh, ax=ax)
     units = str(da.attrs.get("units", "")).strip()
     cbar.set_label(units)
@@ -265,11 +341,20 @@ def _plot_hovmuller_comparison(
         exp_field,
         mask=mask,
     )
-    vmin = min(float(np.nanmin(base_field)), float(np.nanmin(exp_field)))
-    vmax = max(float(np.nanmax(base_field)), float(np.nanmax(exp_field)))
+    clim = _compute_color_limits(
+        np.concatenate([base_field.ravel(), exp_field.ravel()]),
+        method=config.plots.hovmuller.color_limit_method,
+        q_low=config.plots.hovmuller.color_limit_quantile_low,
+        q_high=config.plots.hovmuller.color_limit_quantile_high,
+        sigma_count=config.plots.hovmuller.color_limit_sigma,
+    )
+    mesh_kwargs = {"shading": "auto", "cmap": "viridis"}
+    if clim is not None:
+        mesh_kwargs["vmin"] = clim[0]
+        mesh_kwargs["vmax"] = clim[1]
 
-    mesh_base = axes[0].pcolormesh(_plot_time(base2), yvals, base_field, shading="auto", cmap="viridis", vmin=vmin, vmax=vmax)
-    mesh_exp = axes[1].pcolormesh(_plot_time(exp2), yvals, exp_field, shading="auto", cmap="viridis", vmin=vmin, vmax=vmax)
+    mesh_base = axes[0].pcolormesh(_plot_time(base2), yvals, base_field, **mesh_kwargs)
+    mesh_exp = axes[1].pcolormesh(_plot_time(exp2), yvals, exp_field, **mesh_kwargs)
 
     units = str(da_exp.attrs.get("units", "")).strip()
     cbar0 = fig.colorbar(mesh_base, ax=axes[0])
