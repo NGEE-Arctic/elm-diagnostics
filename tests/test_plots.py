@@ -86,6 +86,7 @@ def test_timeseries_vertical_depth_coloring_and_legend():
         },
     )
     ds = ds.assign_coords(levgrnd=np.linspace(0.02, 3.0, n_levels))
+    ds["levgrnd"].attrs["units"] = "m"
 
     with tempfile.TemporaryDirectory() as tmpdir:
         save_as_elm_files(ds, Path(tmpdir), casename="vertical_plot_test", tape="h0")
@@ -133,6 +134,7 @@ def test_seasonal_vertical_depth_coloring_and_legend():
         },
     )
     ds = ds.assign_coords(levgrnd=np.linspace(0.02, 3.0, n_levels))
+    ds["levgrnd"].attrs["units"] = "m"
 
     with tempfile.TemporaryDirectory() as tmpdir:
         save_as_elm_files(ds, Path(tmpdir), casename="vertical_seasonal_test", tape="h0")
@@ -143,6 +145,8 @@ def test_seasonal_vertical_depth_coloring_and_legend():
         assert len(ax.lines) == n_levels
         assert ax.get_legend() is not None
         assert len(ax.get_legend().get_texts()) <= 8
+        legend_texts = [txt.get_text() for txt in ax.get_legend().get_texts()]
+        assert any(" m" in txt for txt in legend_texts)
 
         run.close()
 
