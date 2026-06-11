@@ -17,6 +17,43 @@ from elm_diagnostics.plots.dimension_helpers import (
     squeeze_spatial_dims,
 )
 
+_DEPTH_DIMS = {"levgrnd", "levsoi"}
+
+
+def _enforce_depth_convention(
+    dim: str,
+    yvals: np.ndarray,
+    *,
+    units: str,
+    is_depth_like: bool,
+) -> tuple[np.ndarray, str, bool]:
+    """Force levgrnd/levsoi axes to be depth-from-top coordinates.
+
+    For these dimensions, 0 must be at the top and values must increase
+    downward whether the source is a physical coordinate or layer indices.
+    """
+    if dim not in _DEPTH_DIMS:
+        label = "Depth" if is_depth_like else dim
+        if units:
+            label = f"{label} ({units})"
+        return yvals, label, is_depth_like
+
+    values = np.asarray(yvals)
+    if values.ndim != 1 or not np.issubdtype(values.dtype, np.number):
+        values = np.arange(values.size)
+    values = values.astype(float, copy=False)
+
+    # Convert negative-down conventions to positive depth, then rebase to zero.
+    if np.all(np.isfinite(values)) and np.nanmax(values) <= 0.0:
+        values = np.abs(values)
+    min_val = float(np.nanmin(values)) if values.size > 0 else 0.0
+    values = values - min_val
+
+    label = "Depth"
+    if units:
+        label = f"{label} ({units})"
+    return values, label, True
+
 
 def _plot_hovmuller_run(
     run: Run,
@@ -39,8 +76,20 @@ def _plot_hovmuller_run(
         )
 
     da2 = da.transpose("time", dim)
-    yvals, ylab, _, _, is_depth_like = resolve_dimension_axis(da2, dim, run=run)
-    if ylab.endswith(" index"):
+    yvals, _, _, level_units, is_depth_like = resolve_dimension_axis(da2, dim, run=run)
+    yvals, ylab, is_depth_like = _enforce_depth_convention(
+        dim,
+        yvals,
+        units=level_units,
+        is_depth_like=is_depth_like,
+    )
+    if level_units == "" and dim in _DEPTH_DIMS:
+        warnings.warn(
+            f"No explicit depth units found for dimension '{dim}'; using raw values.",
+            UserWarning,
+            stacklevel=3,
+        )
+    elif ylab.endswith(" index"):
         warnings.warn(
             f"No coordinate found for dimension '{dim}'; using index values.",
             UserWarning,
@@ -82,8 +131,20 @@ def _plot_hovmuller_comparison(
 
     base2 = da_base.transpose("time", dim)
     exp2 = da_exp.transpose("time", dim)
-    yvals, ylab, _, _, is_depth_like = resolve_dimension_axis(exp2, dim, run=source.experiment)
-    if ylab.endswith(" index"):
+    yvals, _, _, level_units, is_depth_like = resolve_dimension_axis(exp2, dim, run=source.experiment)
+    yvals, ylab, is_depth_like = _enforce_depth_convention(
+        dim,
+        yvals,
+        units=level_units,
+        is_depth_like=is_depth_like,
+    )
+    if level_units == "" and dim in _DEPTH_DIMS:
+        warnings.warn(
+            f"No explicit depth units found for dimension '{dim}'; using raw values.",
+            UserWarning,
+            stacklevel=3,
+        )
+    elif ylab.endswith(" index"):
         warnings.warn(
             f"No coordinate found for dimension '{dim}'; using index values.",
             UserWarning,

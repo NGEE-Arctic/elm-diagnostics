@@ -214,6 +214,67 @@ def test_hovmuller_vertical_uses_depth_axis():
     plt.close("all")
 
 
+def test_hovmuller_levgrnd_has_zero_top_and_downward_depth():
+    """levgrnd Hovmuller should use depth with 0 at top, increasing downward."""
+    ds = make_vertical_profile_dataset(n_months=24, n_levels=10)
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        save_as_elm_files(ds, Path(tmpdir), casename="hov_depth_test", tape="h0")
+        run = Run(tmpdir)
+
+        fig = plot_hovmuller(run, "SOILLIQ")
+        ax = fig.axes[0]
+
+        assert "Depth" in ax.get_ylabel()
+        # Inverted axis means smaller values (near zero depth) appear at the top.
+        y0, y1 = ax.get_ylim()
+        assert y0 > y1
+
+        run.close()
+
+    import matplotlib.pyplot as plt
+
+    plt.close("all")
+
+
+def test_hovmuller_levgrnd_index_fallback_still_depth_oriented():
+    """If levgrnd uses indices only, Hovmuller should still be depth-oriented."""
+    n_months = 24
+    n_levels = 8
+    phase = np.linspace(0.0, 2.0 * np.pi, n_months)
+    profile = np.linspace(0.4, 1.2, n_levels)
+    data = np.sin(phase)[:, None] * profile[None, :]
+
+    ds = make_single_point_dataset(
+        start_year=2000,
+        n_months=n_months,
+        variables={
+            "SOILLIQ": {
+                "data": data,
+                "units": "kg/m2",
+                "cell_methods": "time: point",
+            }
+        },
+    )
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        save_as_elm_files(ds, Path(tmpdir), casename="hov_index_test", tape="h0")
+        run = Run(tmpdir)
+
+        fig = plot_hovmuller(run, "SOILLIQ")
+        ax = fig.axes[0]
+
+        assert "Depth" in ax.get_ylabel()
+        y0, y1 = ax.get_ylim()
+        assert y0 > y1
+
+        run.close()
+
+    import matplotlib.pyplot as plt
+
+    plt.close("all")
+
+
 def test_general_additional_dimension_supports_non_vertical_names():
     """Expanded plotting should work for any additional non-space dimension."""
     n_months = 24
