@@ -51,13 +51,17 @@ def _plot_multilevel_lines(
         return None
 
     n_levels = da.sizes[dim]
-    level_values, _, level_name, _ = resolve_dimension_axis(da, dim, run=run)
+    level_values, _, level_name, level_units, _ = resolve_dimension_axis(da, dim, run=run)
     legend_idx = _legend_level_indices(n_levels, max_entries=legend_max_entries)
     cmap = plt.get_cmap("viridis")
 
     for i in range(n_levels):
         fraction = i / max(n_levels - 1, 1)
-        line_label = format_level_label(level_values[i], level_name) if i in legend_idx else "_nolegend_"
+        line_label = (
+            format_level_label(level_values[i], level_name, units=level_units)
+            if i in legend_idx
+            else "_nolegend_"
+        )
         ax.plot(
             _plot_time(da),
             da.isel({dim: i}).values,

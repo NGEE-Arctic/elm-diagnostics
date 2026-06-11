@@ -112,7 +112,7 @@ def resolve_dimension_axis(
     dim: str,
     *,
     run: Run | None = None,
-) -> tuple[np.ndarray, str, str, bool]:
+) -> tuple[np.ndarray, str, str, str, bool]:
     """Resolve axis values/labels for an additional dimension.
 
     Returns
@@ -120,6 +120,7 @@ def resolve_dimension_axis(
     values : np.ndarray
     axis_label : str
     level_name : str
+    level_units : str
     is_depth_like : bool
     """
     candidates = _coord_candidates_from_dataarray(da, dim)
@@ -127,7 +128,7 @@ def resolve_dimension_axis(
         candidates.extend(_coord_candidates_from_run(run, dim, da.sizes[dim]))
 
     if not candidates:
-        return np.arange(da.sizes[dim]), f"{dim} index", dim, False
+        return np.arange(da.sizes[dim]), f"{dim} index", dim, "", False
 
     best_name, best_coord = max(
         candidates,
@@ -138,12 +139,13 @@ def resolve_dimension_axis(
     attrs = best_coord.attrs
     units = str(attrs.get("units", "")).strip()
     positive = str(attrs.get("positive", "")).lower().strip()
+    long_name = str(attrs.get("long_name", attrs.get("standard_name", ""))).strip()
 
-    long_name = str(attrs.get("long_name", attrs.get("standard_name", ""))).lower()
+    long_name_lower = long_name.lower()
     is_depth_like = (
         positive in ("up", "down")
         or "depth" in best_name.lower()
-        or "depth" in long_name
+        or "depth" in long_name_lower
         or best_name.lower().startswith("z")
     )
 
@@ -157,24 +159,25 @@ def resolve_dimension_axis(
         values = np.abs(values)
 
     if positive == "up":
-        axis_label = "Height"
+        axis_label = long_name or "Height"
     elif is_depth_like:
-        axis_label = "Depth"
+        axis_label = long_name or "Depth"
     else:
-        axis_label = best_name
+        axis_label = long_name or best_name
 
     if units:
         axis_label = f"{axis_label} ({units})"
 
-    return values, axis_label, best_name, is_depth_like
+    return values, axis_label, best_name, units, is_depth_like
 
 
-def format_level_label(level_value: object, level_name: str) -> str:
+def format_level_label(level_value: object, level_name: str, units: str = "") -> str:
     """Format legend label for one coordinate level."""
+    suffix = f" {units}" if units else ""
     try:
         numeric = float(level_value)
         if np.isfinite(numeric):
-            return f"{level_name}={numeric:.3g}"
+            return f"{level_name}={numeric:.3g}{suffix}"
     except (TypeError, ValueError):
         pass
-    return f"{level_name}={level_value}"
+    return f"{level_name}={level_value}{suffix}"

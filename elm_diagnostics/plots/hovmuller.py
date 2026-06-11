@@ -39,7 +39,7 @@ def _plot_hovmuller_run(
         )
 
     da2 = da.transpose("time", dim)
-    yvals, ylab, _, is_depth_like = resolve_dimension_axis(da2, dim, run=run)
+    yvals, ylab, _, _, is_depth_like = resolve_dimension_axis(da2, dim, run=run)
     if ylab.endswith(" index"):
         warnings.warn(
             f"No coordinate found for dimension '{dim}'; using index values.",
@@ -82,7 +82,7 @@ def _plot_hovmuller_comparison(
 
     base2 = da_base.transpose("time", dim)
     exp2 = da_exp.transpose("time", dim)
-    yvals, ylab, _, is_depth_like = resolve_dimension_axis(exp2, dim, run=source.experiment)
+    yvals, ylab, _, _, is_depth_like = resolve_dimension_axis(exp2, dim, run=source.experiment)
     if ylab.endswith(" index"):
         warnings.warn(
             f"No coordinate found for dimension '{dim}'; using index values.",

@@ -50,7 +50,7 @@ def _plot_multilevel_seasonal_lines(
         return None
 
     n_levels = mean_da.sizes[dim]
-    level_values, _, level_name, _ = resolve_dimension_axis(mean_da, dim, run=run)
+    level_values, _, level_name, _, _ = resolve_dimension_axis(mean_da, dim, run=run)
     legend_idx = _legend_level_indices(n_levels, max_entries=legend_max_entries)
     cmap = plt.get_cmap("viridis")
 
