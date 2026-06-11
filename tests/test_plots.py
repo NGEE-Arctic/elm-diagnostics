@@ -212,3 +212,53 @@ def test_hovmuller_vertical_uses_depth_axis():
     import matplotlib.pyplot as plt
 
     plt.close("all")
+
+
+def test_general_additional_dimension_supports_non_vertical_names():
+    """Expanded plotting should work for any additional non-space dimension."""
+    n_months = 24
+    n_levels = 9
+    phase = np.linspace(0.0, 2.0 * np.pi, n_months)
+    profile = np.linspace(0.4, 1.2, n_levels)
+    data = np.sin(phase)[:, None] * profile[None, :]
+
+    ds = make_single_point_dataset(
+        start_year=2000,
+        n_months=n_months,
+        variables={
+            "LAYER_VAR": {
+                "data": data,
+                "units": "kg/m2",
+                "cell_methods": "time: point",
+            }
+        },
+    )
+    ds = ds.rename({"levgrnd": "layer"})
+    ds = ds.assign_coords(layer_depth=("layer", np.linspace(0.05, 2.5, n_levels)))
+    ds["layer_depth"].attrs["units"] = "m"
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        save_as_elm_files(ds, Path(tmpdir), casename="layered_test", tape="h0")
+        run = Run(tmpdir)
+
+        fig_ts = plot_timeseries(run, "LAYER_VAR")
+        ax_ts = fig_ts.axes[0]
+        assert len(ax_ts.lines) == n_levels
+        assert ax_ts.get_legend() is not None
+        legend_texts = [txt.get_text() for txt in ax_ts.get_legend().get_texts()]
+        assert any("layer_depth=" in txt for txt in legend_texts)
+
+        fig_seasonal = plot_seasonal(run, "LAYER_VAR")
+        ax_seasonal = fig_seasonal.axes[0]
+        assert len(ax_seasonal.lines) == n_levels
+
+        fig_hov = plot_hovmuller(run, "LAYER_VAR")
+        ax_hov = fig_hov.axes[0]
+        assert ax_hov.collections
+        assert "Depth" in ax_hov.get_ylabel()
+
+        run.close()
+
+    import matplotlib.pyplot as plt
+
+    plt.close("all")

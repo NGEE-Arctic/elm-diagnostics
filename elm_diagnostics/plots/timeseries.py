@@ -13,16 +13,12 @@ from elm_diagnostics.config.schema import Config, load_config
 from elm_diagnostics.io.run import Comparison, Run
 from elm_diagnostics.io.subgrid import SubgridLevel
 from elm_diagnostics.plots.climatology import compute_climo_stats
-
-_VERTICAL_DIMS = ("levgrnd", "levsoi", "levdcmp", "levlak", "levsno")
-
-
-def _get_vertical_dim(da: xr.DataArray) -> str | None:
-    """Return the first recognized vertical dimension in a data array."""
-    for dim in _VERTICAL_DIMS:
-        if dim in da.dims and da.sizes[dim] > 1:
-            return dim
-    return None
+from elm_diagnostics.plots.dimension_helpers import (
+    detect_additional_dimension,
+    format_level_label,
+    resolve_dimension_axis,
+    squeeze_spatial_dims,
+)
 
 
 def _legend_level_indices(n_levels: int, max_entries: int = 8) -> set[int]:
@@ -33,63 +29,45 @@ def _legend_level_indices(n_levels: int, max_entries: int = 8) -> set[int]:
     return set(idx.tolist())
 
 
-def _format_depth_label(level_value: object, vdim: str) -> str:
-    """Format a compact depth label for legend entries."""
-    try:
-        numeric = float(level_value)
-        if np.isfinite(numeric):
-            return f"{vdim}={numeric:.3g}"
-    except (TypeError, ValueError):
-        pass
-    return f"{vdim}={level_value}"
-
-
-def _plot_vertical_lines(
+def _plot_multilevel_lines(
     ax: plt.Axes,
     da: xr.DataArray,
     *,
+    run: Run | None = None,
     linestyle: str = "-",
     alpha: float = 1.0,
     legend_max_entries: int = 8,
-) -> bool:
-    """Plot one line per vertical level with colormap progression.
+) -> str | None:
+    """Plot one line per additional-dimension level with colormap progression.
 
     Returns
     -------
-    bool
-        True if the variable had a vertical dimension and was plotted as
-        multiple depth lines. False when variable is not vertically resolved.
+    str or None
+        Name of the expanded dimension if multi-level plotting was used,
+        otherwise None.
     """
-    vdim = _get_vertical_dim(da)
-    if vdim is None:
-        return False
+    dim = detect_additional_dimension(da)
+    if dim is None:
+        return None
 
-    n_levels = da.sizes[vdim]
-    level_values = da.coords[vdim].values if vdim in da.coords else np.arange(n_levels)
+    n_levels = da.sizes[dim]
+    level_values, _, level_name, _ = resolve_dimension_axis(da, dim, run=run)
     legend_idx = _legend_level_indices(n_levels, max_entries=legend_max_entries)
     cmap = plt.get_cmap("viridis")
 
     for i in range(n_levels):
         fraction = i / max(n_levels - 1, 1)
-        line_label = _format_depth_label(level_values[i], vdim) if i in legend_idx else "_nolegend_"
+        line_label = format_level_label(level_values[i], level_name) if i in legend_idx else "_nolegend_"
         ax.plot(
             _plot_time(da),
-            da.isel({vdim: i}).values,
+            da.isel({dim: i}).values,
             color=cmap(fraction),
             linestyle=linestyle,
             alpha=alpha,
             label=line_label,
         )
 
-    return True
-
-
-def _squeeze_spatial(da: xr.DataArray) -> xr.DataArray:
-    """Squeeze singleton spatial dims (lat/lon/lndgrid/gridcell)."""
-    for dim in ("lat", "lon", "lndgrid", "gridcell"):
-        if dim in da.dims and da.sizes[dim] == 1:
-            da = da.squeeze(dim, drop=True)
-    return da
+    return dim
 
 
 def plot_timeseries(
@@ -169,14 +147,15 @@ def _plot_timeseries_single(
         fig = ax.figure
 
     if isinstance(source, Comparison):
-        da_base = _squeeze_spatial(source.base.get(varname))
-        da_exp = _squeeze_spatial(source.experiment.get(varname))
-        has_vertical = _plot_vertical_lines(ax, da_exp, linestyle="-", alpha=1.0)
-        if has_vertical:
+        da_base = squeeze_spatial_dims(source.base.get(varname))
+        da_exp = squeeze_spatial_dims(source.experiment.get(varname))
+        level_dim = _plot_multilevel_lines(ax, da_exp, run=source.experiment, linestyle="-", alpha=1.0)
+        if level_dim is not None:
             # Overlay base as dashed lines with same depth colormap.
-            _plot_vertical_lines(
+            _plot_multilevel_lines(
                 ax,
                 da_base,
+                run=source.base,
                 linestyle="--",
                 alpha=0.7,
                 legend_max_entries=0,
@@ -184,7 +163,7 @@ def _plot_timeseries_single(
             depth_legend = ax.legend(
                 loc="upper right",
                 fontsize="x-small",
-                title="Depth levels",
+                title=f"{level_dim} levels",
             )
             ax.add_artist(depth_legend)
             run_handles = [
@@ -209,10 +188,10 @@ def _plot_timeseries_single(
             ax.legend(loc="best", fontsize="small")
         units = da_base.attrs.get("units", "")
     else:
-        da = _squeeze_spatial(source.get(varname))
-        has_vertical = _plot_vertical_lines(ax, da)
-        if has_vertical:
-            ax.legend(loc="best", fontsize="x-small", title="Depth levels")
+        da = squeeze_spatial_dims(source.get(varname))
+        level_dim = _plot_multilevel_lines(ax, da, run=source)
+        if level_dim is not None:
+            ax.legend(loc="best", fontsize="x-small", title=f"{level_dim} levels")
         else:
             ax.plot(_plot_time(da), da.values, color="tab:blue")
 
@@ -276,14 +255,21 @@ def _plot_timeseries_faceted(
     # Plot each subgrid unit
     for unit_id, ax_i in zip(units, axes.flat):
         if isinstance(source, Comparison):
-            da_base_unit = _squeeze_spatial(da_base.sel({by: unit_id}))
-            da_exp_unit = _squeeze_spatial(da_exp.sel({by: unit_id}))
+            da_base_unit = squeeze_spatial_dims(da_base.sel({by: unit_id}))
+            da_exp_unit = squeeze_spatial_dims(da_exp.sel({by: unit_id}))
 
-            has_vertical = _plot_vertical_lines(ax_i, da_exp_unit, linestyle="-", alpha=1.0)
-            if has_vertical:
-                _plot_vertical_lines(
+            level_dim = _plot_multilevel_lines(
+                ax_i,
+                da_exp_unit,
+                run=source.experiment,
+                linestyle="-",
+                alpha=1.0,
+            )
+            if level_dim is not None:
+                _plot_multilevel_lines(
                     ax_i,
                     da_base_unit,
+                    run=source.base,
                     linestyle="--",
                     alpha=0.7,
                     legend_max_entries=0,
@@ -292,7 +278,7 @@ def _plot_timeseries_faceted(
                     depth_legend = ax_i.legend(
                         loc="upper right",
                         fontsize="xx-small",
-                        title="Depth levels",
+                        title=f"{level_dim} levels",
                     )
                     ax_i.add_artist(depth_legend)
                     run_handles = [
@@ -318,11 +304,11 @@ def _plot_timeseries_faceted(
 
             units_str = da_base.attrs.get("units", "")
         else:
-            da_unit = _squeeze_spatial(da.sel({by: unit_id}))
-            has_vertical = _plot_vertical_lines(ax_i, da_unit)
-            if has_vertical and unit_id == units[0]:
-                ax_i.legend(loc="best", fontsize="xx-small", title="Depth levels")
-            if not has_vertical:
+            da_unit = squeeze_spatial_dims(da.sel({by: unit_id}))
+            level_dim = _plot_multilevel_lines(ax_i, da_unit, run=source)
+            if level_dim is not None and unit_id == units[0]:
+                ax_i.legend(loc="best", fontsize="xx-small", title=f"{level_dim} levels")
+            if level_dim is None:
                 ax_i.plot(_plot_time(da_unit), da_unit.values, color="tab:blue")
 
                 # Climatology envelope

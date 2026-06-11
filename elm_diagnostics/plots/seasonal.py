@@ -12,18 +12,15 @@ from elm_diagnostics.config.schema import Config, load_config
 from elm_diagnostics.io.run import Comparison, Run
 from elm_diagnostics.io.subgrid import SubgridLevel
 from elm_diagnostics.plots.climatology import compute_climo_stats
+from elm_diagnostics.plots.dimension_helpers import (
+    detect_additional_dimension,
+    format_level_label,
+    resolve_dimension_axis,
+    squeeze_spatial_dims,
+)
 
 
 _MONTH_LABELS = ["J", "F", "M", "A", "M", "J", "J", "A", "S", "O", "N", "D"]
-_VERTICAL_DIMS = ("levgrnd", "levsoi", "levdcmp", "levlak", "levsno")
-
-
-def _get_vertical_dim(da: xr.DataArray) -> str | None:
-    """Return the first recognized vertical dimension in a data array."""
-    for dim in _VERTICAL_DIMS:
-        if dim in da.dims and da.sizes[dim] > 1:
-            return dim
-    return None
 
 
 def _legend_level_indices(n_levels: int, max_entries: int = 8) -> set[int]:
@@ -36,43 +33,33 @@ def _legend_level_indices(n_levels: int, max_entries: int = 8) -> set[int]:
     return set(idx.tolist())
 
 
-def _format_depth_label(level_value: object, vdim: str) -> str:
-    """Format compact level labels for depth legends."""
-    try:
-        numeric = float(level_value)
-        if np.isfinite(numeric):
-            return f"{vdim}={numeric:.3g}"
-    except (TypeError, ValueError):
-        pass
-    return f"{vdim}={level_value}"
-
-
-def _plot_vertical_seasonal_lines(
+def _plot_multilevel_seasonal_lines(
     ax: plt.Axes,
     months: np.ndarray,
     mean_da: xr.DataArray,
     *,
+    run: Run | None = None,
     linestyle: str = "-",
     alpha: float = 1.0,
     linewidth: float = 2.0,
     legend_max_entries: int = 8,
-) -> bool:
-    """Plot one seasonal line per depth level when variable is vertical."""
-    vdim = _get_vertical_dim(mean_da)
-    if vdim is None:
-        return False
+) -> str | None:
+    """Plot one seasonal line per additional-dimension level."""
+    dim = detect_additional_dimension(mean_da, excluded_dims=("month",))
+    if dim is None:
+        return None
 
-    n_levels = mean_da.sizes[vdim]
-    level_values = mean_da.coords[vdim].values if vdim in mean_da.coords else np.arange(n_levels)
+    n_levels = mean_da.sizes[dim]
+    level_values, _, level_name, _ = resolve_dimension_axis(mean_da, dim, run=run)
     legend_idx = _legend_level_indices(n_levels, max_entries=legend_max_entries)
     cmap = plt.get_cmap("viridis")
 
     for i in range(n_levels):
         fraction = i / max(n_levels - 1, 1)
-        line_label = _format_depth_label(level_values[i], vdim) if i in legend_idx else "_nolegend_"
+        line_label = format_level_label(level_values[i], level_name) if i in legend_idx else "_nolegend_"
         ax.plot(
             months,
-            mean_da.isel({vdim: i}).values,
+            mean_da.isel({dim: i}).values,
             color=cmap(fraction),
             linestyle=linestyle,
             alpha=alpha,
@@ -80,15 +67,7 @@ def _plot_vertical_seasonal_lines(
             label=line_label,
         )
 
-    return True
-
-
-def _squeeze_spatial(da: xr.DataArray) -> xr.DataArray:
-    """Squeeze singleton spatial dims (lat/lon/lndgrid/gridcell)."""
-    for dim in ("lat", "lon", "lndgrid", "gridcell"):
-        if dim in da.dims and da.sizes[dim] == 1:
-            da = da.squeeze(dim, drop=True)
-    return da
+    return dim
 
 
 def _seasonal_stats(
@@ -184,8 +163,8 @@ def _plot_seasonal_single(
     months = np.arange(1, 13)
 
     if isinstance(source, Comparison):
-        da_base = _squeeze_spatial(source.base.get(varname))
-        da_exp = _squeeze_spatial(source.experiment.get(varname))
+        da_base = squeeze_spatial_dims(source.base.get(varname))
+        da_exp = squeeze_spatial_dims(source.experiment.get(varname))
 
         mean_b, lo_b, hi_b = _seasonal_stats(
             da_base,
@@ -213,26 +192,28 @@ def _plot_seasonal_single(
             fig.tight_layout()
             return fig
 
-        has_vertical = _plot_vertical_seasonal_lines(
+        level_dim = _plot_multilevel_seasonal_lines(
             ax,
             months,
             mean_e,
+            run=source.experiment,
             linestyle="-",
             alpha=1.0,
             linewidth=2,
         )
 
-        if has_vertical:
-            _plot_vertical_seasonal_lines(
+        if level_dim is not None:
+            _plot_multilevel_seasonal_lines(
                 ax,
                 months,
                 mean_b,
+                run=source.base,
                 linestyle="--",
                 alpha=0.7,
                 linewidth=1.8,
                 legend_max_entries=0,
             )
-            depth_legend = ax.legend(loc="upper right", fontsize="x-small", title="Depth levels")
+            depth_legend = ax.legend(loc="upper right", fontsize="x-small", title=f"{level_dim} levels")
             ax.add_artist(depth_legend)
             run_handles = [
                 Line2D([0], [0], color="black", linestyle="--", label=source.base.name),
@@ -259,7 +240,7 @@ def _plot_seasonal_single(
             ax.legend(loc="best", fontsize="small")
         units = da_base.attrs.get("units", "")
     else:
-        da = _squeeze_spatial(source.get(varname))
+        da = squeeze_spatial_dims(source.get(varname))
         mean, lo, hi = _seasonal_stats(
             da,
             envelope,
@@ -280,9 +261,9 @@ def _plot_seasonal_single(
             fig.tight_layout()
             return fig
 
-        has_vertical = _plot_vertical_seasonal_lines(ax, months, mean, linewidth=2)
-        if has_vertical:
-            ax.legend(loc="best", fontsize="x-small", title="Depth levels")
+        level_dim = _plot_multilevel_seasonal_lines(ax, months, mean, run=source, linewidth=2)
+        if level_dim is not None:
+            ax.legend(loc="best", fontsize="x-small", title=f"{level_dim} levels")
         else:
             if include_climos:
                 ax.fill_between(months, lo.values, hi.values, alpha=0.2, color="tab:blue")
@@ -345,8 +326,8 @@ def _plot_seasonal_faceted(
     # Plot each subgrid unit
     for unit_id, ax_i in zip(units, axes.flat):
         if isinstance(source, Comparison):
-            da_base_unit = _squeeze_spatial(da_base.sel({by: unit_id}))
-            da_exp_unit = _squeeze_spatial(da_exp.sel({by: unit_id}))
+            da_base_unit = squeeze_spatial_dims(da_base.sel({by: unit_id}))
+            da_exp_unit = squeeze_spatial_dims(da_exp.sel({by: unit_id}))
 
             mean_b, lo_b, hi_b = _seasonal_stats(
                 da_base_unit,
@@ -363,19 +344,21 @@ def _plot_seasonal_faceted(
 
             # Check if we have sufficient data
             if mean_b is not None and mean_e is not None:
-                has_vertical = _plot_vertical_seasonal_lines(
+                level_dim = _plot_multilevel_seasonal_lines(
                     ax_i,
                     months,
                     mean_e,
+                    run=source.experiment,
                     linestyle="-",
                     alpha=1.0,
                     linewidth=2,
                 )
-                if has_vertical:
-                    _plot_vertical_seasonal_lines(
+                if level_dim is not None:
+                    _plot_multilevel_seasonal_lines(
                         ax_i,
                         months,
                         mean_b,
+                        run=source.base,
                         linestyle="--",
                         alpha=0.7,
                         linewidth=1.8,
@@ -385,7 +368,7 @@ def _plot_seasonal_faceted(
                         depth_legend = ax_i.legend(
                             loc="upper right",
                             fontsize="xx-small",
-                            title="Depth levels",
+                            title=f"{level_dim} levels",
                         )
                         ax_i.add_artist(depth_legend)
                         run_handles = [
@@ -416,7 +399,7 @@ def _plot_seasonal_faceted(
 
             units_str = da_base.attrs.get("units", "")
         else:
-            da_unit = _squeeze_spatial(da.sel({by: unit_id}))
+            da_unit = squeeze_spatial_dims(da.sel({by: unit_id}))
             mean, lo, hi = _seasonal_stats(
                 da_unit,
                 envelope,
@@ -426,10 +409,16 @@ def _plot_seasonal_faceted(
 
             # Check if we have sufficient data
             if mean is not None:
-                has_vertical = _plot_vertical_seasonal_lines(ax_i, months, mean, linewidth=2)
-                if has_vertical:
+                level_dim = _plot_multilevel_seasonal_lines(
+                    ax_i,
+                    months,
+                    mean,
+                    run=source,
+                    linewidth=2,
+                )
+                if level_dim is not None:
                     if unit_id == units[0]:
-                        ax_i.legend(loc="best", fontsize="xx-small", title="Depth levels")
+                        ax_i.legend(loc="best", fontsize="xx-small", title=f"{level_dim} levels")
                 else:
                     if include_climos:
                         ax_i.fill_between(months, lo.values, hi.values, alpha=0.2, color="tab:blue")
