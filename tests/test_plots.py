@@ -537,6 +537,7 @@ def test_hovmuller_color_limit_quantile_reduces_outlier_influence():
 
         fig_full = plot_hovmuller(run, "SOILLIQ", config=load_config())
         vmax_full = fig_full.axes[0].collections[0].get_clim()[1]
+        assert fig_full.axes[0].collections[0].colorbar.extend == "neither"
 
         cfg_path = Path(tmpdir) / "cfg_quantile.yaml"
         cfg_path.write_text(
@@ -557,6 +558,7 @@ def test_hovmuller_color_limit_quantile_reduces_outlier_influence():
         vmax_quantile = fig_quantile.axes[0].collections[0].get_clim()[1]
 
         assert vmax_quantile < vmax_full
+        assert fig_quantile.axes[0].collections[0].colorbar.extend in {"min", "max", "both"}
 
         run.close()
 
@@ -690,6 +692,8 @@ def test_hovmuller_comparison_uses_shared_color_limits_with_robust_method():
         clim_exp = fig.axes[1].collections[0].get_clim()
 
         assert clim_base == pytest.approx(clim_exp)
+        assert fig.axes[0].collections[0].colorbar.extend in {"min", "max", "both"}
+        assert fig.axes[1].collections[0].colorbar.extend in {"min", "max", "both"}
 
         base_run.close()
         exp_run.close()

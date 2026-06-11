@@ -43,8 +43,8 @@ def _compute_color_limits(
     q_low: float,
     q_high: float,
     sigma_count: float,
-) -> tuple[float, float] | None:
-    """Compute vmin/vmax using the configured color-limit method."""
+) -> tuple[float, float, str] | None:
+    """Compute vmin/vmax and colorbar extend using configured method."""
     arr = np.asarray(values, dtype=float).ravel()
     finite = arr[np.isfinite(arr)]
     if finite.size == 0:
@@ -55,8 +55,20 @@ def _compute_color_limits(
     if not np.isfinite(vmin_full) or not np.isfinite(vmax_full) or vmin_full == vmax_full:
         return None
 
+    def _extend_for(vmin: float, vmax: float) -> str:
+        eps = 1e-12
+        below = vmin > (vmin_full + eps)
+        above = vmax < (vmax_full - eps)
+        if below and above:
+            return "both"
+        if below:
+            return "min"
+        if above:
+            return "max"
+        return "neither"
+
     if method == "full_range":
-        return vmin_full, vmax_full
+        return vmin_full, vmax_full, "neither"
 
     if method == "quantile":
         if q_low >= q_high:
@@ -68,14 +80,14 @@ def _compute_color_limits(
                 UserWarning,
                 stacklevel=3,
             )
-            return vmin_full, vmax_full
+            return vmin_full, vmax_full, "neither"
         vmin = float(np.nanpercentile(finite, q_low))
         vmax = float(np.nanpercentile(finite, q_high))
     elif method == "sigma_clip":
         mean = float(np.nanmean(finite))
         std = float(np.nanstd(finite))
         if not np.isfinite(std) or std <= 0.0:
-            return vmin_full, vmax_full
+            return vmin_full, vmax_full, "neither"
         vmin = mean - float(sigma_count) * std
         vmax = mean + float(sigma_count) * std
     else:
@@ -84,7 +96,7 @@ def _compute_color_limits(
             UserWarning,
             stacklevel=3,
         )
-        return vmin_full, vmax_full
+        return vmin_full, vmax_full, "neither"
 
     if not np.isfinite(vmin) or not np.isfinite(vmax) or vmin >= vmax:
         warnings.warn(
@@ -95,9 +107,9 @@ def _compute_color_limits(
             UserWarning,
             stacklevel=3,
         )
-        return vmin_full, vmax_full
+        return vmin_full, vmax_full, "neither"
 
-    return float(vmin), float(vmax)
+    return float(vmin), float(vmax), _extend_for(float(vmin), float(vmax))
 
 
 def _max_depth_mask(
@@ -263,12 +275,14 @@ def _plot_hovmuller_run(
         sigma_count=config.plots.hovmuller.color_limit_sigma,
     )
     mesh_kwargs = {"shading": "auto", "cmap": "viridis"}
+    cbar_extend = "neither"
     if clim is not None:
         mesh_kwargs["vmin"] = clim[0]
         mesh_kwargs["vmax"] = clim[1]
+        cbar_extend = clim[2]
 
     mesh = ax.pcolormesh(_plot_time(da2), yvals, field, **mesh_kwargs)
-    cbar = fig.colorbar(mesh, ax=ax)
+    cbar = fig.colorbar(mesh, ax=ax, extend=cbar_extend)
     units = str(da.attrs.get("units", "")).strip()
     cbar.set_label(units)
 
@@ -349,16 +363,18 @@ def _plot_hovmuller_comparison(
         sigma_count=config.plots.hovmuller.color_limit_sigma,
     )
     mesh_kwargs = {"shading": "auto", "cmap": "viridis"}
+    cbar_extend = "neither"
     if clim is not None:
         mesh_kwargs["vmin"] = clim[0]
         mesh_kwargs["vmax"] = clim[1]
+        cbar_extend = clim[2]
 
     mesh_base = axes[0].pcolormesh(_plot_time(base2), yvals, base_field, **mesh_kwargs)
     mesh_exp = axes[1].pcolormesh(_plot_time(exp2), yvals, exp_field, **mesh_kwargs)
 
     units = str(da_exp.attrs.get("units", "")).strip()
-    cbar0 = fig.colorbar(mesh_base, ax=axes[0])
-    cbar1 = fig.colorbar(mesh_exp, ax=axes[1])
+    cbar0 = fig.colorbar(mesh_base, ax=axes[0], extend=cbar_extend)
+    cbar1 = fig.colorbar(mesh_exp, ax=axes[1], extend=cbar_extend)
     cbar0.set_label(units)
     cbar1.set_label(units)
 
