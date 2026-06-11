@@ -6,12 +6,82 @@ from __future__ import annotations
 import matplotlib.pyplot as plt
 import numpy as np
 import xarray as xr
+from matplotlib.lines import Line2D
 
 from elm_diagnostics.balances.base import _plot_time
 from elm_diagnostics.config.schema import Config, load_config
 from elm_diagnostics.io.run import Comparison, Run
 from elm_diagnostics.io.subgrid import SubgridLevel
 from elm_diagnostics.plots.climatology import compute_climo_stats
+
+_VERTICAL_DIMS = ("levgrnd", "levsoi", "levdcmp", "levlak", "levsno")
+
+
+def _get_vertical_dim(da: xr.DataArray) -> str | None:
+    """Return the first recognized vertical dimension in a data array."""
+    for dim in _VERTICAL_DIMS:
+        if dim in da.dims and da.sizes[dim] > 1:
+            return dim
+    return None
+
+
+def _legend_level_indices(n_levels: int, max_entries: int = 8) -> set[int]:
+    """Choose representative vertical levels for concise legends."""
+    if n_levels <= max_entries:
+        return set(range(n_levels))
+    idx = np.linspace(0, n_levels - 1, max_entries).astype(int)
+    return set(idx.tolist())
+
+
+def _format_depth_label(level_value: object, vdim: str) -> str:
+    """Format a compact depth label for legend entries."""
+    try:
+        numeric = float(level_value)
+        if np.isfinite(numeric):
+            return f"{vdim}={numeric:.3g}"
+    except (TypeError, ValueError):
+        pass
+    return f"{vdim}={level_value}"
+
+
+def _plot_vertical_lines(
+    ax: plt.Axes,
+    da: xr.DataArray,
+    *,
+    linestyle: str = "-",
+    alpha: float = 1.0,
+    legend_max_entries: int = 8,
+) -> bool:
+    """Plot one line per vertical level with colormap progression.
+
+    Returns
+    -------
+    bool
+        True if the variable had a vertical dimension and was plotted as
+        multiple depth lines. False when variable is not vertically resolved.
+    """
+    vdim = _get_vertical_dim(da)
+    if vdim is None:
+        return False
+
+    n_levels = da.sizes[vdim]
+    level_values = da.coords[vdim].values if vdim in da.coords else np.arange(n_levels)
+    legend_idx = _legend_level_indices(n_levels, max_entries=legend_max_entries)
+    cmap = plt.get_cmap("viridis")
+
+    for i in range(n_levels):
+        fraction = i / max(n_levels - 1, 1)
+        line_label = _format_depth_label(level_values[i], vdim) if i in legend_idx else "_nolegend_"
+        ax.plot(
+            _plot_time(da),
+            da.isel({vdim: i}).values,
+            color=cmap(fraction),
+            linestyle=linestyle,
+            alpha=alpha,
+            label=line_label,
+        )
+
+    return True
 
 
 def _squeeze_spatial(da: xr.DataArray) -> xr.DataArray:
@@ -101,34 +171,60 @@ def _plot_timeseries_single(
     if isinstance(source, Comparison):
         da_base = _squeeze_spatial(source.base.get(varname))
         da_exp = _squeeze_spatial(source.experiment.get(varname))
-        ax.plot(
-            _plot_time(da_base),
-            da_base.values,
-            color="gray",
-            label=source.base.name,
-            alpha=0.8,
-        )
-        ax.plot(
-            _plot_time(da_exp),
-            da_exp.values,
-            color="tab:blue",
-            label=source.experiment.name,
-        )
-        ax.legend(loc="best", fontsize="small")
+        has_vertical = _plot_vertical_lines(ax, da_exp, linestyle="-", alpha=1.0)
+        if has_vertical:
+            # Overlay base as dashed lines with same depth colormap.
+            _plot_vertical_lines(
+                ax,
+                da_base,
+                linestyle="--",
+                alpha=0.7,
+                legend_max_entries=0,
+            )
+            depth_legend = ax.legend(
+                loc="upper right",
+                fontsize="x-small",
+                title="Depth levels",
+            )
+            ax.add_artist(depth_legend)
+            run_handles = [
+                Line2D([0], [0], color="black", linestyle="--", label=source.base.name),
+                Line2D([0], [0], color="black", linestyle="-", label=source.experiment.name),
+            ]
+            ax.legend(handles=run_handles, loc="upper left", fontsize="x-small")
+        else:
+            ax.plot(
+                _plot_time(da_base),
+                da_base.values,
+                color="gray",
+                label=source.base.name,
+                alpha=0.8,
+            )
+            ax.plot(
+                _plot_time(da_exp),
+                da_exp.values,
+                color="tab:blue",
+                label=source.experiment.name,
+            )
+            ax.legend(loc="best", fontsize="small")
         units = da_base.attrs.get("units", "")
     else:
         da = _squeeze_spatial(source.get(varname))
-        ax.plot(_plot_time(da), da.values, color="tab:blue")
+        has_vertical = _plot_vertical_lines(ax, da)
+        if has_vertical:
+            ax.legend(loc="best", fontsize="x-small", title="Depth levels")
+        else:
+            ax.plot(_plot_time(da), da.values, color="tab:blue")
 
-        # Climatology envelope if multi-year
-        _add_climatology_envelope(
-            da,
-            ax,
-            config.plots.climatology.envelope,
-            include_climos=config.plots.climatology.include_climos,
-            climo_start_year=config.plots.climatology.climo_start_year,
-            climo_end_year=config.plots.climatology.climo_end_year,
-        )
+            # Climatology envelope if multi-year
+            _add_climatology_envelope(
+                da,
+                ax,
+                config.plots.climatology.envelope,
+                include_climos=config.plots.climatology.include_climos,
+                climo_start_year=config.plots.climatology.climo_start_year,
+                climo_end_year=config.plots.climatology.climo_end_year,
+            )
         units = da.attrs.get("units", "")
 
     ax.set_xlabel("Time")
@@ -183,35 +279,61 @@ def _plot_timeseries_faceted(
             da_base_unit = _squeeze_spatial(da_base.sel({by: unit_id}))
             da_exp_unit = _squeeze_spatial(da_exp.sel({by: unit_id}))
 
-            ax_i.plot(
-                _plot_time(da_base_unit),
-                da_base_unit.values,
-                color="gray",
-                label=source.base.name,
-                alpha=0.8,
-            )
-            ax_i.plot(
-                _plot_time(da_exp_unit),
-                da_exp_unit.values,
-                color="tab:blue",
-                label=source.experiment.name,
-            )
-            ax_i.legend(loc="best", fontsize="x-small")
+            has_vertical = _plot_vertical_lines(ax_i, da_exp_unit, linestyle="-", alpha=1.0)
+            if has_vertical:
+                _plot_vertical_lines(
+                    ax_i,
+                    da_base_unit,
+                    linestyle="--",
+                    alpha=0.7,
+                    legend_max_entries=0,
+                )
+                if unit_id == units[0]:
+                    depth_legend = ax_i.legend(
+                        loc="upper right",
+                        fontsize="xx-small",
+                        title="Depth levels",
+                    )
+                    ax_i.add_artist(depth_legend)
+                    run_handles = [
+                        Line2D([0], [0], color="black", linestyle="--", label=source.base.name),
+                        Line2D([0], [0], color="black", linestyle="-", label=source.experiment.name),
+                    ]
+                    ax_i.legend(handles=run_handles, loc="upper left", fontsize="xx-small")
+            else:
+                ax_i.plot(
+                    _plot_time(da_base_unit),
+                    da_base_unit.values,
+                    color="gray",
+                    label=source.base.name,
+                    alpha=0.8,
+                )
+                ax_i.plot(
+                    _plot_time(da_exp_unit),
+                    da_exp_unit.values,
+                    color="tab:blue",
+                    label=source.experiment.name,
+                )
+                ax_i.legend(loc="best", fontsize="x-small")
 
             units_str = da_base.attrs.get("units", "")
         else:
             da_unit = _squeeze_spatial(da.sel({by: unit_id}))
-            ax_i.plot(_plot_time(da_unit), da_unit.values, color="tab:blue")
+            has_vertical = _plot_vertical_lines(ax_i, da_unit)
+            if has_vertical and unit_id == units[0]:
+                ax_i.legend(loc="best", fontsize="xx-small", title="Depth levels")
+            if not has_vertical:
+                ax_i.plot(_plot_time(da_unit), da_unit.values, color="tab:blue")
 
-            # Climatology envelope
-            _add_climatology_envelope(
-                da_unit,
-                ax_i,
-                config.plots.climatology.envelope,
-                include_climos=config.plots.climatology.include_climos,
-                climo_start_year=config.plots.climatology.climo_start_year,
-                climo_end_year=config.plots.climatology.climo_end_year,
-            )
+                # Climatology envelope
+                _add_climatology_envelope(
+                    da_unit,
+                    ax_i,
+                    config.plots.climatology.envelope,
+                    include_climos=config.plots.climatology.include_climos,
+                    climo_start_year=config.plots.climatology.climo_start_year,
+                    climo_end_year=config.plots.climatology.climo_end_year,
+                )
 
             units_str = da.attrs.get("units", "")
 

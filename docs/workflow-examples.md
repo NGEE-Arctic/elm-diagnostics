@@ -118,6 +118,22 @@ ax.plot(years, intercept + slope * years, '--', label=f'Trend ({slope:.3f}/yr)',
 ax.set_xlabel('Year')
 ax.set_ylabel('GPP (gC/m²/day)')
 ax.set_title('GPP Trend Analysis')
+
+### Vertical Time Series (Depth-Resolved Variables)
+
+For variables with a vertical dimension (for example `SOILLIQ(time, levgrnd)`),
+`plot_timeseries` draws one line per depth and uses color to encode depth.
+The legend is thinned to representative levels when many depths are present.
+
+```python
+from elm_diagnostics import Run
+from elm_diagnostics.plots import plot_timeseries
+
+run = Run("tests/fixtures/data")
+
+fig = plot_timeseries(run, "SOILLIQ")
+fig.savefig("soilliq_depth_timeseries.png", dpi=300, bbox_inches="tight")
+```
 ax.legend()
 ax.grid(True, alpha=0.3)
 fig.savefig("gpp_trend.png", dpi=300, bbox_inches="tight")

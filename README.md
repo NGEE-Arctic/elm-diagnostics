@@ -160,6 +160,10 @@ run = Run("/path/to/case")
 fig = plot_timeseries(run, "GPP")
 fig.savefig("gpp_timeseries.png")
 
+# Vertically resolved variable: one line per depth level with depth-colored legend
+fig = plot_timeseries(run, "SOILLIQ")
+fig.savefig("soilliq_depth_timeseries.png")
+
 # Seasonal cycle (monthly mean with spread)
 fig = plot_seasonal(run, "RAIN")
 fig.savefig("rain_seasonal.png")
@@ -189,6 +193,9 @@ fig.savefig("multi_panel.png")
 
 **Available plot types:**
 - **`plot_timeseries`**: Time series with optional climatology envelope
+- For variables with a vertical dimension (`levgrnd`, `levsoi`, etc.),
+  `plot_timeseries` draws one line per depth with color varying by depth
+  and an automatically thinned depth legend.
 - **`plot_seasonal`**: Monthly mean seasonal cycle with spread (minmax/p10_p90/std)
 - **`plot_anomaly`**: Annual anomalies as bar chart (positive=blue, negative=red)
 - **`plot_histogram`**: Distribution histogram or PDF
