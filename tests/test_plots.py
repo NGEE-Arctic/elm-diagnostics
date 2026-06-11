@@ -402,3 +402,107 @@ def test_general_additional_dimension_supports_non_vertical_names():
     import matplotlib.pyplot as plt
 
     plt.close("all")
+
+
+def test_timeseries_single_title_and_ylabel_include_long_name_and_varname():
+    n_months = 24
+    data = np.linspace(0.0, 1.0, n_months)
+    ds = make_single_point_dataset(
+        start_year=2000,
+        n_months=n_months,
+        variables={
+            "RAIN": {
+                "data": data,
+                "units": "mm/s",
+                "long_name": "Rainfall rate",
+                "cell_methods": "time: mean",
+            }
+        },
+    )
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        save_as_elm_files(ds, Path(tmpdir), casename="title_ts_test", tape="h0")
+        run = Run(tmpdir)
+        fig = plot_timeseries(run, "RAIN")
+        ax = fig.axes[0]
+
+        assert "Rainfall rate" in ax.get_title()
+        assert "\n" in ax.get_title()
+        assert ax.get_ylabel() == "RAIN (mm/s)"
+
+        run.close()
+
+    import matplotlib.pyplot as plt
+
+    plt.close("all")
+
+
+def test_seasonal_single_title_and_ylabel_include_long_name_and_varname():
+    n_months = 24
+    data = np.linspace(0.0, 1.0, n_months)
+    ds = make_single_point_dataset(
+        start_year=2000,
+        n_months=n_months,
+        variables={
+            "RAIN": {
+                "data": data,
+                "units": "mm/s",
+                "long_name": "Rainfall rate",
+                "cell_methods": "time: mean",
+            }
+        },
+    )
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        save_as_elm_files(ds, Path(tmpdir), casename="title_seasonal_test", tape="h0")
+        run = Run(tmpdir)
+        fig = plot_seasonal(run, "RAIN")
+        ax = fig.axes[0]
+
+        assert "Rainfall rate" in ax.get_title()
+        assert "\n" in ax.get_title()
+        assert ax.get_ylabel() == "RAIN (mm/s)"
+
+        run.close()
+
+    import matplotlib.pyplot as plt
+
+    plt.close("all")
+
+
+def test_hovmuller_title_includes_long_name_second_line():
+    n_months = 24
+    n_levels = 10
+    phase = np.linspace(0.0, 2.0 * np.pi, n_months)
+    profile = np.linspace(0.5, 1.5, n_levels)
+    data = np.sin(phase)[:, None] * profile[None, :]
+
+    ds = make_single_point_dataset(
+        start_year=2000,
+        n_months=n_months,
+        variables={
+            "SOILLIQ": {
+                "data": data,
+                "units": "kg/m2",
+                "long_name": "Volumetric liquid soil water",
+                "cell_methods": "time: point",
+            }
+        },
+    )
+    ds = ds.assign_coords(levgrnd=np.linspace(0.02, 3.0, n_levels))
+    ds["levgrnd"].attrs["units"] = "m"
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        save_as_elm_files(ds, Path(tmpdir), casename="title_hov_hist_test", tape="h0")
+        run = Run(tmpdir, chunk_mode="off")
+
+        fig_hov = plot_hovmuller(run, "SOILLIQ")
+        ax_hov = fig_hov.axes[0]
+        assert "Volumetric liquid soil water" in ax_hov.get_title()
+        assert "\n" in ax_hov.get_title()
+
+        run.close()
+
+    import matplotlib.pyplot as plt
+
+    plt.close("all")

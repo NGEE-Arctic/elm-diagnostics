@@ -37,6 +37,13 @@ def _flatten_finite_values(da: xr.DataArray) -> np.ndarray:
     return finite.values
 
 
+def _append_long_name_line(title: str, da: xr.DataArray | None) -> str:
+    if da is None:
+        return title
+    long_name = str(da.attrs.get("long_name", "")).strip()
+    return f"{title}\n{long_name}" if long_name else title
+
+
 def plot_histogram(
     source: Run | Comparison,
     varname: str,
@@ -113,6 +120,7 @@ def _plot_histogram_single(
     if isinstance(source, Comparison):
         da_base = _squeeze_spatial(source.base.get(varname))
         da_exp = _squeeze_spatial(source.experiment.get(varname))
+        title_da = da_exp
         vals_b = _flatten_finite_values(da_base)
         vals_e = _flatten_finite_values(da_exp)
 
@@ -140,6 +148,7 @@ def _plot_histogram_single(
         units = da_base.attrs.get("units", "")
     else:
         da = _squeeze_spatial(source.get(varname))
+        title_da = da
         vals = _flatten_finite_values(da)
         ax.hist(vals, bins=bins, density=density, alpha=0.7, color="tab:blue")
         units = da.attrs.get("units", "")
@@ -150,7 +159,7 @@ def _plot_histogram_single(
     title = f"{varname} — Distribution"
     if isinstance(source, Run):
         title += f" — {source.name}"
-    ax.set_title(title)
+    ax.set_title(_append_long_name_line(title, title_da))
     fig.tight_layout()
 
     return fig

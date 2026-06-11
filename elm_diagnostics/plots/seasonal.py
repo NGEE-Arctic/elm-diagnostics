@@ -23,6 +23,18 @@ from elm_diagnostics.plots.dimension_helpers import (
 _MONTH_LABELS = ["J", "F", "M", "A", "M", "J", "J", "A", "S", "O", "N", "D"]
 
 
+def _format_var_ylabel(varname: str, units: str) -> str:
+    units = str(units).strip()
+    return f"{varname} ({units})" if units else varname
+
+
+def _append_long_name_line(title: str, da: xr.DataArray | None) -> str:
+    if da is None:
+        return title
+    long_name = str(da.attrs.get("long_name", "")).strip()
+    return f"{title}\n{long_name}" if long_name else title
+
+
 def _legend_level_indices(n_levels: int, max_entries: int = 8) -> set[int]:
     """Choose representative vertical levels for concise legends."""
     if max_entries <= 0:
@@ -168,6 +180,7 @@ def _plot_seasonal_single(
     if isinstance(source, Comparison):
         da_base = squeeze_spatial_dims(source.base.get(varname))
         da_exp = squeeze_spatial_dims(source.experiment.get(varname))
+        title_da = da_exp
 
         mean_b, lo_b, hi_b = _seasonal_stats(
             da_base,
@@ -242,6 +255,7 @@ def _plot_seasonal_single(
         units = da_base.attrs.get("units", "")
     else:
         da = squeeze_spatial_dims(source.get(varname))
+        title_da = da
         mean, lo, hi = _seasonal_stats(
             da,
             envelope,
@@ -274,12 +288,12 @@ def _plot_seasonal_single(
     ax.set_xticks(months)
     ax.set_xticklabels(_MONTH_LABELS)
     ax.set_xlabel("Month")
-    ax.set_ylabel(units)
+    ax.set_ylabel(_format_var_ylabel(varname, units))
 
     title = f"{varname} — Seasonal Cycle"
     if isinstance(source, Run):
         title += f" — {source.name}"
-    ax.set_title(title)
+    ax.set_title(_append_long_name_line(title, title_da))
     fig.tight_layout()
 
     return fig

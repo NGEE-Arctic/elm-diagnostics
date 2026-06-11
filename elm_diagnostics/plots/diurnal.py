@@ -62,6 +62,18 @@ def _median_time_step_hours(da: xr.DataArray) -> float | None:
         return None
 
 
+def _format_var_ylabel(varname: str, units: str) -> str:
+    units = str(units).strip()
+    return f"{varname} ({units})" if units else varname
+
+
+def _append_long_name_line(title: str, da: xr.DataArray | None) -> str:
+    if da is None:
+        return title
+    long_name = str(da.attrs.get("long_name", "")).strip()
+    return f"{title}\n{long_name}" if long_name else title
+
+
 def plot_diurnal(
     source: Run | Comparison,
     varname: str,
@@ -149,6 +161,7 @@ def _plot_diurnal_single(
     if isinstance(source, Comparison):
         da_base = _squeeze_spatial(source.base.get(varname))
         da_exp = _squeeze_spatial(source.experiment.get(varname))
+        title_da = da_exp
 
         if not _check_subdaily(da_base) or not _check_subdaily(da_exp):
             ax.text(
@@ -219,6 +232,7 @@ def _plot_diurnal_single(
         units = da_base.attrs.get("units", "")
     else:
         da = _squeeze_spatial(source.get(varname))
+        title_da = da
 
         if not _check_subdaily(da):
             ax.text(
@@ -260,12 +274,12 @@ def _plot_diurnal_single(
 
     ax.set_xticks(np.arange(0, 24, 3))
     ax.set_xlabel("Hour of Day (UTC)")
-    ax.set_ylabel(units)
+    ax.set_ylabel(_format_var_ylabel(varname, units))
 
     title = f"{varname} — Diurnal Cycle"
     if isinstance(source, Run):
         title += f" — {source.name}"
-    ax.set_title(title)
+    ax.set_title(_append_long_name_line(title, title_da))
 
     ax.grid(True, alpha=0.3)
     fig.tight_layout()

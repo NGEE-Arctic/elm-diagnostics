@@ -20,6 +20,13 @@ from elm_diagnostics.plots.dimension_helpers import (
 _DEPTH_DIMS = {"levgrnd", "levsoi"}
 
 
+def _append_long_name_line(title: str, da: xr.DataArray | None) -> str:
+    if da is None:
+        return title
+    long_name = str(da.attrs.get("long_name", "")).strip()
+    return f"{title}\n{long_name}" if long_name else title
+
+
 def _is_index_like(values: np.ndarray) -> bool:
     if values.ndim != 1 or values.size == 0:
         return False
@@ -194,7 +201,7 @@ def _plot_hovmuller_run(
 
     ax.set_xlabel("Time")
     ax.set_ylabel(ylab)
-    ax.set_title(f"{varname} Hovmuller — {run.name}")
+    ax.set_title(_append_long_name_line(f"{varname} Hovmuller — {run.name}", da))
     fig.tight_layout()
     return fig
 
@@ -280,7 +287,12 @@ def _plot_hovmuller_comparison(
     axes[1].set_ylabel(ylab)
     axes[1].set_xlabel("Time")
 
-    fig.suptitle(f"{varname} Hovmuller — {source.base.name} vs {source.experiment.name}")
+    fig.suptitle(
+        _append_long_name_line(
+            f"{varname} Hovmuller — {source.base.name} vs {source.experiment.name}",
+            da_exp,
+        )
+    )
     fig.tight_layout()
     return fig
 

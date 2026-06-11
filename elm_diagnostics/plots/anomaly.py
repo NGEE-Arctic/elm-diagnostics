@@ -31,6 +31,18 @@ def _annual_anomaly(da: xr.DataArray) -> tuple[np.ndarray, np.ndarray]:
     return years, anomalies
 
 
+def _format_var_ylabel(varname: str, units: str) -> str:
+    units = str(units).strip()
+    return f"{varname} ({units})" if units else varname
+
+
+def _append_long_name_line(title: str, da: xr.DataArray | None) -> str:
+    if da is None:
+        return title
+    long_name = str(da.attrs.get("long_name", "")).strip()
+    return f"{title}\n{long_name}" if long_name else title
+
+
 def plot_anomaly(
     source: Run | Comparison,
     varname: str,
@@ -101,6 +113,7 @@ def _plot_anomaly_single(
     if isinstance(source, Comparison):
         da_base = _squeeze_spatial(source.base.get(varname))
         da_exp = _squeeze_spatial(source.experiment.get(varname))
+        title_da = da_exp
         years_b, anom_b = _annual_anomaly(da_base)
         years_e, anom_e = _annual_anomaly(da_exp)
 
@@ -112,13 +125,16 @@ def _plot_anomaly_single(
             delta = anom_e[mask_e] - anom_b[mask_b]
             colors = ["tab:blue" if v >= 0 else "tab:red" for v in delta]
             ax.bar(common_years, delta, color=colors, alpha=0.8)
-            ax.set_title(f"{varname} — Annual Anomaly (exp - base)")
+            ax.set_title(
+                _append_long_name_line(f"{varname} — Annual Anomaly (exp - base)", title_da)
+            )
         else:
             ax.text(
                 0.5, 0.5, "No overlapping years", transform=ax.transAxes, ha="center"
             )
     else:
         da = _squeeze_spatial(source.get(varname))
+        title_da = da
         years, anomalies = _annual_anomaly(da)
         colors = ["tab:blue" if v >= 0 else "tab:red" for v in anomalies]
         ax.bar(years, anomalies, color=colors, alpha=0.8)
@@ -126,7 +142,7 @@ def _plot_anomaly_single(
         title = f"{varname} — Annual Anomaly"
         if isinstance(source, Run):
             title += f" — {source.name}"
-        ax.set_title(title)
+        ax.set_title(_append_long_name_line(title, title_da))
 
     units = ""
     if isinstance(source, Comparison):
@@ -135,7 +151,7 @@ def _plot_anomaly_single(
         units = source.get(varname).attrs.get("units", "")
 
     ax.set_xlabel("Year")
-    ax.set_ylabel(units)
+    ax.set_ylabel(_format_var_ylabel(varname, units))
     ax.axhline(0, color="gray", linewidth=0.5)
     fig.tight_layout()
 

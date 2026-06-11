@@ -29,6 +29,18 @@ def _legend_level_indices(n_levels: int, max_entries: int = 8) -> set[int]:
     return set(idx.tolist())
 
 
+def _format_var_ylabel(varname: str, units: str) -> str:
+    units = str(units).strip()
+    return f"{varname} ({units})" if units else varname
+
+
+def _append_long_name_line(title: str, da: xr.DataArray | None) -> str:
+    if da is None:
+        return title
+    long_name = str(da.attrs.get("long_name", "")).strip()
+    return f"{title}\n{long_name}" if long_name else title
+
+
 def _plot_multilevel_lines(
     ax: plt.Axes,
     da: xr.DataArray,
@@ -152,6 +164,7 @@ def _plot_timeseries_single(
     if isinstance(source, Comparison):
         da_base = squeeze_spatial_dims(source.base.get(varname))
         da_exp = squeeze_spatial_dims(source.experiment.get(varname))
+        title_da = da_exp
         level_dim = _plot_multilevel_lines(ax, da_exp, linestyle="-", alpha=1.0)
         if level_dim is not None:
             # Overlay base as dashed lines with same depth colormap.
@@ -191,6 +204,7 @@ def _plot_timeseries_single(
         units = da_base.attrs.get("units", "")
     else:
         da = squeeze_spatial_dims(source.get(varname))
+        title_da = da
         level_dim = _plot_multilevel_lines(ax, da)
         if level_dim is not None:
             ax.legend(loc="best", fontsize="x-small", title=f"{level_dim} levels")
@@ -209,13 +223,13 @@ def _plot_timeseries_single(
         units = da.attrs.get("units", "")
 
     ax.set_xlabel("Time")
-    ax.set_ylabel(units)
+    ax.set_ylabel(_format_var_ylabel(varname, units))
     title = varname
     if isinstance(source, Comparison):
         title += f" — {source.base.name} vs {source.experiment.name}"
     elif isinstance(source, Run):
         title += f" — {source.name}"
-    ax.set_title(title)
+    ax.set_title(_append_long_name_line(title, title_da))
     fig.tight_layout()
 
     return fig
