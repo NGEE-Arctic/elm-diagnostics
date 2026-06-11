@@ -76,7 +76,7 @@ def _plot_hovmuller_run(
         )
 
     da2 = da.transpose("time", dim)
-    yvals, _, _, level_units, is_depth_like = resolve_dimension_axis(da2, dim, run=run)
+    yvals, _, _, level_units, is_depth_like = resolve_dimension_axis(da2, dim)
     yvals, ylab, is_depth_like = _enforce_depth_convention(
         dim,
         yvals,
@@ -131,7 +131,7 @@ def _plot_hovmuller_comparison(
 
     base2 = da_base.transpose("time", dim)
     exp2 = da_exp.transpose("time", dim)
-    yvals, _, _, level_units, is_depth_like = resolve_dimension_axis(exp2, dim, run=source.experiment)
+    yvals, _, _, level_units, is_depth_like = resolve_dimension_axis(exp2, dim)
     yvals, ylab, is_depth_like = _enforce_depth_convention(
         dim,
         yvals,

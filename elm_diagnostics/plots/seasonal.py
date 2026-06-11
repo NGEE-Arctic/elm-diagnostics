@@ -38,7 +38,6 @@ def _plot_multilevel_seasonal_lines(
     months: np.ndarray,
     mean_da: xr.DataArray,
     *,
-    run: Run | None = None,
     linestyle: str = "-",
     alpha: float = 1.0,
     linewidth: float = 2.0,
@@ -50,7 +49,7 @@ def _plot_multilevel_seasonal_lines(
         return None
 
     n_levels = mean_da.sizes[dim]
-    level_values, _, level_name, _, _ = resolve_dimension_axis(mean_da, dim, run=run)
+    level_values, _, level_name, _, _ = resolve_dimension_axis(mean_da, dim)
     legend_idx = _legend_level_indices(n_levels, max_entries=legend_max_entries)
     cmap = plt.get_cmap("viridis")
 
@@ -196,7 +195,6 @@ def _plot_seasonal_single(
             ax,
             months,
             mean_e,
-            run=source.experiment,
             linestyle="-",
             alpha=1.0,
             linewidth=2,
@@ -207,7 +205,6 @@ def _plot_seasonal_single(
                 ax,
                 months,
                 mean_b,
-                run=source.base,
                 linestyle="--",
                 alpha=0.7,
                 linewidth=1.8,
@@ -261,7 +258,7 @@ def _plot_seasonal_single(
             fig.tight_layout()
             return fig
 
-        level_dim = _plot_multilevel_seasonal_lines(ax, months, mean, run=source, linewidth=2)
+        level_dim = _plot_multilevel_seasonal_lines(ax, months, mean, linewidth=2)
         if level_dim is not None:
             ax.legend(loc="best", fontsize="x-small", title=f"{level_dim} levels")
         else:
@@ -348,7 +345,6 @@ def _plot_seasonal_faceted(
                     ax_i,
                     months,
                     mean_e,
-                    run=source.experiment,
                     linestyle="-",
                     alpha=1.0,
                     linewidth=2,
@@ -358,7 +354,6 @@ def _plot_seasonal_faceted(
                         ax_i,
                         months,
                         mean_b,
-                        run=source.base,
                         linestyle="--",
                         alpha=0.7,
                         linewidth=1.8,
@@ -413,7 +408,6 @@ def _plot_seasonal_faceted(
                     ax_i,
                     months,
                     mean,
-                    run=source,
                     linewidth=2,
                 )
                 if level_dim is not None:

@@ -33,7 +33,6 @@ def _plot_multilevel_lines(
     ax: plt.Axes,
     da: xr.DataArray,
     *,
-    run: Run | None = None,
     linestyle: str = "-",
     alpha: float = 1.0,
     legend_max_entries: int = 8,
@@ -51,7 +50,7 @@ def _plot_multilevel_lines(
         return None
 
     n_levels = da.sizes[dim]
-    level_values, _, level_name, level_units, _ = resolve_dimension_axis(da, dim, run=run)
+    level_values, _, level_name, level_units, _ = resolve_dimension_axis(da, dim)
     legend_idx = _legend_level_indices(n_levels, max_entries=legend_max_entries)
     cmap = plt.get_cmap("viridis")
 
@@ -153,13 +152,12 @@ def _plot_timeseries_single(
     if isinstance(source, Comparison):
         da_base = squeeze_spatial_dims(source.base.get(varname))
         da_exp = squeeze_spatial_dims(source.experiment.get(varname))
-        level_dim = _plot_multilevel_lines(ax, da_exp, run=source.experiment, linestyle="-", alpha=1.0)
+        level_dim = _plot_multilevel_lines(ax, da_exp, linestyle="-", alpha=1.0)
         if level_dim is not None:
             # Overlay base as dashed lines with same depth colormap.
             _plot_multilevel_lines(
                 ax,
                 da_base,
-                run=source.base,
                 linestyle="--",
                 alpha=0.7,
                 legend_max_entries=0,
@@ -193,7 +191,7 @@ def _plot_timeseries_single(
         units = da_base.attrs.get("units", "")
     else:
         da = squeeze_spatial_dims(source.get(varname))
-        level_dim = _plot_multilevel_lines(ax, da, run=source)
+        level_dim = _plot_multilevel_lines(ax, da)
         if level_dim is not None:
             ax.legend(loc="best", fontsize="x-small", title=f"{level_dim} levels")
         else:
@@ -265,7 +263,6 @@ def _plot_timeseries_faceted(
             level_dim = _plot_multilevel_lines(
                 ax_i,
                 da_exp_unit,
-                run=source.experiment,
                 linestyle="-",
                 alpha=1.0,
             )
@@ -273,7 +270,6 @@ def _plot_timeseries_faceted(
                 _plot_multilevel_lines(
                     ax_i,
                     da_base_unit,
-                    run=source.base,
                     linestyle="--",
                     alpha=0.7,
                     legend_max_entries=0,
@@ -309,7 +305,7 @@ def _plot_timeseries_faceted(
             units_str = da_base.attrs.get("units", "")
         else:
             da_unit = squeeze_spatial_dims(da.sel({by: unit_id}))
-            level_dim = _plot_multilevel_lines(ax_i, da_unit, run=source)
+            level_dim = _plot_multilevel_lines(ax_i, da_unit)
             if level_dim is not None and unit_id == units[0]:
                 ax_i.legend(loc="best", fontsize="xx-small", title=f"{level_dim} levels")
             if level_dim is None:

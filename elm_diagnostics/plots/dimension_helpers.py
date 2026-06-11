@@ -7,8 +7,6 @@ import warnings
 import numpy as np
 import xarray as xr
 
-from elm_diagnostics.io.run import Run
-
 _SPACE_DIMS = ("lat", "lon", "lndgrid", "gridcell")
 
 
@@ -81,37 +79,9 @@ def _coord_candidates_from_dataarray(da: xr.DataArray, dim: str) -> list[tuple[s
     return candidates
 
 
-def _coord_candidates_from_run(
-    run: Run,
-    dim: str,
-    expected_size: int,
-) -> list[tuple[str, xr.DataArray]]:
-    candidates: list[tuple[str, xr.DataArray]] = []
-    seen: set[str] = set()
-
-    for stream in run.streams.values():
-        for cname in stream.coords:
-            if cname in seen:
-                continue
-            coord = stream.coords[cname]
-            if coord.dims == (dim,) and coord.size == expected_size:
-                candidates.append((cname, coord))
-                seen.add(cname)
-        for vname, var in stream.data_vars.items():
-            if vname in seen:
-                continue
-            if var.dims == (dim,) and var.size == expected_size:
-                candidates.append((vname, var))
-                seen.add(vname)
-
-    return candidates
-
-
 def resolve_dimension_axis(
     da: xr.DataArray,
     dim: str,
-    *,
-    run: Run | None = None,
 ) -> tuple[np.ndarray, str, str, str, bool]:
     """Resolve axis values/labels for an additional dimension.
 
@@ -124,8 +94,6 @@ def resolve_dimension_axis(
     is_depth_like : bool
     """
     candidates = _coord_candidates_from_dataarray(da, dim)
-    if run is not None:
-        candidates.extend(_coord_candidates_from_run(run, dim, da.sizes[dim]))
 
     if not candidates:
         return np.arange(da.sizes[dim]), f"{dim} index", dim, "", False
