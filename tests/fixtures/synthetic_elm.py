@@ -546,6 +546,44 @@ def make_multicolumn_dataset(
     return ds
 
 
+def make_vertical_profile_dataset(
+    start_year: int = 2000,
+    n_months: int = 24,
+    n_levels: int = 10,
+    calendar: str = "noleap",
+) -> xr.Dataset:
+    """Build a single-point dataset with a depth-resolved SOILLIQ profile.
+
+    The dataset includes a dedicated depth coordinate ``zsoi`` (m, positive down)
+    on ``levgrnd`` so Hovmuller plots can use physical depth values.
+    """
+    phase = np.linspace(0.0, 2.0 * np.pi, n_months)
+    seasonal = 1.0 + 0.2 * np.sin(phase)
+    depth = np.geomspace(0.02, 3.0, n_levels)
+    attenuation = np.exp(-depth / depth.max())
+    profile = seasonal[:, None] * attenuation[None, :] * 200.0
+
+    ds = make_single_point_dataset(
+        start_year=start_year,
+        n_months=n_months,
+        calendar=calendar,
+        variables={
+            "SOILLIQ": {
+                "data": profile,
+                "units": "kg/m2",
+                "long_name": "Volumetric liquid soil water",
+                "cell_methods": "time: point",
+            }
+        },
+    )
+
+    ds = ds.assign_coords(zsoi=("levgrnd", depth))
+    ds["zsoi"].attrs["units"] = "m"
+    ds["zsoi"].attrs["positive"] = "down"
+
+    return ds
+
+
 def save_as_elm_files(
     ds: xr.Dataset,
     outdir: Path,

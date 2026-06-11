@@ -43,7 +43,7 @@ class ThumbnailConfig(BaseModel):
 
 
 class ReportPlotTypesConfig(BaseModel):
-    include: list[str] = ["timeseries", "seasonal", "anomaly", "histogram", "diurnal"]
+    include: list[str] = ["timeseries", "hovmuller", "seasonal", "anomaly", "histogram", "diurnal"]
 
 
 class VariableSectionsConfig(BaseModel):

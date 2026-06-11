@@ -11,7 +11,7 @@ report:
     dpi: 72
   
   plot_types:
-    include: [timeseries, seasonal, anomaly, histogram, diurnal]
+    include: [timeseries, hovmuller, seasonal, anomaly, histogram, diurnal]
   
   variable_sections:
     max_variables_per_group: 10

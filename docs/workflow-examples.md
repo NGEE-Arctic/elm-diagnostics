@@ -134,6 +134,20 @@ run = Run("tests/fixtures/data")
 fig = plot_timeseries(run, "SOILLIQ")
 fig.savefig("soilliq_depth_timeseries.png", dpi=300, bbox_inches="tight")
 ```
+
+### Hovmuller (Time x Depth) Visualization
+
+Use Hovmuller plots for a compact view of temporal evolution across depth.
+
+```python
+from elm_diagnostics import Run
+from elm_diagnostics.plots import plot_hovmuller
+
+run = Run("tests/fixtures/data")
+
+fig = plot_hovmuller(run, "SOILLIQ")
+fig.savefig("soilliq_hovmuller.png", dpi=300, bbox_inches="tight")
+```
 ax.legend()
 ax.grid(True, alpha=0.3)
 fig.savefig("gpp_trend.png", dpi=300, bbox_inches="tight")

@@ -14,10 +14,12 @@ from elm_diagnostics.plots import (
     plot_anomaly,
     plot_diurnal,
     plot_histogram,
+    plot_hovmuller,
     plot_seasonal,
     plot_timeseries,
 )
 from tests.fixtures.synthetic_elm import (
+    make_vertical_profile_dataset,
     make_single_point_dataset,
     make_water_balance_dataset,
     save_as_elm_files,
@@ -147,6 +149,28 @@ def test_diurnal(short_run):
     fig = plot_diurnal(short_run, "RAIN")
     assert fig is not None
     # Should complete without error, even though data isn't sub-daily
+    import matplotlib.pyplot as plt
+
+    plt.close("all")
+
+
+def test_hovmuller_vertical_uses_depth_axis():
+    """Hovmuller plot should render a mesh for vertical variables."""
+    ds = make_vertical_profile_dataset(n_months=24, n_levels=10)
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        save_as_elm_files(ds, Path(tmpdir), casename="hovmuller_test", tape="h0")
+        run = Run(tmpdir)
+
+        fig = plot_hovmuller(run, "SOILLIQ")
+        ax = fig.axes[0]
+
+        assert fig is not None
+        assert ax.collections  # pcolormesh collection exists
+        assert "Depth" in ax.get_ylabel()
+
+        run.close()
+
     import matplotlib.pyplot as plt
 
     plt.close("all")

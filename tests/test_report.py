@@ -13,6 +13,7 @@ from elm_diagnostics.report.build import Report
 from elm_diagnostics.config.schema import Config
 from tests.fixtures.synthetic_elm import (
     make_multicolumn_dataset,
+    make_vertical_profile_dataset,
     make_water_balance_dataset,
     save_as_elm_files,
 )
@@ -157,6 +158,31 @@ def test_report_multiple_plot_types(report_run):
 
         # Should have at least timeseries
         assert "timeseries" in plot_types_found
+
+
+def test_report_includes_hovmuller_subsections():
+    """Variable sections should render Timeseries/Hovmuller subsection headings."""
+    ds = make_vertical_profile_dataset(n_months=24, n_levels=8)
+    with tempfile.TemporaryDirectory() as tmpdir:
+        save_as_elm_files(ds, Path(tmpdir), casename="hovmuller_report", tape="h0")
+        run = Run(tmpdir)
+
+        cfg = Config()
+        cfg.variables.groups = {"hydrology": ["SOILLIQ"]}
+        cfg.report.plot_types.include = ["timeseries", "hovmuller"]
+
+        rpt = Report(run, config=cfg)
+        with tempfile.TemporaryDirectory() as outdir:
+            html_path = rpt.build(outdir)
+            content = html_path.read_text()
+            assert "Timeseries plots" in content
+            assert "Hovmuller plots" in content
+
+            figdir = Path(outdir) / "figures"
+            assert any("_timeseries" in p.name for p in figdir.glob("*.png"))
+            assert any("_hovmuller" in p.name for p in figdir.glob("*.png"))
+
+        run.close()
 
 
 def test_report_error_handling(report_run):
