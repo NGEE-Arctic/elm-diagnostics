@@ -6,6 +6,7 @@ from __future__ import annotations
 import matplotlib.pyplot as plt
 import numpy as np
 import xarray as xr
+from matplotlib.lines import Line2D
 
 from elm_diagnostics.config.schema import Config, load_config
 from elm_diagnostics.io.run import Comparison, Run
@@ -14,6 +15,72 @@ from elm_diagnostics.plots.climatology import compute_climo_stats
 
 
 _MONTH_LABELS = ["J", "F", "M", "A", "M", "J", "J", "A", "S", "O", "N", "D"]
+_VERTICAL_DIMS = ("levgrnd", "levsoi", "levdcmp", "levlak", "levsno")
+
+
+def _get_vertical_dim(da: xr.DataArray) -> str | None:
+    """Return the first recognized vertical dimension in a data array."""
+    for dim in _VERTICAL_DIMS:
+        if dim in da.dims and da.sizes[dim] > 1:
+            return dim
+    return None
+
+
+def _legend_level_indices(n_levels: int, max_entries: int = 8) -> set[int]:
+    """Choose representative vertical levels for concise legends."""
+    if max_entries <= 0:
+        return set()
+    if n_levels <= max_entries:
+        return set(range(n_levels))
+    idx = np.linspace(0, n_levels - 1, max_entries).astype(int)
+    return set(idx.tolist())
+
+
+def _format_depth_label(level_value: object, vdim: str) -> str:
+    """Format compact level labels for depth legends."""
+    try:
+        numeric = float(level_value)
+        if np.isfinite(numeric):
+            return f"{vdim}={numeric:.3g}"
+    except (TypeError, ValueError):
+        pass
+    return f"{vdim}={level_value}"
+
+
+def _plot_vertical_seasonal_lines(
+    ax: plt.Axes,
+    months: np.ndarray,
+    mean_da: xr.DataArray,
+    *,
+    linestyle: str = "-",
+    alpha: float = 1.0,
+    linewidth: float = 2.0,
+    legend_max_entries: int = 8,
+) -> bool:
+    """Plot one seasonal line per depth level when variable is vertical."""
+    vdim = _get_vertical_dim(mean_da)
+    if vdim is None:
+        return False
+
+    n_levels = mean_da.sizes[vdim]
+    level_values = mean_da.coords[vdim].values if vdim in mean_da.coords else np.arange(n_levels)
+    legend_idx = _legend_level_indices(n_levels, max_entries=legend_max_entries)
+    cmap = plt.get_cmap("viridis")
+
+    for i in range(n_levels):
+        fraction = i / max(n_levels - 1, 1)
+        line_label = _format_depth_label(level_values[i], vdim) if i in legend_idx else "_nolegend_"
+        ax.plot(
+            months,
+            mean_da.isel({vdim: i}).values,
+            color=cmap(fraction),
+            linestyle=linestyle,
+            alpha=alpha,
+            linewidth=linewidth,
+            label=line_label,
+        )
+
+    return True
 
 
 def _squeeze_spatial(da: xr.DataArray) -> xr.DataArray:
@@ -146,25 +213,50 @@ def _plot_seasonal_single(
             fig.tight_layout()
             return fig
 
-        if include_climos:
-            ax.fill_between(months, lo_b.values, hi_b.values, alpha=0.2, color="gray")
-        ax.plot(
-            months, mean_b.values, color="gray", label=source.base.name, linewidth=2
-        )
-
-        if include_climos:
-            ax.fill_between(
-                months, lo_e.values, hi_e.values, alpha=0.2, color="tab:blue"
-            )
-        ax.plot(
+        has_vertical = _plot_vertical_seasonal_lines(
+            ax,
             months,
-            mean_e.values,
-            color="tab:blue",
-            label=source.experiment.name,
+            mean_e,
+            linestyle="-",
+            alpha=1.0,
             linewidth=2,
         )
 
-        ax.legend(loc="best", fontsize="small")
+        if has_vertical:
+            _plot_vertical_seasonal_lines(
+                ax,
+                months,
+                mean_b,
+                linestyle="--",
+                alpha=0.7,
+                linewidth=1.8,
+                legend_max_entries=0,
+            )
+            depth_legend = ax.legend(loc="upper right", fontsize="x-small", title="Depth levels")
+            ax.add_artist(depth_legend)
+            run_handles = [
+                Line2D([0], [0], color="black", linestyle="--", label=source.base.name),
+                Line2D([0], [0], color="black", linestyle="-", label=source.experiment.name),
+            ]
+            ax.legend(handles=run_handles, loc="upper left", fontsize="x-small")
+        else:
+            if include_climos:
+                ax.fill_between(months, lo_b.values, hi_b.values, alpha=0.2, color="gray")
+            ax.plot(
+                months, mean_b.values, color="gray", label=source.base.name, linewidth=2
+            )
+
+            if include_climos:
+                ax.fill_between(months, lo_e.values, hi_e.values, alpha=0.2, color="tab:blue")
+            ax.plot(
+                months,
+                mean_e.values,
+                color="tab:blue",
+                label=source.experiment.name,
+                linewidth=2,
+            )
+
+            ax.legend(loc="best", fontsize="small")
         units = da_base.attrs.get("units", "")
     else:
         da = _squeeze_spatial(source.get(varname))
@@ -188,9 +280,13 @@ def _plot_seasonal_single(
             fig.tight_layout()
             return fig
 
-        if include_climos:
-            ax.fill_between(months, lo.values, hi.values, alpha=0.2, color="tab:blue")
-        ax.plot(months, mean.values, color="tab:blue", linewidth=2)
+        has_vertical = _plot_vertical_seasonal_lines(ax, months, mean, linewidth=2)
+        if has_vertical:
+            ax.legend(loc="best", fontsize="x-small", title="Depth levels")
+        else:
+            if include_climos:
+                ax.fill_between(months, lo.values, hi.values, alpha=0.2, color="tab:blue")
+            ax.plot(months, mean.values, color="tab:blue", linewidth=2)
         units = da.attrs.get("units", "")
 
     ax.set_xticks(months)
@@ -267,29 +363,56 @@ def _plot_seasonal_faceted(
 
             # Check if we have sufficient data
             if mean_b is not None and mean_e is not None:
-                if include_climos:
-                    ax_i.fill_between(
-                        months, lo_b.values, hi_b.values, alpha=0.2, color="gray"
-                    )
-                ax_i.plot(
+                has_vertical = _plot_vertical_seasonal_lines(
+                    ax_i,
                     months,
-                    mean_b.values,
-                    color="gray",
-                    label=source.base.name,
+                    mean_e,
+                    linestyle="-",
+                    alpha=1.0,
                     linewidth=2,
                 )
-                if include_climos:
-                    ax_i.fill_between(
-                        months, lo_e.values, hi_e.values, alpha=0.2, color="tab:blue"
+                if has_vertical:
+                    _plot_vertical_seasonal_lines(
+                        ax_i,
+                        months,
+                        mean_b,
+                        linestyle="--",
+                        alpha=0.7,
+                        linewidth=1.8,
+                        legend_max_entries=0,
                     )
-                ax_i.plot(
-                    months,
-                    mean_e.values,
-                    color="tab:blue",
-                    label=source.experiment.name,
-                    linewidth=2,
-                )
-                ax_i.legend(loc="best", fontsize="x-small")
+                    if unit_id == units[0]:
+                        depth_legend = ax_i.legend(
+                            loc="upper right",
+                            fontsize="xx-small",
+                            title="Depth levels",
+                        )
+                        ax_i.add_artist(depth_legend)
+                        run_handles = [
+                            Line2D([0], [0], color="black", linestyle="--", label=source.base.name),
+                            Line2D([0], [0], color="black", linestyle="-", label=source.experiment.name),
+                        ]
+                        ax_i.legend(handles=run_handles, loc="upper left", fontsize="xx-small")
+                else:
+                    if include_climos:
+                        ax_i.fill_between(months, lo_b.values, hi_b.values, alpha=0.2, color="gray")
+                    ax_i.plot(
+                        months,
+                        mean_b.values,
+                        color="gray",
+                        label=source.base.name,
+                        linewidth=2,
+                    )
+                    if include_climos:
+                        ax_i.fill_between(months, lo_e.values, hi_e.values, alpha=0.2, color="tab:blue")
+                    ax_i.plot(
+                        months,
+                        mean_e.values,
+                        color="tab:blue",
+                        label=source.experiment.name,
+                        linewidth=2,
+                    )
+                    ax_i.legend(loc="best", fontsize="x-small")
 
             units_str = da_base.attrs.get("units", "")
         else:
@@ -303,11 +426,14 @@ def _plot_seasonal_faceted(
 
             # Check if we have sufficient data
             if mean is not None:
-                if include_climos:
-                    ax_i.fill_between(
-                        months, lo.values, hi.values, alpha=0.2, color="tab:blue"
-                    )
-                ax_i.plot(months, mean.values, color="tab:blue", linewidth=2)
+                has_vertical = _plot_vertical_seasonal_lines(ax_i, months, mean, linewidth=2)
+                if has_vertical:
+                    if unit_id == units[0]:
+                        ax_i.legend(loc="best", fontsize="xx-small", title="Depth levels")
+                else:
+                    if include_climos:
+                        ax_i.fill_between(months, lo.values, hi.values, alpha=0.2, color="tab:blue")
+                    ax_i.plot(months, mean.values, color="tab:blue", linewidth=2)
 
             units_str = da.attrs.get("units", "")
 

@@ -111,6 +111,44 @@ def test_seasonal(plot_run):
     plt.close("all")
 
 
+def test_seasonal_vertical_depth_coloring_and_legend():
+    """Seasonal plots should render one colored line per depth with a legend."""
+    n_months = 24
+    n_levels = 12
+    phase = np.linspace(0.0, 2.0 * np.pi, n_months)
+    profile = np.linspace(0.5, 1.5, n_levels)
+    data = np.sin(phase)[:, None] * profile[None, :]
+
+    ds = make_single_point_dataset(
+        start_year=2000,
+        n_months=n_months,
+        variables={
+            "SOILLIQ": {
+                "data": data,
+                "units": "kg/m2",
+                "cell_methods": "time: point",
+            }
+        },
+    )
+    ds = ds.assign_coords(levgrnd=np.linspace(0.02, 3.0, n_levels))
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        save_as_elm_files(ds, Path(tmpdir), casename="vertical_seasonal_test", tape="h0")
+        run = Run(tmpdir)
+        fig = plot_seasonal(run, "SOILLIQ")
+        ax = fig.axes[0]
+
+        assert len(ax.lines) == n_levels
+        assert ax.get_legend() is not None
+        assert len(ax.get_legend().get_texts()) <= 8
+
+        run.close()
+
+    import matplotlib.pyplot as plt
+
+    plt.close("all")
+
+
 def test_seasonal_short_data(short_run):
     """Seasonal works even with only 12 months (one year)."""
     fig = plot_seasonal(short_run, "RAIN")
