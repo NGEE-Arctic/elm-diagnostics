@@ -121,3 +121,50 @@ def test_invalid_envelope_rejected():
         f.flush()
         with pytest.raises(Exception):
             load_config(path=f.name)
+
+
+def test_hovmuller_max_depth_default_none():
+    config = load_config()
+    assert config.plots.hovmuller.max_depth_m is None
+
+
+def test_hovmuller_max_depth_override():
+    override = {"plots": {"hovmuller": {"max_depth_m": 2.5}}}
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
+        yaml.dump(override, f)
+        f.flush()
+        config = load_config(path=f.name)
+
+    assert config.plots.hovmuller.max_depth_m == 2.5
+
+
+def test_hovmuller_color_limit_defaults():
+    config = load_config()
+    hov = config.plots.hovmuller
+    assert hov.color_limit_method == "full_range"
+    assert hov.color_limit_quantile_low == 2.0
+    assert hov.color_limit_quantile_high == 98.0
+    assert hov.color_limit_sigma == 2.0
+
+
+def test_hovmuller_color_limit_override():
+    override = {
+        "plots": {
+            "hovmuller": {
+                "color_limit_method": "quantile",
+                "color_limit_quantile_low": 5.0,
+                "color_limit_quantile_high": 95.0,
+                "color_limit_sigma": 3.0,
+            }
+        }
+    }
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
+        yaml.dump(override, f)
+        f.flush()
+        config = load_config(path=f.name)
+
+    hov = config.plots.hovmuller
+    assert hov.color_limit_method == "quantile"
+    assert hov.color_limit_quantile_low == 5.0
+    assert hov.color_limit_quantile_high == 95.0
+    assert hov.color_limit_sigma == 3.0

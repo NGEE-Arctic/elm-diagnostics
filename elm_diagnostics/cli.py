@@ -113,7 +113,7 @@ def complete_balance_type(incomplete: str) -> List[str]:
 
 def complete_plot_kind(incomplete: str) -> List[str]:
     """Auto-complete plot kinds."""
-    kinds = ["timeseries", "seasonal", "anomaly", "histogram", "diurnal"]
+    kinds = ["timeseries", "hovmuller", "seasonal", "anomaly", "histogram", "diurnal"]
     return [k for k in kinds if k.startswith(incomplete)]
 
 
@@ -618,7 +618,7 @@ def plot(
     kind: str = typer.Option(
         "timeseries",
         "--kind",
-        help="Plot type: timeseries, seasonal, anomaly, histogram, or diurnal.",
+        help="Plot type: timeseries, hovmuller, seasonal, anomaly, histogram, or diurnal.",
         autocompletion=complete_plot_kind,
     ),
     out: Optional[str] = typer.Option(
@@ -637,7 +637,8 @@ def plot(
     Plot a single variable.
 
     Generate various plot types for ELM output variables including time series,
-    seasonal cycles, annual anomalies, histograms, and diurnal cycles.
+    Hovmuller diagrams, seasonal cycles, annual anomalies, histograms,
+    and diurnal cycles.
 
     Examples:
 
@@ -673,6 +674,7 @@ def plot(
         from elm_diagnostics.io.run import Run
         from elm_diagnostics.plots import (
             plot_anomaly,
+            plot_hovmuller,
             plot_histogram,
             plot_seasonal,
             plot_timeseries,
@@ -680,6 +682,7 @@ def plot(
 
         plot_funcs = {
             "timeseries": plot_timeseries,
+            "hovmuller": plot_hovmuller,
             "seasonal": plot_seasonal,
             "anomaly": plot_anomaly,
             "histogram": plot_histogram,

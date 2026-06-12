@@ -148,6 +148,7 @@ fig_e, fig_f = eb.plot()
 from elm_diagnostics import Run
 from elm_diagnostics.plots import (
     plot_timeseries,
+  plot_hovmuller,
     plot_seasonal,
     plot_anomaly,
     plot_histogram,
@@ -159,6 +160,14 @@ run = Run("/path/to/case")
 # Time series with climatology envelope (for multi-year data)
 fig = plot_timeseries(run, "GPP")
 fig.savefig("gpp_timeseries.png")
+
+# Vertically resolved variable: one line per depth level with depth-colored legend
+fig = plot_timeseries(run, "SOILLIQ")
+fig.savefig("soilliq_depth_timeseries.png")
+
+# Hovmuller plot for vertically resolved variables (time x depth)
+fig = plot_hovmuller(run, "SOILLIQ")
+fig.savefig("soilliq_hovmuller.png")
 
 # Seasonal cycle (monthly mean with spread)
 fig = plot_seasonal(run, "RAIN")
@@ -189,6 +198,11 @@ fig.savefig("multi_panel.png")
 
 **Available plot types:**
 - **`plot_timeseries`**: Time series with optional climatology envelope
+- For variables with a vertical dimension (`levgrnd`, `levsoi`, etc.),
+  `plot_timeseries` draws one line per depth with color varying by depth
+  and an automatically thinned depth legend.
+- **`plot_hovmuller`**: Hovmuller diagram (time on x-axis, depth on y-axis,
+  colored by variable value)
 - **`plot_seasonal`**: Monthly mean seasonal cycle with spread (minmax/p10_p90/std)
 - **`plot_anomaly`**: Annual anomalies as bar chart (positive=blue, negative=red)
 - **`plot_histogram`**: Distribution histogram or PDF
@@ -273,7 +287,9 @@ report.build("output_directory/")
 **Report Features:**
 - **Interactive thumbnails**: Click images to view full-size in lightbox modal
 - **Comprehensive coverage**: All 3 balance types (water, carbon, energy) + variable groups
-- **Multiple plot types**: Timeseries, seasonal, anomaly, histogram, and diurnal for each variable
+- **Multiple plot types**: Timeseries, Hovmuller, seasonal, anomaly, histogram, and diurnal for each variable
+- **Grouped plot subsections**: Variable sections include plot-type subheadings
+  (for example, Timeseries plots and Hovmuller plots)
 - **Statistics tables**: Summary statistics for each balance section
 - **Error diagnostics**: Clear reporting of any issues encountered
 - **Comparison support**: Side-by-side base vs. experiment analysis
@@ -316,7 +332,7 @@ report:
     dpi: 72
   
   plot_types:
-    include: [timeseries, seasonal, anomaly, histogram, diurnal]
+    include: [timeseries, hovmuller, seasonal, anomaly, histogram, diurnal]
   
   variable_sections:
     max_variables_per_group: 10
@@ -333,6 +349,11 @@ report:
   metadata:
     show_run_info: true
     show_generation_timestamp: true
+
+plots:
+  hovmuller:
+    max_depth_m: null  # null keeps full vertical extent from source variable
+                      # set a float (meters) to cap plotted depth/height
 ```
 
 ## Command-Line Interface
@@ -460,7 +481,7 @@ elm-diagnostics plot FSH /path/to/elm/output --kind anomaly --out fsh_anomalies.
 elm-diagnostics plot ER /path/to/elm/output --kind histogram --out er_distribution.png
 ```
 
-**Available plot types:** `timeseries`, `seasonal`, `anomaly`, `histogram`, `diurnal`
+**Available plot types:** `timeseries`, `hovmuller`, `seasonal`, `anomaly`, `histogram`, `diurnal`
 
 ### Verbosity Control
 

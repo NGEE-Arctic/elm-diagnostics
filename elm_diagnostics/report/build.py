@@ -32,6 +32,7 @@ from elm_diagnostics.plots import (
     plot_anomaly,
     plot_diurnal,
     plot_histogram,
+    plot_hovmuller,
     plot_seasonal,
     plot_timeseries,
 )
@@ -52,9 +53,16 @@ class _Section:
         self.id = re.sub(r"[^a-z0-9]+", "-", title.lower()).strip("-")
         self.description = description
         self.figures: list[dict[str, str]] = []
+        self.subsections: list[_Subsection] = []
         self.statistics: Any = {}
         self.extra_tables: list[dict[str, Any]] = []
         self.extra_text_blocks: list[dict[str, str]] = []
+
+    def add_subsection(self, title: str) -> "_Subsection":
+        """Create a named subsection for grouped figures."""
+        subsection = _Subsection(self.id, title)
+        self.subsections.append(subsection)
+        return subsection
 
     def add_figure(
         self, path: str, thumb_path: str, caption: str, plot_type: str = ""
@@ -98,6 +106,29 @@ class _Section:
     def add_text_block(self, title: str, content: str) -> None:
         """Add a preformatted text block beneath section tables."""
         self.extra_text_blocks.append({"title": title, "content": content})
+
+
+class _Subsection:
+    """Container for grouped figures within a report section."""
+
+    def __init__(self, section_id: str, title: str):
+        self.title = title
+        slug = re.sub(r"[^a-z0-9]+", "-", title.lower()).strip("-")
+        self.id = f"{section_id}-{slug}"
+        self.figures: list[dict[str, str]] = []
+
+    def add_figure(
+        self, path: str, thumb_path: str, caption: str, plot_type: str = ""
+    ) -> None:
+        """Add a figure to the subsection."""
+        self.figures.append(
+            {
+                "path": path,
+                "thumb_path": thumb_path,
+                "caption": caption,
+                "plot_type": plot_type,
+            }
+        )
 
 
 class Report:
@@ -949,6 +980,12 @@ class Report:
             plot_seconds = 0.0
             section_title = group_name.replace("_", " ").title()
             sec = _Section(section_title)
+            subsection_by_plot_type = {
+                plot_type: sec.add_subsection(
+                    f"{plot_type.replace('_', ' ').title()} plots"
+                )
+                for plot_type in plot_types
+            }
             self._announce_section_progress(section_title)
 
             # Limit number of variables if configured
@@ -985,8 +1022,13 @@ class Report:
                                 fig, figdir, basename
                             )
                             io_seconds += time.perf_counter() - io_start
-                            caption = f"{varname} ({plot_type})"
-                            sec.add_figure(full_path, thumb_path, caption, plot_type)
+                            caption = f"{varname}"
+                            subsection_by_plot_type[plot_type].add_figure(
+                                full_path,
+                                thumb_path,
+                                caption,
+                                plot_type,
+                            )
                     except Exception:
                         # Silently skip individual plot failures
                         # (e.g., diurnal for monthly data, seasonal for insufficient data)
@@ -996,7 +1038,8 @@ class Report:
                             plt.close(fig)
                         self._close_new_figures(existing_fignums)
 
-            if sec.figures:
+            has_grouped_figures = any(sub.figures for sub in sec.subsections)
+            if sec.figures or has_grouped_figures:
                 sections.append(sec)
 
             self._record_section_timing(
@@ -1079,6 +1122,13 @@ class Report:
             return (
                 plot_diurnal(self.source, varname, config=self.config),
                 compute_seconds,
+                time.perf_counter() - plot_start,
+            )
+        elif plot_type == "hovmuller":
+            plot_start = time.perf_counter()
+            return (
+                plot_hovmuller(self.source, varname, config=self.config),
+                0.0,
                 time.perf_counter() - plot_start,
             )
         else:
@@ -1187,7 +1237,10 @@ class Report:
         title = self.config.report.title_template.format(casename=self._casename)
 
         # Generate summary statistics
-        total_figures = sum(len(s.figures) for s in sections)
+        total_figures = sum(
+            len(s.figures) + sum(len(sub.figures) for sub in s.subsections)
+            for s in sections
+        )
         total_errors = len(self._errors)
         total_warnings = len(self._warnings)
 
@@ -1225,6 +1278,14 @@ class Report:
                     "title": s.title,
                     "description": s.description,
                     "figures": s.figures,
+                    "subsections": [
+                        {
+                            "id": sub.id,
+                            "title": sub.title,
+                            "figures": sub.figures,
+                        }
+                        for sub in s.subsections
+                    ],
                     "statistics": s.statistics,
                     "extra_tables": s.extra_tables,
                     "extra_text_blocks": s.extra_text_blocks,
