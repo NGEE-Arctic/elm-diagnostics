@@ -71,8 +71,10 @@ def test_report_command_help():
     import re
     output_clean = re.sub(r'\x1b\[[0-9;]*m', '', result.output)
     assert "--compare" in output_clean
-    assert "--year" in output_clean
-    assert "--all-years" in output_clean
+    assert "--config" in output_clean
+    assert "--year" not in output_clean
+    assert "--all-years" not in output_clean
+    assert "--water-year-start" not in output_clean
 
 
 def test_balance_command_help():
@@ -102,8 +104,24 @@ def test_report_command_basic(synthetic_data_dir, temp_output_dir):
     assert (temp_output_dir / "index.html").exists()
 
 
-def test_report_with_year(synthetic_data_dir, temp_output_dir):
-    """Test report generation for specific year."""
+def test_report_with_analysis_window_config(synthetic_data_dir, temp_output_dir, tmp_path):
+    """Test report generation using year window in config."""
+    config_file = tmp_path / "analysis_window.yaml"
+    config_file.write_text(
+        "\n".join(
+            [
+                "time:",
+                "  analysis_start_year: 2000",
+                "  analysis_end_year: 2000",
+                "  water_year_start_month: 10",
+                "plots:",
+                "  climatology:",
+                "    include_climos: false",
+                "",
+            ]
+        )
+    )
+
     result = runner.invoke(
         app,
         [
@@ -111,8 +129,8 @@ def test_report_with_year(synthetic_data_dir, temp_output_dir):
             str(synthetic_data_dir),
             "--out",
             str(temp_output_dir),
-            "--year",
-            "2000",
+            "--config",
+            str(config_file),
             "--quiet",
         ],
     )
@@ -347,44 +365,8 @@ def test_conflicting_quiet_verbose(synthetic_data_dir, temp_output_dir):
 
 
 # =============================================================================
-# Flag Tests
+# Option Tests
 # =============================================================================
-
-
-def test_all_years_flag(synthetic_data_dir, temp_output_dir):
-    """Test --all-years flag."""
-    result = runner.invoke(
-        app,
-        [
-            "report",
-            str(synthetic_data_dir),
-            "--out",
-            str(temp_output_dir),
-            "--all-years",
-            "--quiet",
-        ],
-    )
-    assert result.exit_code == 0
-    assert (temp_output_dir / "index.html").exists()
-
-
-def test_water_year_start_flag(synthetic_data_dir, temp_output_dir):
-    """Test --water-year-start flag."""
-    result = runner.invoke(
-        app,
-        [
-            "report",
-            str(synthetic_data_dir),
-            "--out",
-            str(temp_output_dir),
-            "--water-year-start",
-            "10",
-            "--quiet",
-        ],
-    )
-    assert result.exit_code == 0
-    # Currently shows a note about config support
-    assert "Water year" in result.output or "Report generated" in result.output
 
 
 def test_verbose_flag(synthetic_data_dir, temp_output_dir):
@@ -422,43 +404,6 @@ def test_quiet_flag_suppresses_output(synthetic_data_dir, temp_output_dir):
     assert "Loading" not in result.output or "Saved to" in result.output
 
 
-def test_year_and_all_years_conflict(synthetic_data_dir, temp_output_dir):
-    """Test that --year and --all-years cannot be used together."""
-    result = runner.invoke(
-        app,
-        [
-            "report",
-            str(synthetic_data_dir),
-            "--out",
-            str(temp_output_dir),
-            "--year",
-            "2000",
-            "--all-years",
-            "--quiet",
-        ],
-    )
-    assert result.exit_code == 1
-    assert "Cannot specify both" in result.output
-
-
-def test_water_year_start_validation(synthetic_data_dir, temp_output_dir):
-    """Test that --water-year-start validates range."""
-    result = runner.invoke(
-        app,
-        [
-            "report",
-            str(synthetic_data_dir),
-            "--out",
-            str(temp_output_dir),
-            "--water-year-start",
-            "13",  # Invalid, should be 1-12
-            "--quiet",
-        ],
-    )
-    assert result.exit_code == 2  # Usage error
-    assert "range" in result.output.lower() or "invalid" in result.output.lower()
-
-
 def test_analysis_year_filter_includes_previous_year_for_water_year(tmp_path):
     """Year narrowing should include prior year for water-year framing."""
     cfg = tmp_path / "config.yaml"
@@ -466,6 +411,8 @@ def test_analysis_year_filter_includes_previous_year_for_water_year(tmp_path):
         "\n".join(
             [
                 "time:",
+                "  analysis_start_year: 2000",
+                "  analysis_end_year: 2000",
                 "  water_year_start_month: 10",
                 "plots:",
                 "  climatology:",
@@ -475,8 +422,30 @@ def test_analysis_year_filter_includes_previous_year_for_water_year(tmp_path):
         )
     )
 
-    lo, hi = _resolve_analysis_year_filter(str(cfg), year=2000, all_years=False)
+    lo, hi = _resolve_analysis_year_filter(str(cfg))
     assert (lo, hi) == (1999, 2000)
+
+
+def test_analysis_year_filter_uses_config_window(tmp_path):
+    """Year narrowing should honor config start/end year bounds."""
+    cfg = tmp_path / "config.yaml"
+    cfg.write_text(
+        "\n".join(
+            [
+                "time:",
+                "  analysis_start_year: 1990",
+                "  analysis_end_year: 1995",
+                "  water_year_start_month: 1",
+                "plots:",
+                "  climatology:",
+                "    include_climos: false",
+                "",
+            ]
+        )
+    )
+
+    lo, hi = _resolve_analysis_year_filter(str(cfg))
+    assert (lo, hi) == (1990, 1995)
 
 
 # =============================================================================
@@ -642,16 +611,31 @@ plots:
     assert (temp_output_dir / "index.html").exists()
 
 
-def test_balance_with_year(synthetic_data_dir, temp_output_dir):
-    """Test balance command with specific year."""
+def test_balance_with_analysis_window_config(synthetic_data_dir, temp_output_dir, tmp_path):
+    """Test balance command uses year window in config."""
+    config_file = tmp_path / "analysis_window.yaml"
+    config_file.write_text(
+        "\n".join(
+            [
+                "time:",
+                "  analysis_start_year: 2000",
+                "  analysis_end_year: 2000",
+                "plots:",
+                "  climatology:",
+                "    include_climos: false",
+                "",
+            ]
+        )
+    )
+
     result = runner.invoke(
         app,
         [
             "balance",
             "water",
             str(synthetic_data_dir),
-            "--year",
-            "2000",
+            "--config",
+            str(config_file),
             "--out",
             str(temp_output_dir),
             "--quiet",
