@@ -990,6 +990,21 @@ class Report:
         for fignum in set(plt.get_fignums()) - existing_fignums:
             plt.close(fignum)
 
+    @staticmethod
+    def _build_var_plot_context(var: xr.DataArray) -> dict[str, Any]:
+        """Precompute reusable time metadata for plot eligibility checks."""
+        n_time = len(var.time)
+        is_subdaily = False
+        if n_time >= 24:
+            time_diff = np.diff(var.time.values).astype("timedelta64[h]").astype(int)
+            if time_diff.size > 0:
+                is_subdaily = bool(np.median(time_diff) < 24)
+
+        return {
+            "n_time": n_time,
+            "is_subdaily": is_subdaily,
+        }
+
     def _build_variable_sections(self, figdir: Path) -> list[_Section]:
         sections = []
         groups = self.config.variables.groups
@@ -1022,10 +1037,12 @@ class Report:
             for varname in varnames_to_plot:
                 compute_start = time.perf_counter()
                 var = None
+                var_context: dict[str, Any] | None = None
                 has_var = run.has(varname)
                 if has_var:
                     # Load once so validation checks do not repeatedly call run.get(varname).
                     var = run.get(varname)
+                    var_context = self._build_var_plot_context(var)
                 compute_seconds += time.perf_counter() - compute_start
                 if var is None:
                     continue
@@ -1040,6 +1057,7 @@ class Report:
                                 plot_type,
                                 varname,
                                 var,
+                                var_context,
                             )
                         )
                         compute_seconds += plot_compute_seconds
@@ -1096,6 +1114,7 @@ class Report:
         plot_type: str,
         varname: str,
         var: xr.DataArray,
+        var_context: dict[str, Any] | None,
     ) -> tuple[plt.Figure | None, float, float]:
         """Create one plot and return aggregated compute and render timings.
 
@@ -1113,7 +1132,8 @@ class Report:
         elif plot_type == "seasonal":
             # Check if we have enough data
             compute_start = time.perf_counter()
-            if len(var.time) < 12:
+            n_time = int((var_context or {}).get("n_time", len(var.time)))
+            if n_time < 12:
                 return None, time.perf_counter() - compute_start, 0.0
             compute_seconds = time.perf_counter() - compute_start
             plot_start = time.perf_counter()
@@ -1125,7 +1145,8 @@ class Report:
         elif plot_type == "anomaly":
             # Check if we have enough data (need at least 2 years)
             compute_start = time.perf_counter()
-            if len(var.time) < 24:  # Rough approximation
+            n_time = int((var_context or {}).get("n_time", len(var.time)))
+            if n_time < 24:  # Rough approximation
                 return None, time.perf_counter() - compute_start, 0.0
             compute_seconds = time.perf_counter() - compute_start
             plot_start = time.perf_counter()
@@ -1144,12 +1165,11 @@ class Report:
         elif plot_type == "diurnal":
             # Check if data is sub-daily
             compute_start = time.perf_counter()
-            if len(var.time) < 24:
+            n_time = int((var_context or {}).get("n_time", len(var.time)))
+            if n_time < 24:
                 return None, time.perf_counter() - compute_start, 0.0
-            # Check time resolution
-            time_diff = np.diff(var.time.values).astype("timedelta64[h]").astype(int)
-            median_hours = np.median(time_diff)
-            if median_hours >= 24:
+            is_subdaily = bool((var_context or {}).get("is_subdaily", False))
+            if not is_subdaily:
                 return None, time.perf_counter() - compute_start, 0.0  # Not sub-daily
             compute_seconds = time.perf_counter() - compute_start
             plot_start = time.perf_counter()
