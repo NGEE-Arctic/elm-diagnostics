@@ -1090,53 +1090,54 @@ class Report:
                     continue
 
                 # Try each plot type
-                for plot_type in plot_types:
-                    fig: plt.Figure | None = None
-                    existing_fignums = set(plt.get_fignums())
-                    try:
-                        fig, plot_compute_seconds, plot_render_seconds = (
-                            self._create_plot(
-                                plot_type,
-                                varname,
-                                var,
-                                base_var,
-                                var_context,
+                with self._plot_source_cache_context(varname, var, base_var):
+                    for plot_type in plot_types:
+                        fig: plt.Figure | None = None
+                        existing_fignums = set(plt.get_fignums())
+                        try:
+                            fig, plot_compute_seconds, plot_render_seconds = (
+                                self._create_plot(
+                                    plot_type,
+                                    varname,
+                                    var,
+                                    base_var,
+                                    var_context,
+                                )
                             )
-                        )
-                        compute_seconds += plot_compute_seconds
-                        plot_seconds += plot_render_seconds
-                        io_elapsed = 0.0
-                        if fig is not None:
-                            basename = f"{group_name}_{varname}_{plot_type}"
-                            io_start = time.perf_counter()
-                            full_path, thumb_path = self._save_figure(
-                                fig, figdir, basename
+                            compute_seconds += plot_compute_seconds
+                            plot_seconds += plot_render_seconds
+                            io_elapsed = 0.0
+                            if fig is not None:
+                                basename = f"{group_name}_{varname}_{plot_type}"
+                                io_start = time.perf_counter()
+                                full_path, thumb_path = self._save_figure(
+                                    fig, figdir, basename
+                                )
+                                io_elapsed = time.perf_counter() - io_start
+                                io_seconds += io_elapsed
+                                caption = f"{varname}"
+                                subsection_by_plot_type[plot_type].add_figure(
+                                    full_path,
+                                    thumb_path,
+                                    caption,
+                                    plot_type,
+                                )
+                            self._record_plot_timing(
+                                section_title=section_title,
+                                varname=varname,
+                                plot_type=plot_type,
+                                compute_seconds=plot_compute_seconds,
+                                plot_seconds=plot_render_seconds,
+                                io_seconds=io_elapsed,
                             )
-                            io_elapsed = time.perf_counter() - io_start
-                            io_seconds += io_elapsed
-                            caption = f"{varname}"
-                            subsection_by_plot_type[plot_type].add_figure(
-                                full_path,
-                                thumb_path,
-                                caption,
-                                plot_type,
-                            )
-                        self._record_plot_timing(
-                            section_title=section_title,
-                            varname=varname,
-                            plot_type=plot_type,
-                            compute_seconds=plot_compute_seconds,
-                            plot_seconds=plot_render_seconds,
-                            io_seconds=io_elapsed,
-                        )
-                    except Exception:
-                        # Silently skip individual plot failures
-                        # (e.g., diurnal for monthly data, seasonal for insufficient data)
-                        pass
-                    finally:
-                        if fig is not None:
-                            plt.close(fig)
-                        self._close_new_figures(existing_fignums)
+                        except Exception:
+                            # Silently skip individual plot failures
+                            # (e.g., diurnal for monthly data, seasonal for insufficient data)
+                            pass
+                        finally:
+                            if fig is not None:
+                                plt.close(fig)
+                            self._close_new_figures(existing_fignums)
 
             has_grouped_figures = any(sub.figures for sub in sec.subsections)
             if sec.figures or has_grouped_figures:
@@ -1168,12 +1169,11 @@ class Report:
         """
         if plot_type == "timeseries":
             plot_start = time.perf_counter()
-            with self._plot_source_cache_context(varname, var, base_var):
-                return (
-                    plot_timeseries(self.source, varname, config=self.config),
-                    0.0,
-                    time.perf_counter() - plot_start,
-                )
+            return (
+                plot_timeseries(self.source, varname, config=self.config),
+                0.0,
+                time.perf_counter() - plot_start,
+            )
         elif plot_type == "seasonal":
             # Check if we have enough data
             compute_start = time.perf_counter()
@@ -1182,12 +1182,11 @@ class Report:
                 return None, time.perf_counter() - compute_start, 0.0
             compute_seconds = time.perf_counter() - compute_start
             plot_start = time.perf_counter()
-            with self._plot_source_cache_context(varname, var, base_var):
-                return (
-                    plot_seasonal(self.source, varname, config=self.config),
-                    compute_seconds,
-                    time.perf_counter() - plot_start,
-                )
+            return (
+                plot_seasonal(self.source, varname, config=self.config),
+                compute_seconds,
+                time.perf_counter() - plot_start,
+            )
         elif plot_type == "anomaly":
             # Check if we have enough data (need at least 2 years)
             compute_start = time.perf_counter()
@@ -1196,20 +1195,18 @@ class Report:
                 return None, time.perf_counter() - compute_start, 0.0
             compute_seconds = time.perf_counter() - compute_start
             plot_start = time.perf_counter()
-            with self._plot_source_cache_context(varname, var, base_var):
-                return (
-                    plot_anomaly(self.source, varname, config=self.config),
-                    compute_seconds,
-                    time.perf_counter() - plot_start,
-                )
+            return (
+                plot_anomaly(self.source, varname, config=self.config),
+                compute_seconds,
+                time.perf_counter() - plot_start,
+            )
         elif plot_type == "histogram":
             plot_start = time.perf_counter()
-            with self._plot_source_cache_context(varname, var, base_var):
-                return (
-                    plot_histogram(self.source, varname, config=self.config),
-                    0.0,
-                    time.perf_counter() - plot_start,
-                )
+            return (
+                plot_histogram(self.source, varname, config=self.config),
+                0.0,
+                time.perf_counter() - plot_start,
+            )
         elif plot_type == "diurnal":
             # Check if data is sub-daily
             compute_start = time.perf_counter()
@@ -1221,20 +1218,18 @@ class Report:
                 return None, time.perf_counter() - compute_start, 0.0  # Not sub-daily
             compute_seconds = time.perf_counter() - compute_start
             plot_start = time.perf_counter()
-            with self._plot_source_cache_context(varname, var, base_var):
-                return (
-                    plot_diurnal(self.source, varname, config=self.config),
-                    compute_seconds,
-                    time.perf_counter() - plot_start,
-                )
+            return (
+                plot_diurnal(self.source, varname, config=self.config),
+                compute_seconds,
+                time.perf_counter() - plot_start,
+            )
         elif plot_type == "hovmuller":
             plot_start = time.perf_counter()
-            with self._plot_source_cache_context(varname, var, base_var):
-                return (
-                    plot_hovmuller(self.source, varname, config=self.config),
-                    0.0,
-                    time.perf_counter() - plot_start,
-                )
+            return (
+                plot_hovmuller(self.source, varname, config=self.config),
+                0.0,
+                time.perf_counter() - plot_start,
+            )
         else:
             return None, 0.0, 0.0
 
