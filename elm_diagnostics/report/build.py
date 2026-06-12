@@ -11,6 +11,7 @@ import sys
 import threading
 import time
 import traceback
+from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -1005,6 +1006,44 @@ class Report:
             "is_subdaily": is_subdaily,
         }
 
+    @staticmethod
+    @contextmanager
+    def _cached_get_for_var(run: Run, varname: str, var: xr.DataArray):
+        """Temporarily memoize one variable lookup on a Run instance."""
+        original_get = run.get
+
+        def _get_with_cache(name: str) -> xr.DataArray:
+            if name == varname:
+                return var
+            return original_get(name)
+
+        run.get = _get_with_cache  # type: ignore[assignment]
+        try:
+            yield
+        finally:
+            run.get = original_get  # type: ignore[assignment]
+
+    @contextmanager
+    def _plot_source_cache_context(
+        self,
+        varname: str,
+        experiment_var: xr.DataArray,
+        base_var: xr.DataArray | None,
+    ):
+        """Cache active variable lookups for plot helpers during one plot call."""
+        if isinstance(self.source, Comparison) and base_var is not None:
+            with self._cached_get_for_var(
+                self.source.experiment,
+                varname,
+                experiment_var,
+            ):
+                with self._cached_get_for_var(self.source.base, varname, base_var):
+                    yield
+            return
+
+        with self._cached_get_for_var(self._run, varname, experiment_var):
+            yield
+
     def _build_variable_sections(self, figdir: Path) -> list[_Section]:
         sections = []
         groups = self.config.variables.groups
@@ -1037,11 +1076,14 @@ class Report:
             for varname in varnames_to_plot:
                 compute_start = time.perf_counter()
                 var = None
+                base_var = None
                 var_context: dict[str, Any] | None = None
                 has_var = run.has(varname)
                 if has_var:
                     # Load once so validation checks do not repeatedly call run.get(varname).
                     var = run.get(varname)
+                    if isinstance(self.source, Comparison):
+                        base_var = self.source.base.get(varname)
                     var_context = self._build_var_plot_context(var)
                 compute_seconds += time.perf_counter() - compute_start
                 if var is None:
@@ -1057,6 +1099,7 @@ class Report:
                                 plot_type,
                                 varname,
                                 var,
+                                base_var,
                                 var_context,
                             )
                         )
@@ -1114,6 +1157,7 @@ class Report:
         plot_type: str,
         varname: str,
         var: xr.DataArray,
+        base_var: xr.DataArray | None,
         var_context: dict[str, Any] | None,
     ) -> tuple[plt.Figure | None, float, float]:
         """Create one plot and return aggregated compute and render timings.
@@ -1124,11 +1168,12 @@ class Report:
         """
         if plot_type == "timeseries":
             plot_start = time.perf_counter()
-            return (
-                plot_timeseries(self.source, varname, config=self.config),
-                0.0,
-                time.perf_counter() - plot_start,
-            )
+            with self._plot_source_cache_context(varname, var, base_var):
+                return (
+                    plot_timeseries(self.source, varname, config=self.config),
+                    0.0,
+                    time.perf_counter() - plot_start,
+                )
         elif plot_type == "seasonal":
             # Check if we have enough data
             compute_start = time.perf_counter()
@@ -1137,11 +1182,12 @@ class Report:
                 return None, time.perf_counter() - compute_start, 0.0
             compute_seconds = time.perf_counter() - compute_start
             plot_start = time.perf_counter()
-            return (
-                plot_seasonal(self.source, varname, config=self.config),
-                compute_seconds,
-                time.perf_counter() - plot_start,
-            )
+            with self._plot_source_cache_context(varname, var, base_var):
+                return (
+                    plot_seasonal(self.source, varname, config=self.config),
+                    compute_seconds,
+                    time.perf_counter() - plot_start,
+                )
         elif plot_type == "anomaly":
             # Check if we have enough data (need at least 2 years)
             compute_start = time.perf_counter()
@@ -1150,18 +1196,20 @@ class Report:
                 return None, time.perf_counter() - compute_start, 0.0
             compute_seconds = time.perf_counter() - compute_start
             plot_start = time.perf_counter()
-            return (
-                plot_anomaly(self.source, varname, config=self.config),
-                compute_seconds,
-                time.perf_counter() - plot_start,
-            )
+            with self._plot_source_cache_context(varname, var, base_var):
+                return (
+                    plot_anomaly(self.source, varname, config=self.config),
+                    compute_seconds,
+                    time.perf_counter() - plot_start,
+                )
         elif plot_type == "histogram":
             plot_start = time.perf_counter()
-            return (
-                plot_histogram(self.source, varname, config=self.config),
-                0.0,
-                time.perf_counter() - plot_start,
-            )
+            with self._plot_source_cache_context(varname, var, base_var):
+                return (
+                    plot_histogram(self.source, varname, config=self.config),
+                    0.0,
+                    time.perf_counter() - plot_start,
+                )
         elif plot_type == "diurnal":
             # Check if data is sub-daily
             compute_start = time.perf_counter()
@@ -1173,18 +1221,20 @@ class Report:
                 return None, time.perf_counter() - compute_start, 0.0  # Not sub-daily
             compute_seconds = time.perf_counter() - compute_start
             plot_start = time.perf_counter()
-            return (
-                plot_diurnal(self.source, varname, config=self.config),
-                compute_seconds,
-                time.perf_counter() - plot_start,
-            )
+            with self._plot_source_cache_context(varname, var, base_var):
+                return (
+                    plot_diurnal(self.source, varname, config=self.config),
+                    compute_seconds,
+                    time.perf_counter() - plot_start,
+                )
         elif plot_type == "hovmuller":
             plot_start = time.perf_counter()
-            return (
-                plot_hovmuller(self.source, varname, config=self.config),
-                0.0,
-                time.perf_counter() - plot_start,
-            )
+            with self._plot_source_cache_context(varname, var, base_var):
+                return (
+                    plot_hovmuller(self.source, varname, config=self.config),
+                    0.0,
+                    time.perf_counter() - plot_start,
+                )
         else:
             return None, 0.0, 0.0
 
