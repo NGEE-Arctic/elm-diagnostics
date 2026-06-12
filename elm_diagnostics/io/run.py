@@ -124,8 +124,8 @@ def _extract_file_year(path: Path) -> int | None:
 def _filter_stream_files_by_year(
     files: list[Path],
     *,
-    year_min: int,
-    year_max: int,
+    year_min: int | None,
+    year_max: int | None,
     tolerance_years: int,
     tape: str,
 ) -> list[Path]:
@@ -159,18 +159,34 @@ def _filter_stream_files_by_year(
         )
         return files
 
-    filtered = [
-        path
-        for path, file_year in parsed
-        if (year_min - tolerance_years) <= file_year <= (year_max + tolerance_years)
-    ]
+    lo = None if year_min is None else year_min - tolerance_years
+    hi = None if year_max is None else year_max + tolerance_years
+
+    filtered = []
+    for path, file_year in parsed:
+        if lo is not None and file_year < lo:
+            continue
+        if hi is not None and file_year > hi:
+            continue
+        filtered.append(path)
+
     if filtered:
         return filtered
+
+    if year_min is None and year_max is None:
+        return files
+
+    if year_min is None:
+        year_range_label = f"<= {year_max}"
+    elif year_max is None:
+        year_range_label = f">= {year_min}"
+    else:
+        year_range_label = f"{year_min}:{year_max}"
 
     warnings.warn(
         (
             f"Early year filter for stream {tape} matched no files for "
-            f"year_range={year_min}:{year_max}; "
+            f"year_range={year_range_label}; "
             "using all files instead."
         ),
         RuntimeWarning,
@@ -252,7 +268,7 @@ class Run:
         else:
             self._stream_files = _discover_streams(self.path)
 
-        if self._analysis_year_min is not None and self._analysis_year_max is not None:
+        if self._analysis_year_min is not None or self._analysis_year_max is not None:
             self._stream_files = {
                 tape: _filter_stream_files_by_year(
                     files,

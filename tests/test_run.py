@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from elm_diagnostics.io.run import Run
+from elm_diagnostics.io.run import Run, _filter_stream_files_by_year
 from tests.fixtures.synthetic_elm import (
     make_water_balance_dataset,
     save_as_elm_files,
@@ -74,3 +74,45 @@ def test_run_repr(elm_case_dir):
     assert "test_case" in r
     assert "h0" in r
     run.close()
+
+
+def test_filter_stream_files_with_lower_bound_only():
+    files = [
+        Path("case.elm.h0.1999-01.nc"),
+        Path("case.elm.h0.2000-01.nc"),
+        Path("case.elm.h0.2001-01.nc"),
+    ]
+
+    filtered = _filter_stream_files_by_year(
+        files,
+        year_min=2000,
+        year_max=None,
+        tolerance_years=0,
+        tape="h0",
+    )
+
+    assert [p.name for p in filtered] == [
+        "case.elm.h0.2000-01.nc",
+        "case.elm.h0.2001-01.nc",
+    ]
+
+
+def test_filter_stream_files_with_upper_bound_only():
+    files = [
+        Path("case.elm.h0.1999-01.nc"),
+        Path("case.elm.h0.2000-01.nc"),
+        Path("case.elm.h0.2001-01.nc"),
+    ]
+
+    filtered = _filter_stream_files_by_year(
+        files,
+        year_min=None,
+        year_max=2000,
+        tolerance_years=0,
+        tape="h0",
+    )
+
+    assert [p.name for p in filtered] == [
+        "case.elm.h0.1999-01.nc",
+        "case.elm.h0.2000-01.nc",
+    ]
