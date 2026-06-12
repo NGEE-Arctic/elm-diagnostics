@@ -168,3 +168,52 @@ def test_hovmuller_color_limit_override():
     assert hov.color_limit_quantile_low == 5.0
     assert hov.color_limit_quantile_high == 95.0
     assert hov.color_limit_sigma == 3.0
+
+
+def test_analysis_year_window_defaults():
+    config = load_config()
+    assert config.time.analysis_start_year is None
+    assert config.time.analysis_end_year is None
+
+
+def test_analysis_year_window_override():
+    override = {
+        "time": {
+            "analysis_start_year": 2000,
+            "analysis_end_year": 2010,
+        }
+    }
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
+        yaml.dump(override, f)
+        f.flush()
+        config = load_config(path=f.name)
+
+    assert config.time.analysis_start_year == 2000
+    assert config.time.analysis_end_year == 2010
+
+
+def test_analysis_year_window_rejects_inverted_bounds():
+    override = {
+        "time": {
+            "analysis_start_year": 2010,
+            "analysis_end_year": 2000,
+        }
+    }
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
+        yaml.dump(override, f)
+        f.flush()
+        with pytest.raises(ValueError, match="analysis_start_year"):
+            load_config(path=f.name)
+
+
+def test_water_year_start_month_validation():
+    override = {
+        "time": {
+            "water_year_start_month": 13,
+        }
+    }
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
+        yaml.dump(override, f)
+        f.flush()
+        with pytest.raises(ValueError, match="water_year_start_month"):
+            load_config(path=f.name)

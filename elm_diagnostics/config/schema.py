@@ -7,7 +7,7 @@ from typing import Any, Literal
 
 import warnings
 import yaml
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 _DEFAULTS_PATH = Path(__file__).parent / "defaults.yaml"
 _USER_CONFIG_PATH = Path.home() / ".config" / "elm-diagnostics" / "config.yaml"
@@ -95,8 +95,19 @@ class ReportConfig(BaseModel):
 
 
 class TimeConfig(BaseModel):
-    water_year_start_month: int = 10
-    cumulative_years: str | list[int] = "all"
+    water_year_start_month: int = Field(default=10, ge=1, le=12)
+    analysis_start_year: int | None = None
+    analysis_end_year: int | None = None
+
+    @model_validator(mode="after")
+    def _validate_year_window(self) -> "TimeConfig":
+        if (
+            self.analysis_start_year is not None
+            and self.analysis_end_year is not None
+            and self.analysis_start_year > self.analysis_end_year
+        ):
+            raise ValueError("time.analysis_start_year must be <= time.analysis_end_year")
+        return self
 
 
 class WaterBalanceConfig(BaseModel):
