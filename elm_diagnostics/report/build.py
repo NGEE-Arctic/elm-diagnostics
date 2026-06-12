@@ -156,6 +156,7 @@ class Report:
         self._warnings: list[str] = []
         self._generation_time = datetime.now()
         self._section_timings: list[dict[str, Any]] = []
+        self._plot_timings: list[dict[str, Any]] = []
         self._rendered_section_titles: list[str] = []
         self._build_total_seconds: float | None = None
         self._progress_section_index = 0
@@ -336,6 +337,29 @@ class Report:
                 "io_seconds": io_seconds,
                 "compute_seconds": compute_seconds,
                 "plot_seconds": plot_seconds,
+            }
+        )
+
+    def _record_plot_timing(
+        self,
+        *,
+        section_title: str,
+        varname: str,
+        plot_type: str,
+        compute_seconds: float,
+        plot_seconds: float,
+        io_seconds: float,
+    ) -> None:
+        """Record timing details for a single variable/plot-type build."""
+        self._plot_timings.append(
+            {
+                "section": section_title,
+                "variable": varname,
+                "plot_type": plot_type,
+                "compute_seconds": compute_seconds,
+                "plot_seconds": plot_seconds,
+                "io_seconds": io_seconds,
+                "total_seconds": compute_seconds + plot_seconds + io_seconds,
             }
         )
 
@@ -997,9 +1021,13 @@ class Report:
 
             for varname in varnames_to_plot:
                 compute_start = time.perf_counter()
+                var = None
                 has_var = run.has(varname)
+                if has_var:
+                    # Load once so validation checks do not repeatedly call run.get(varname).
+                    var = run.get(varname)
                 compute_seconds += time.perf_counter() - compute_start
-                if not has_var:
+                if var is None:
                     continue
 
                 # Try each plot type
@@ -1011,17 +1039,20 @@ class Report:
                             self._create_plot(
                                 plot_type,
                                 varname,
+                                var,
                             )
                         )
                         compute_seconds += plot_compute_seconds
                         plot_seconds += plot_render_seconds
+                        io_elapsed = 0.0
                         if fig is not None:
                             basename = f"{group_name}_{varname}_{plot_type}"
                             io_start = time.perf_counter()
                             full_path, thumb_path = self._save_figure(
                                 fig, figdir, basename
                             )
-                            io_seconds += time.perf_counter() - io_start
+                            io_elapsed = time.perf_counter() - io_start
+                            io_seconds += io_elapsed
                             caption = f"{varname}"
                             subsection_by_plot_type[plot_type].add_figure(
                                 full_path,
@@ -1029,6 +1060,14 @@ class Report:
                                 caption,
                                 plot_type,
                             )
+                        self._record_plot_timing(
+                            section_title=section_title,
+                            varname=varname,
+                            plot_type=plot_type,
+                            compute_seconds=plot_compute_seconds,
+                            plot_seconds=plot_render_seconds,
+                            io_seconds=io_elapsed,
+                        )
                     except Exception:
                         # Silently skip individual plot failures
                         # (e.g., diurnal for monthly data, seasonal for insufficient data)
@@ -1056,6 +1095,7 @@ class Report:
         self,
         plot_type: str,
         varname: str,
+        var: xr.DataArray,
     ) -> tuple[plt.Figure | None, float, float]:
         """Create one plot and return aggregated compute and render timings.
 
@@ -1073,8 +1113,6 @@ class Report:
         elif plot_type == "seasonal":
             # Check if we have enough data
             compute_start = time.perf_counter()
-            run = self._run
-            var = run.get(varname)
             if len(var.time) < 12:
                 return None, time.perf_counter() - compute_start, 0.0
             compute_seconds = time.perf_counter() - compute_start
@@ -1087,8 +1125,6 @@ class Report:
         elif plot_type == "anomaly":
             # Check if we have enough data (need at least 2 years)
             compute_start = time.perf_counter()
-            run = self._run
-            var = run.get(varname)
             if len(var.time) < 24:  # Rough approximation
                 return None, time.perf_counter() - compute_start, 0.0
             compute_seconds = time.perf_counter() - compute_start
@@ -1108,8 +1144,6 @@ class Report:
         elif plot_type == "diurnal":
             # Check if data is sub-daily
             compute_start = time.perf_counter()
-            run = self._run
-            var = run.get(varname)
             if len(var.time) < 24:
                 return None, time.perf_counter() - compute_start, 0.0
             # Check time resolution
@@ -1211,6 +1245,37 @@ class Report:
             ],
             rows=timing_rows,
         )
+        if self._plot_timings:
+            top_plot_rows = []
+            for entry in sorted(
+                self._plot_timings,
+                key=lambda row: float(row["total_seconds"]),
+                reverse=True,
+            )[:15]:
+                top_plot_rows.append(
+                    [
+                        str(entry["section"]),
+                        str(entry["variable"]),
+                        str(entry["plot_type"]),
+                        f"{float(entry['total_seconds']):.2f}",
+                        f"{float(entry['compute_seconds']):.2f}",
+                        f"{float(entry['plot_seconds']):.2f}",
+                        f"{float(entry['io_seconds']):.2f}",
+                    ]
+                )
+            sec.add_table(
+                title="Top variable plot timings",
+                columns=[
+                    "Section",
+                    "Variable",
+                    "Plot",
+                    "Total (s)",
+                    "Prep/Checks (s)",
+                    "Plot Build (s)",
+                    "Export/Write (s)",
+                ],
+                rows=top_plot_rows,
+            )
         config_title, config_yaml = self._diagnostics_config_yaml()
         sec.add_text_block(config_title, config_yaml)
         self._record_section_timing(section_title, start_time)
