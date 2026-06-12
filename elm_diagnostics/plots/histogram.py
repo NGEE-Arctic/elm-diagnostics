@@ -25,14 +25,16 @@ def _squeeze_spatial(da: xr.DataArray) -> xr.DataArray:
 def _flatten_finite_values(da: xr.DataArray) -> np.ndarray:
     """Return finite values as a 1D NumPy array.
 
-    Materialize once and use NumPy filtering to avoid expensive xarray
-    stack/where operations for large arrays.
+    This keeps flattening and NaN filtering in xarray until the final
+    materialization step, which is friendlier to chunked arrays than
+    immediately calling ``.values.ravel()``.
     """
-    # Compute dask arrays once before NumPy filtering.
+    # Compute dask arrays before boolean indexing to avoid KeyError
     if hasattr(da, "chunks") and da.chunks is not None:
         da = da.compute()
-    values = np.asarray(da.values).ravel()
-    return values[np.isfinite(values)]
+    stacked = da.stack(sample=da.dims)
+    finite = stacked.where(np.isfinite(stacked), drop=True)
+    return finite.values
 
 
 def _append_long_name_line(title: str, da: xr.DataArray | None) -> str:
