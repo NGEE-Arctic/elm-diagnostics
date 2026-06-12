@@ -65,6 +65,8 @@ def _plot_multilevel_lines(
     level_values, _, level_name, level_units, _ = resolve_dimension_axis(da, dim)
     legend_idx = _legend_level_indices(n_levels, max_entries=legend_max_entries)
     cmap = plt.get_cmap("viridis")
+    time_values = _plot_time(da)
+    line_values = np.asarray(da.transpose(dim, "time").values)
 
     for i in range(n_levels):
         fraction = i / max(n_levels - 1, 1)
@@ -74,8 +76,8 @@ def _plot_multilevel_lines(
             else "_nolegend_"
         )
         ax.plot(
-            _plot_time(da),
-            da.isel({dim: i}).values,
+            time_values,
+            line_values[i, :],
             color=cmap(fraction),
             linestyle=linestyle,
             alpha=alpha,

@@ -64,6 +64,7 @@ def _plot_multilevel_seasonal_lines(
     level_values, _, level_name, level_units, _ = resolve_dimension_axis(mean_da, dim)
     legend_idx = _legend_level_indices(n_levels, max_entries=legend_max_entries)
     cmap = plt.get_cmap("viridis")
+    line_values = np.asarray(mean_da.transpose(dim, "month").values)
 
     for i in range(n_levels):
         fraction = i / max(n_levels - 1, 1)
@@ -74,7 +75,7 @@ def _plot_multilevel_seasonal_lines(
         )
         ax.plot(
             months,
-            mean_da.isel({dim: i}).values,
+            line_values[i, :],
             color=cmap(fraction),
             linestyle=linestyle,
             alpha=alpha,
