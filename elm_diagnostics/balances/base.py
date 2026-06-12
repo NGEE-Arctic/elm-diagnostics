@@ -19,15 +19,29 @@ from elm_diagnostics.time.calendars import (
 )
 
 
+_PLOT_TIME_CACHE: dict[int, list] = {}
+_PLOT_TIME_CACHE_MAX = 4096
+
+
 def _plot_time(da: xr.DataArray):
     """Return time values suitable for matplotlib plotting.
 
     Converts cftime dates to Python datetime objects since matplotlib
     cannot handle cftime types natively without nc_time_axis.
     """
+    time_data = da.coords["time"].data
+    cache_key = id(time_data)
+    cached = _PLOT_TIME_CACHE.get(cache_key)
+    if cached is not None:
+        return cached
+
     times = da.time.values
     if len(times) > 0 and isinstance(times[0], cftime.datetime):
-        return [t._to_real_datetime() for t in times]
+        converted = [t._to_real_datetime() for t in times]
+        if len(_PLOT_TIME_CACHE) >= _PLOT_TIME_CACHE_MAX:
+            _PLOT_TIME_CACHE.clear()
+        _PLOT_TIME_CACHE[cache_key] = converted
+        return converted
     return times
 
 
