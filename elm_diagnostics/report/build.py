@@ -1023,7 +1023,7 @@ class Report:
                                 caption,
                                 plot_type,
                             )
-                    except Exception as e:
+                    except Exception:
                         # Silently skip individual plot failures
                         # (e.g., diurnal for monthly data, seasonal for insufficient data)
                         pass
