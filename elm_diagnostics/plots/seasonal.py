@@ -227,22 +227,30 @@ def _plot_seasonal_single(
                 linewidth=1.8,
                 legend_max_entries=0,
             )
-            depth_legend = ax.legend(loc="upper right", fontsize="x-small", title=f"{level_dim} levels")
+            depth_legend = ax.legend(
+                loc="upper right", fontsize="x-small", title=f"{level_dim} levels"
+            )
             ax.add_artist(depth_legend)
             run_handles = [
                 Line2D([0], [0], color="black", linestyle="--", label=source.base.name),
-                Line2D([0], [0], color="black", linestyle="-", label=source.experiment.name),
+                Line2D(
+                    [0], [0], color="black", linestyle="-", label=source.experiment.name
+                ),
             ]
             ax.legend(handles=run_handles, loc="upper left", fontsize="x-small")
         else:
             if include_climos:
-                ax.fill_between(months, lo_b.values, hi_b.values, alpha=0.2, color="gray")
+                ax.fill_between(
+                    months, lo_b.values, hi_b.values, alpha=0.2, color="gray"
+                )
             ax.plot(
                 months, mean_b.values, color="gray", label=source.base.name, linewidth=2
             )
 
             if include_climos:
-                ax.fill_between(months, lo_e.values, hi_e.values, alpha=0.2, color="tab:blue")
+                ax.fill_between(
+                    months, lo_e.values, hi_e.values, alpha=0.2, color="tab:blue"
+                )
             ax.plot(
                 months,
                 mean_e.values,
@@ -281,7 +289,9 @@ def _plot_seasonal_single(
             ax.legend(loc="best", fontsize="x-small", title=f"{level_dim} levels")
         else:
             if include_climos:
-                ax.fill_between(months, lo.values, hi.values, alpha=0.2, color="tab:blue")
+                ax.fill_between(
+                    months, lo.values, hi.values, alpha=0.2, color="tab:blue"
+                )
             ax.plot(months, mean.values, color="tab:blue", linewidth=2)
         units = da.attrs.get("units", "")
 
@@ -385,13 +395,29 @@ def _plot_seasonal_faceted(
                         )
                         ax_i.add_artist(depth_legend)
                         run_handles = [
-                            Line2D([0], [0], color="black", linestyle="--", label=source.base.name),
-                            Line2D([0], [0], color="black", linestyle="-", label=source.experiment.name),
+                            Line2D(
+                                [0],
+                                [0],
+                                color="black",
+                                linestyle="--",
+                                label=source.base.name,
+                            ),
+                            Line2D(
+                                [0],
+                                [0],
+                                color="black",
+                                linestyle="-",
+                                label=source.experiment.name,
+                            ),
                         ]
-                        ax_i.legend(handles=run_handles, loc="upper left", fontsize="xx-small")
+                        ax_i.legend(
+                            handles=run_handles, loc="upper left", fontsize="xx-small"
+                        )
                 else:
                     if include_climos:
-                        ax_i.fill_between(months, lo_b.values, hi_b.values, alpha=0.2, color="gray")
+                        ax_i.fill_between(
+                            months, lo_b.values, hi_b.values, alpha=0.2, color="gray"
+                        )
                     ax_i.plot(
                         months,
                         mean_b.values,
@@ -400,7 +426,13 @@ def _plot_seasonal_faceted(
                         linewidth=2,
                     )
                     if include_climos:
-                        ax_i.fill_between(months, lo_e.values, hi_e.values, alpha=0.2, color="tab:blue")
+                        ax_i.fill_between(
+                            months,
+                            lo_e.values,
+                            hi_e.values,
+                            alpha=0.2,
+                            color="tab:blue",
+                        )
                     ax_i.plot(
                         months,
                         mean_e.values,
@@ -430,10 +462,14 @@ def _plot_seasonal_faceted(
                 )
                 if level_dim is not None:
                     if unit_id == units[0]:
-                        ax_i.legend(loc="best", fontsize="xx-small", title=f"{level_dim} levels")
+                        ax_i.legend(
+                            loc="best", fontsize="xx-small", title=f"{level_dim} levels"
+                        )
                 else:
                     if include_climos:
-                        ax_i.fill_between(months, lo.values, hi.values, alpha=0.2, color="tab:blue")
+                        ax_i.fill_between(
+                            months, lo.values, hi.values, alpha=0.2, color="tab:blue"
+                        )
                     ax_i.plot(months, mean.values, color="tab:blue", linewidth=2)
 
             units_str = da.attrs.get("units", "")

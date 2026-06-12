@@ -126,7 +126,9 @@ def _plot_anomaly_single(
             colors = ["tab:blue" if v >= 0 else "tab:red" for v in delta]
             ax.bar(common_years, delta, color=colors, alpha=0.8)
             ax.set_title(
-                _append_long_name_line(f"{varname} — Annual Anomaly (exp - base)", title_da)
+                _append_long_name_line(
+                    f"{varname} — Annual Anomaly (exp - base)", title_da
+                )
             )
         else:
             ax.text(

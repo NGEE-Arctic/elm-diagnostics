@@ -52,7 +52,11 @@ def _compute_color_limits(
 
     vmin_full = float(np.min(finite))
     vmax_full = float(np.max(finite))
-    if not np.isfinite(vmin_full) or not np.isfinite(vmax_full) or vmin_full == vmax_full:
+    if (
+        not np.isfinite(vmin_full)
+        or not np.isfinite(vmax_full)
+        or vmin_full == vmax_full
+    ):
         return None
 
     def _extend_for(vmin: float, vmax: float) -> str:
@@ -234,8 +238,12 @@ def _plot_hovmuller_run(
         )
 
     da2 = da.transpose("time", dim)
-    yvals_raw, axis_label_raw, _, level_units, is_depth_like = resolve_dimension_axis(da2, dim)
-    is_index_based_axis = axis_label_raw == f"{dim} index" or _is_index_like(np.asarray(yvals_raw))
+    yvals_raw, axis_label_raw, _, level_units, is_depth_like = resolve_dimension_axis(
+        da2, dim
+    )
+    is_index_based_axis = axis_label_raw == f"{dim} index" or _is_index_like(
+        np.asarray(yvals_raw)
+    )
     yvals, ylab, is_depth_like = _enforce_depth_convention(
         dim,
         yvals_raw,
@@ -303,7 +311,13 @@ def _plot_hovmuller_comparison(
 ) -> plt.Figure:
     """Plot side-by-side Hovmuller diagrams for a base/experiment comparison."""
     style = config.plots.style
-    fig, axes = plt.subplots(2, 1, figsize=(style.figsize[0], style.figsize[1] * 1.6), dpi=style.dpi, sharex=True)
+    fig, axes = plt.subplots(
+        2,
+        1,
+        figsize=(style.figsize[0], style.figsize[1] * 1.6),
+        dpi=style.dpi,
+        sharex=True,
+    )
 
     da_base = squeeze_spatial_dims(source.base.get(varname))
     da_exp = squeeze_spatial_dims(source.experiment.get(varname))
@@ -315,8 +329,12 @@ def _plot_hovmuller_comparison(
 
     base2 = da_base.transpose("time", dim)
     exp2 = da_exp.transpose("time", dim)
-    yvals_raw, axis_label_raw, _, level_units, is_depth_like = resolve_dimension_axis(exp2, dim)
-    is_index_based_axis = axis_label_raw == f"{dim} index" or _is_index_like(np.asarray(yvals_raw))
+    yvals_raw, axis_label_raw, _, level_units, is_depth_like = resolve_dimension_axis(
+        exp2, dim
+    )
+    is_index_based_axis = axis_label_raw == f"{dim} index" or _is_index_like(
+        np.asarray(yvals_raw)
+    )
     yvals, ylab, is_depth_like = _enforce_depth_convention(
         dim,
         yvals_raw,
@@ -410,7 +428,9 @@ def plot_hovmuller(
 
     if isinstance(source, Comparison):
         if ax is not None:
-            raise ValueError("Comparison Hovmuller creates its own figure; do not pass ax.")
+            raise ValueError(
+                "Comparison Hovmuller creates its own figure; do not pass ax."
+            )
         return _plot_hovmuller_comparison(source, varname, cfg)
 
     return _plot_hovmuller_run(source, varname, cfg, ax=ax)

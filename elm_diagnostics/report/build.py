@@ -64,7 +64,9 @@ class _Section:
         self.subsections.append(subsection)
         return subsection
 
-    def add_figure(self, path: str, thumb_path: str, caption: str, plot_type: str = "") -> None:
+    def add_figure(
+        self, path: str, thumb_path: str, caption: str, plot_type: str = ""
+    ) -> None:
         """Add a figure to the section.
 
         Parameters
@@ -115,7 +117,9 @@ class _Subsection:
         self.id = f"{section_id}-{slug}"
         self.figures: list[dict[str, str]] = []
 
-    def add_figure(self, path: str, thumb_path: str, caption: str, plot_type: str = "") -> None:
+    def add_figure(
+        self, path: str, thumb_path: str, caption: str, plot_type: str = ""
+    ) -> None:
         """Add a figure to the subsection."""
         self.figures.append(
             {
@@ -977,7 +981,9 @@ class Report:
             section_title = group_name.replace("_", " ").title()
             sec = _Section(section_title)
             subsection_by_plot_type = {
-                plot_type: sec.add_subsection(f"{plot_type.replace('_', ' ').title()} plots")
+                plot_type: sec.add_subsection(
+                    f"{plot_type.replace('_', ' ').title()} plots"
+                )
                 for plot_type in plot_types
             }
             self._announce_section_progress(section_title)
@@ -1031,7 +1037,7 @@ class Report:
                         if fig is not None:
                             plt.close(fig)
                         self._close_new_figures(existing_fignums)
-            
+
             has_grouped_figures = any(sub.figures for sub in sec.subsections)
             if sec.figures or has_grouped_figures:
                 sections.append(sec)

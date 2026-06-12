@@ -71,7 +71,9 @@ def _coord_score(name: str, coord: xr.DataArray, dim: str) -> int:
     return score
 
 
-def _coord_candidates_from_dataarray(da: xr.DataArray, dim: str) -> list[tuple[str, xr.DataArray]]:
+def _coord_candidates_from_dataarray(
+    da: xr.DataArray, dim: str
+) -> list[tuple[str, xr.DataArray]]:
     candidates: list[tuple[str, xr.DataArray]] = []
     for cname, coord in da.coords.items():
         if coord.dims == (dim,) and coord.size == da.sizes[dim]:

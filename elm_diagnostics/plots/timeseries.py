@@ -183,7 +183,9 @@ def _plot_timeseries_single(
             ax.add_artist(depth_legend)
             run_handles = [
                 Line2D([0], [0], color="black", linestyle="--", label=source.base.name),
-                Line2D([0], [0], color="black", linestyle="-", label=source.experiment.name),
+                Line2D(
+                    [0], [0], color="black", linestyle="-", label=source.experiment.name
+                ),
             ]
             ax.legend(handles=run_handles, loc="upper left", fontsize="x-small")
         else:
@@ -296,10 +298,24 @@ def _plot_timeseries_faceted(
                     )
                     ax_i.add_artist(depth_legend)
                     run_handles = [
-                        Line2D([0], [0], color="black", linestyle="--", label=source.base.name),
-                        Line2D([0], [0], color="black", linestyle="-", label=source.experiment.name),
+                        Line2D(
+                            [0],
+                            [0],
+                            color="black",
+                            linestyle="--",
+                            label=source.base.name,
+                        ),
+                        Line2D(
+                            [0],
+                            [0],
+                            color="black",
+                            linestyle="-",
+                            label=source.experiment.name,
+                        ),
                     ]
-                    ax_i.legend(handles=run_handles, loc="upper left", fontsize="xx-small")
+                    ax_i.legend(
+                        handles=run_handles, loc="upper left", fontsize="xx-small"
+                    )
             else:
                 ax_i.plot(
                     _plot_time(da_base_unit),
@@ -321,7 +337,9 @@ def _plot_timeseries_faceted(
             da_unit = squeeze_spatial_dims(da.sel({by: unit_id}))
             level_dim = _plot_multilevel_lines(ax_i, da_unit)
             if level_dim is not None and unit_id == units[0]:
-                ax_i.legend(loc="best", fontsize="xx-small", title=f"{level_dim} levels")
+                ax_i.legend(
+                    loc="best", fontsize="xx-small", title=f"{level_dim} levels"
+                )
             if level_dim is None:
                 ax_i.plot(_plot_time(da_unit), da_unit.values, color="tab:blue")
 
