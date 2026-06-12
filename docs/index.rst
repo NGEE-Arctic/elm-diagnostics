@@ -110,7 +110,7 @@ Command-Line Interface
    elm-diagnostics report /path/to/elm/output
 
    # Compute specific balance
-   elm-diagnostics balance water /path/to/elm/output --year 2015
+   elm-diagnostics balance water /path/to/elm/output --config year_2015.yaml
 
    # Plot single variable
    elm-diagnostics plot GPP /path/to/elm/output --kind seasonal

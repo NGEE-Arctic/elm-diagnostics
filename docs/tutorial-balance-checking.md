@@ -64,7 +64,7 @@ print(f"Residual: {wb.residual().values[-1]:.2f} mm")
 
 **Command-line (1 line):**
 ```bash
-elm-diagnostics balance water tests/fixtures/data --year 2001
+elm-diagnostics balance water tests/fixtures/data --config year_2001.yaml
 ```
 
 This will display the cumulative water balance plots and report the final residual.
@@ -573,24 +573,24 @@ Unlike water and carbon, energy balance:
 **Check all three balances:**
 ```bash
 # Water balance
-elm-diagnostics balance water tests/fixtures/data --year 2001
+elm-diagnostics balance water tests/fixtures/data --config year_2001.yaml
 
 # Carbon balance  
-elm-diagnostics balance carbon tests/fixtures/data --year 2001
+elm-diagnostics balance carbon tests/fixtures/data --config year_2001.yaml
 
 # Energy balance
-elm-diagnostics balance energy tests/fixtures/data --year 2001
+elm-diagnostics balance energy tests/fixtures/data --config year_2001.yaml
 ```
 
 **Save outputs:**
 ```bash
-elm-diagnostics balance water tests/fixtures/data --year 2001 --out ./results/
+elm-diagnostics balance water tests/fixtures/data --config year_2001.yaml --out ./results/
 # Creates: results/water_panel1.png, results/water_panel2.png, results/water_balance.nc
 ```
 
 **Quiet mode for scripts:**
 ```bash
-elm-diagnostics balance water tests/fixtures/data --year 2001 --quiet --out ./results/
+elm-diagnostics balance water tests/fixtures/data --config year_2001.yaml --quiet --out ./results/
 # Minimal output, suitable for batch processing
 ```
 
@@ -610,7 +610,7 @@ mkdir -p "$OUTPUT_DIR"
 for year in 2001 2002 2003; do
     echo "Checking water balance for year $year..."
     elm-diagnostics balance water "$DATA_DIR" \
-        --year $year \
+    --config "$OUTPUT_DIR/year_${year}.yaml" \
         --out "$OUTPUT_DIR/year_$year" \
         --quiet
 done
@@ -624,16 +624,16 @@ Generate comprehensive HTML report with all balances:
 
 ```bash
 # Single year
-elm-diagnostics report tests/fixtures/data --year 2001
+elm-diagnostics report tests/fixtures/data --config year_2001.yaml
 
-# All years (separate sections)
-elm-diagnostics report tests/fixtures/data --all-years
+# Multi-year analysis window from config
+elm-diagnostics report tests/fixtures/data --config years_2000_2005.yaml
 
 # Custom output location
 elm-diagnostics report tests/fixtures/data --out ./diagnostics_report/
 
-# With custom water year start
-elm-diagnostics report tests/fixtures/data --water-year-start 10 --year 2001
+# With custom water year start + year window
+elm-diagnostics report tests/fixtures/data --config wy_october_2001.yaml
 ```
 
 ## Best Practices
@@ -734,9 +734,9 @@ components = eb.components()
 
 **Command-line:**
 ```bash
-elm-diagnostics balance water ./data --year 2001
-elm-diagnostics balance carbon ./data --year 2001
-elm-diagnostics balance energy ./data --year 2001
+elm-diagnostics balance water ./data --config year_2001.yaml
+elm-diagnostics balance carbon ./data --config year_2001.yaml
+elm-diagnostics balance energy ./data --config year_2001.yaml
 ```
 
 **Next steps:**

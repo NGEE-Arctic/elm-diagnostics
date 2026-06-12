@@ -384,7 +384,7 @@ elm-diagnostics report tests/fixtures/data \
 # With specific year
 elm-diagnostics report ./experiment \
     --compare ./control \
-    --year 2001 \
+    --config year_2001.yaml \
     --out ./comparison_WY2001/
 
 # With custom configuration

@@ -263,7 +263,7 @@ for run in "${runs[@]}"; do
     echo "Processing $run..."
     elm-diagnostics report "./simulations/$run" \
         --out "$OUTPUT_BASE/$run" \
-        --year 2001 \
+        --config year_2001.yaml \
         --quiet &
 done
 
@@ -994,7 +994,7 @@ find ./simulations -type d -name "run_*" | \
     parallel -j 4 \
         elm-diagnostics report {} \
             --out reports/{/} \
-            --year 2001 \
+            --config year_2001.yaml \
             --quiet
 
 echo "Parallel processing complete"

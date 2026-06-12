@@ -380,7 +380,7 @@ elm-diagnostics report /path/to/elm/output
 
 **Compute a specific balance:**
 ```bash
-elm-diagnostics balance water /path/to/elm/output --year 2015
+elm-diagnostics balance water /path/to/elm/output --config year_2015.yaml
 ```
 
 **Plot a single variable:**
@@ -401,14 +401,14 @@ elm-diagnostics report /path/to/elm/output
 elm-diagnostics report /path/to/elm/output --out my_diagnostics
 ```
 
-**Specific year:**
+**Specific analysis window (from config):**
 ```bash
-elm-diagnostics report /path/to/elm/output --year 2015
+elm-diagnostics report /path/to/elm/output --config year_2015.yaml
 ```
 
-**All years (separate sections):**
+**Custom analysis range (from config):**
 ```bash
-elm-diagnostics report /path/to/elm/output --all-years
+elm-diagnostics report /path/to/elm/output --config analysis_2000_2010.yaml
 ```
 
 **Comparison report:**
@@ -423,15 +423,15 @@ elm-diagnostics report /path/to/elm/output --config my_config.yaml
 
 **Water year customization:**
 ```bash
-elm-diagnostics report /path/to/elm/output --water-year-start 10
-# Uses October as water year start (month 10)
+elm-diagnostics report /path/to/elm/output --config wy_october.yaml
+# Set time.water_year_start_month: 10 in wy_october.yaml
 ```
 
 ### Balance Analysis
 
-**Water balance for a specific year:**
+**Water balance with a config-defined year window:**
 ```bash
-elm-diagnostics balance water /path/to/elm/output --year 2015
+elm-diagnostics balance water /path/to/elm/output --config year_2015.yaml
 # Shows plots interactively (if display available)
 ```
 
@@ -594,7 +594,7 @@ elm-diagnostics balance water /path/to/elm/output --quiet --out ./quick_check/
 
 **Full annual report with verbose output:**
 ```bash
-elm-diagnostics report /path/to/elm/output --year 2015 --verbose --out annual_2015
+elm-diagnostics report /path/to/elm/output --config year_2015.yaml --verbose --out annual_2015
 ```
 
 **Automated script usage:**
