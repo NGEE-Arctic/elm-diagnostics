@@ -248,7 +248,6 @@ class Report:
 
         # Save full resolution with faster PNG settings when supported.
         savefig_kwargs = {
-            "bbox_inches": "tight",
             "dpi": self.config.plots.style.dpi,
             "pil_kwargs": _PNG_PIL_KWARGS,
         }
@@ -269,7 +268,6 @@ class Report:
             except Exception:
                 # Fall back to legacy behavior if image resize fails.
                 fallback_kwargs = {
-                    "bbox_inches": "tight",
                     "dpi": self.config.report.thumbnails.dpi,
                     "pil_kwargs": _PNG_PIL_KWARGS,
                 }
