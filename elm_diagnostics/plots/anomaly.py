@@ -147,7 +147,11 @@ def _plot_anomaly_single(
             title += f" — {source.name}"
         ax.set_title(_append_long_name_line(title, title_da))
 
-    units = da_base.attrs.get("units", "") if isinstance(source, Comparison) else da.attrs.get("units", "")
+    units = (
+        da_base.attrs.get("units", "")
+        if isinstance(source, Comparison)
+        else da.attrs.get("units", "")
+    )
 
     ax.set_xlabel("Year")
     ax.set_ylabel(_format_var_ylabel(varname, units))
