@@ -19,7 +19,7 @@ from elm_diagnostics.time.calendars import (
 )
 
 
-_PLOT_TIME_CACHE: dict[int, list] = {}
+_PLOT_TIME_CACHE: dict[tuple[int, int], list] = {}
 _PLOT_TIME_CACHE_MAX = 4096
 
 
@@ -30,7 +30,9 @@ def _plot_time(da: xr.DataArray):
     cannot handle cftime types natively without nc_time_axis.
     """
     time_data = da.coords["time"].data
-    cache_key = id(time_data)
+    # Use (id, length) tuple as cache key to avoid returning wrong-length
+    # cached result when object IDs are reused after garbage collection
+    cache_key = (id(time_data), len(time_data))
     cached = _PLOT_TIME_CACHE.get(cache_key)
     if cached is not None:
         return cached
