@@ -29,6 +29,17 @@ def compute_climo_stats(
     if len(da.time) < min_points:
         return None, None, None
 
+    if groupby == "time.month" and method not in {"minmax", "p10_p90", "std"}:
+        # For mean-only climatology, monthly pre-aggregation shrinks the problem
+        # size and avoids expensive grouping over high-frequency raw samples.
+        monthly = da.resample(time="MS").mean()
+        if len(monthly.time) < min_points:
+            return None, None, None
+        mean = monthly.groupby("time.month").mean()
+        if required_groups is not None and mean.size < required_groups:
+            return None, None, None
+        return mean, mean, mean
+
     grouped = da.groupby(groupby)
     mean = grouped.mean()
 

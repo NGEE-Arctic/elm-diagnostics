@@ -25,9 +25,10 @@ def _annual_anomaly(da: xr.DataArray) -> tuple[np.ndarray, np.ndarray]:
     Returns (years, anomalies).
     """
     annual = da.groupby("time.year").mean()
-    long_term_mean = float(annual.mean())
-    anomalies = annual.values - long_term_mean
-    years = annual.year.values
+    annual_values = np.asarray(annual.values)
+    long_term_mean = float(np.mean(annual_values))
+    anomalies = annual_values - long_term_mean
+    years = np.asarray(annual.year.values)
     return years, anomalies
 
 
@@ -146,11 +147,11 @@ def _plot_anomaly_single(
             title += f" — {source.name}"
         ax.set_title(_append_long_name_line(title, title_da))
 
-    units = ""
-    if isinstance(source, Comparison):
-        units = source.base.get(varname).attrs.get("units", "")
-    else:
-        units = source.get(varname).attrs.get("units", "")
+    units = (
+        da_base.attrs.get("units", "")
+        if isinstance(source, Comparison)
+        else da.attrs.get("units", "")
+    )
 
     ax.set_xlabel("Year")
     ax.set_ylabel(_format_var_ylabel(varname, units))

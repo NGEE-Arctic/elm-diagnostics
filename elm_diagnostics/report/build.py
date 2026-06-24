@@ -11,6 +11,7 @@ import sys
 import threading
 import time
 import traceback
+from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -156,6 +157,7 @@ class Report:
         self._warnings: list[str] = []
         self._generation_time = datetime.now()
         self._section_timings: list[dict[str, Any]] = []
+        self._plot_timings: list[dict[str, Any]] = []
         self._rendered_section_titles: list[str] = []
         self._build_total_seconds: float | None = None
         self._progress_section_index = 0
@@ -246,7 +248,6 @@ class Report:
 
         # Save full resolution with faster PNG settings when supported.
         savefig_kwargs = {
-            "bbox_inches": "tight",
             "dpi": self.config.plots.style.dpi,
             "pil_kwargs": _PNG_PIL_KWARGS,
         }
@@ -267,7 +268,6 @@ class Report:
             except Exception:
                 # Fall back to legacy behavior if image resize fails.
                 fallback_kwargs = {
-                    "bbox_inches": "tight",
                     "dpi": self.config.report.thumbnails.dpi,
                     "pil_kwargs": _PNG_PIL_KWARGS,
                 }
@@ -336,6 +336,29 @@ class Report:
                 "io_seconds": io_seconds,
                 "compute_seconds": compute_seconds,
                 "plot_seconds": plot_seconds,
+            }
+        )
+
+    def _record_plot_timing(
+        self,
+        *,
+        section_title: str,
+        varname: str,
+        plot_type: str,
+        compute_seconds: float,
+        plot_seconds: float,
+        io_seconds: float,
+    ) -> None:
+        """Record timing details for a single variable/plot-type build."""
+        self._plot_timings.append(
+            {
+                "section": section_title,
+                "variable": varname,
+                "plot_type": plot_type,
+                "compute_seconds": compute_seconds,
+                "plot_seconds": plot_seconds,
+                "io_seconds": io_seconds,
+                "total_seconds": compute_seconds + plot_seconds + io_seconds,
             }
         )
 
@@ -966,6 +989,59 @@ class Report:
         for fignum in set(plt.get_fignums()) - existing_fignums:
             plt.close(fignum)
 
+    @staticmethod
+    def _build_var_plot_context(var: xr.DataArray) -> dict[str, Any]:
+        """Precompute reusable time metadata for plot eligibility checks."""
+        n_time = len(var.time)
+        is_subdaily = False
+        if n_time >= 24:
+            time_diff = np.diff(var.time.values).astype("timedelta64[h]").astype(int)
+            if time_diff.size > 0:
+                is_subdaily = bool(np.median(time_diff) < 24)
+
+        return {
+            "n_time": n_time,
+            "is_subdaily": is_subdaily,
+        }
+
+    @staticmethod
+    @contextmanager
+    def _cached_get_for_var(run: Run, varname: str, var: xr.DataArray):
+        """Temporarily memoize one variable lookup on a Run instance."""
+        original_get = run.get
+
+        def _get_with_cache(name: str) -> xr.DataArray:
+            if name == varname:
+                return var
+            return original_get(name)
+
+        run.get = _get_with_cache  # type: ignore[assignment]
+        try:
+            yield
+        finally:
+            run.get = original_get  # type: ignore[assignment]
+
+    @contextmanager
+    def _plot_source_cache_context(
+        self,
+        varname: str,
+        experiment_var: xr.DataArray,
+        base_var: xr.DataArray | None,
+    ):
+        """Cache active variable lookups for plot helpers during one plot call."""
+        if isinstance(self.source, Comparison) and base_var is not None:
+            with self._cached_get_for_var(
+                self.source.experiment,
+                varname,
+                experiment_var,
+            ):
+                with self._cached_get_for_var(self.source.base, varname, base_var):
+                    yield
+            return
+
+        with self._cached_get_for_var(self._run, varname, experiment_var):
+            yield
+
     def _build_variable_sections(self, figdir: Path) -> list[_Section]:
         sections = []
         groups = self.config.variables.groups
@@ -997,46 +1073,69 @@ class Report:
 
             for varname in varnames_to_plot:
                 compute_start = time.perf_counter()
+                var = None
+                base_var = None
+                var_context: dict[str, Any] | None = None
                 has_var = run.has(varname)
+                if has_var:
+                    # Load once so validation checks do not repeatedly call run.get(varname).
+                    var = run.get(varname)
+                    if isinstance(self.source, Comparison):
+                        base_var = self.source.base.get(varname)
+                    var_context = self._build_var_plot_context(var)
                 compute_seconds += time.perf_counter() - compute_start
-                if not has_var:
+                if var is None:
                     continue
 
                 # Try each plot type
-                for plot_type in plot_types:
-                    fig: plt.Figure | None = None
-                    existing_fignums = set(plt.get_fignums())
-                    try:
-                        fig, plot_compute_seconds, plot_render_seconds = (
-                            self._create_plot(
-                                plot_type,
-                                varname,
+                with self._plot_source_cache_context(varname, var, base_var):
+                    for plot_type in plot_types:
+                        fig: plt.Figure | None = None
+                        existing_fignums = set(plt.get_fignums())
+                        try:
+                            fig, plot_compute_seconds, plot_render_seconds = (
+                                self._create_plot(
+                                    plot_type,
+                                    varname,
+                                    var,
+                                    base_var,
+                                    var_context,
+                                )
                             )
-                        )
-                        compute_seconds += plot_compute_seconds
-                        plot_seconds += plot_render_seconds
-                        if fig is not None:
-                            basename = f"{group_name}_{varname}_{plot_type}"
-                            io_start = time.perf_counter()
-                            full_path, thumb_path = self._save_figure(
-                                fig, figdir, basename
+                            compute_seconds += plot_compute_seconds
+                            plot_seconds += plot_render_seconds
+                            io_elapsed = 0.0
+                            if fig is not None:
+                                basename = f"{group_name}_{varname}_{plot_type}"
+                                io_start = time.perf_counter()
+                                full_path, thumb_path = self._save_figure(
+                                    fig, figdir, basename
+                                )
+                                io_elapsed = time.perf_counter() - io_start
+                                io_seconds += io_elapsed
+                                caption = f"{varname}"
+                                subsection_by_plot_type[plot_type].add_figure(
+                                    full_path,
+                                    thumb_path,
+                                    caption,
+                                    plot_type,
+                                )
+                            self._record_plot_timing(
+                                section_title=section_title,
+                                varname=varname,
+                                plot_type=plot_type,
+                                compute_seconds=plot_compute_seconds,
+                                plot_seconds=plot_render_seconds,
+                                io_seconds=io_elapsed,
                             )
-                            io_seconds += time.perf_counter() - io_start
-                            caption = f"{varname}"
-                            subsection_by_plot_type[plot_type].add_figure(
-                                full_path,
-                                thumb_path,
-                                caption,
-                                plot_type,
-                            )
-                    except Exception:
-                        # Silently skip individual plot failures
-                        # (e.g., diurnal for monthly data, seasonal for insufficient data)
-                        pass
-                    finally:
-                        if fig is not None:
-                            plt.close(fig)
-                        self._close_new_figures(existing_fignums)
+                        except Exception:
+                            # Silently skip individual plot failures
+                            # (e.g., diurnal for monthly data, seasonal for insufficient data)
+                            pass
+                        finally:
+                            if fig is not None:
+                                plt.close(fig)
+                            self._close_new_figures(existing_fignums)
 
             has_grouped_figures = any(sub.figures for sub in sec.subsections)
             if sec.figures or has_grouped_figures:
@@ -1056,6 +1155,9 @@ class Report:
         self,
         plot_type: str,
         varname: str,
+        var: xr.DataArray,
+        base_var: xr.DataArray | None,
+        var_context: dict[str, Any] | None,
     ) -> tuple[plt.Figure | None, float, float]:
         """Create one plot and return aggregated compute and render timings.
 
@@ -1073,9 +1175,8 @@ class Report:
         elif plot_type == "seasonal":
             # Check if we have enough data
             compute_start = time.perf_counter()
-            run = self._run
-            var = run.get(varname)
-            if len(var.time) < 12:
+            n_time = int((var_context or {}).get("n_time", len(var.time)))
+            if n_time < 12:
                 return None, time.perf_counter() - compute_start, 0.0
             compute_seconds = time.perf_counter() - compute_start
             plot_start = time.perf_counter()
@@ -1087,9 +1188,8 @@ class Report:
         elif plot_type == "anomaly":
             # Check if we have enough data (need at least 2 years)
             compute_start = time.perf_counter()
-            run = self._run
-            var = run.get(varname)
-            if len(var.time) < 24:  # Rough approximation
+            n_time = int((var_context or {}).get("n_time", len(var.time)))
+            if n_time < 24:  # Rough approximation
                 return None, time.perf_counter() - compute_start, 0.0
             compute_seconds = time.perf_counter() - compute_start
             plot_start = time.perf_counter()
@@ -1108,14 +1208,11 @@ class Report:
         elif plot_type == "diurnal":
             # Check if data is sub-daily
             compute_start = time.perf_counter()
-            run = self._run
-            var = run.get(varname)
-            if len(var.time) < 24:
+            n_time = int((var_context or {}).get("n_time", len(var.time)))
+            if n_time < 24:
                 return None, time.perf_counter() - compute_start, 0.0
-            # Check time resolution
-            time_diff = np.diff(var.time.values).astype("timedelta64[h]").astype(int)
-            median_hours = np.median(time_diff)
-            if median_hours >= 24:
+            is_subdaily = bool((var_context or {}).get("is_subdaily", False))
+            if not is_subdaily:
                 return None, time.perf_counter() - compute_start, 0.0  # Not sub-daily
             compute_seconds = time.perf_counter() - compute_start
             plot_start = time.perf_counter()
@@ -1211,6 +1308,37 @@ class Report:
             ],
             rows=timing_rows,
         )
+        if self._plot_timings:
+            top_plot_rows = []
+            for entry in sorted(
+                self._plot_timings,
+                key=lambda row: float(row["total_seconds"]),
+                reverse=True,
+            )[:15]:
+                top_plot_rows.append(
+                    [
+                        str(entry["section"]),
+                        str(entry["variable"]),
+                        str(entry["plot_type"]),
+                        f"{float(entry['total_seconds']):.2f}",
+                        f"{float(entry['compute_seconds']):.2f}",
+                        f"{float(entry['plot_seconds']):.2f}",
+                        f"{float(entry['io_seconds']):.2f}",
+                    ]
+                )
+            sec.add_table(
+                title="Top variable plot timings",
+                columns=[
+                    "Section",
+                    "Variable",
+                    "Plot",
+                    "Total (s)",
+                    "Prep/Checks (s)",
+                    "Plot Build (s)",
+                    "Export/Write (s)",
+                ],
+                rows=top_plot_rows,
+            )
         config_title, config_yaml = self._diagnostics_config_yaml()
         sec.add_text_block(config_title, config_yaml)
         self._record_section_timing(section_title, start_time)

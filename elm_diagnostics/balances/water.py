@@ -43,6 +43,7 @@ class WaterBalance(Balance):
         """Return cumulative water balance components (all in mm)."""
         bc = self._balance_config
         result = {}
+        storage_components: dict[str, xr.DataArray] = {}
 
         # Get parent dataset for time_bounds
         first_input = bc.inputs[0]
@@ -89,6 +90,10 @@ class WaterBalance(Balance):
                 da = convert_water_to_mm(da)
 
                 da = self._select_year(da)
+                storage_components[varname] = storage_change(da)
+                logger.info(
+                    "Storage component '%s' included in storage decomposition.", varname
+                )
                 if total_storage is None:
                     total_storage = da.copy()
                 else:
@@ -102,6 +107,9 @@ class WaterBalance(Balance):
             ds_change.attrs["units"] = "mm"
             ds_change.name = "dS"
             result["dS"] = ds_change
+
+        self._storage_components_cache = storage_components
+        self._storage_components_cache_key = self._cache_key()
 
         return result
 
@@ -130,6 +138,18 @@ class WaterBalance(Balance):
         Each returned variable is a storage-change time series with the same
         definition used for dS: S(t) - S(0).
         """
+        key = self._cache_key()
+        cached = getattr(self, "_storage_components_cache", None)
+        cached_key = getattr(self, "_storage_components_cache_key", None)
+        if cached is not None and cached_key == key:
+            return cached
+
+        self.components()
+        cached = getattr(self, "_storage_components_cache", None)
+        cached_key = getattr(self, "_storage_components_cache_key", None)
+        if cached is not None and cached_key == key:
+            return cached
+
         bc = self._balance_config
         storage_components: dict[str, xr.DataArray] = {}
 
@@ -151,6 +171,9 @@ class WaterBalance(Balance):
                 )
             except KeyError:
                 logger.warning("Missing expected water storage variable '%s'", varname)
+
+        self._storage_components_cache = storage_components
+        self._storage_components_cache_key = key
 
         return storage_components
 
