@@ -4,14 +4,19 @@
 report:
   title_template: "ELM diagnostics — {casename}"
   output_formats: [png, netcdf]
+
+  sections:
+    metadata: true
+    water_balance: true
+    energy_balance: true
+    carbon_balance: true
+    variable_groups: true
+    diagnostics: true
   
   thumbnails:
     enabled: true
     size: [400, 300]  # pixels
     dpi: 72
-  
-  plot_types:
-    include: [timeseries, hovmuller, seasonal, anomaly, histogram, diurnal]
   
   variable_sections:
     max_variables_per_group: 10
@@ -58,15 +63,68 @@ time:
   analysis_start_year: null  # inclusive start year; null means no lower bound
   analysis_end_year: null    # inclusive end year; null means no upper bound
 
-variables:
-  groups:
-    hydrology: [H2OSOI, QRUNOFF, QDRAI, SNOWDP, H2OSNO, H2OSFC,
+variable_groups:
+  hydrology:
+    enabled: true
+    variables: [H2OSOI, QRUNOFF, QDRAI, SNOWDP, H2OSNO, H2OSFC,
                 SOILLIQ, SOILICE, QOVER, QINFL, QSNOMELT]
-    carbon_pools: [LEAFC, LIVESTEMC, DEADSTEMC, FROOTC, LIVECROOTC,
-                   DEADCROOTC, TOTSOMC, TOTLITC, CWDC, TOTECOSYSC, TOTCOLC]
-    carbon_fluxes: [GPP, AR, HR, ER, NEE, NBP, TOTFIRE, WOOD_HARVESTC,
-                    LITHR, SOMHR]
-    energy: [FSDS, FSR, FLDS, FIRE, FSA, FIRA, FSH, EFLX_LH_TOT, FGR,
-             SABV, SABG]
-    soil_state: [TSOI, SOILLIQ, SOILICE]
-    vegetation: [TLAI, TSAI, HTOP, GPP, TOTVEGC]
+    plot_types:
+      timeseries: true
+      hovmuller: true
+      seasonal: true
+      anomaly: true
+      histogram: true
+      diurnal: true
+  carbon_pools:
+    enabled: true
+    variables: [LEAFC, LIVESTEMC, DEADSTEMC, FROOTC, LIVECROOTC,
+                DEADCROOTC, TOTSOMC, TOTLITC, CWDC, TOTECOSYSC, TOTCOLC]
+    plot_types:
+      timeseries: true
+      hovmuller: true
+      seasonal: true
+      anomaly: true
+      histogram: true
+      diurnal: true
+  carbon_fluxes:
+    enabled: true
+    variables: [GPP, AR, HR, ER, NEE, NBP, TOTFIRE, WOOD_HARVESTC,
+                LITHR, SOMHR]
+    plot_types:
+      timeseries: true
+      hovmuller: true
+      seasonal: true
+      anomaly: true
+      histogram: true
+      diurnal: true
+  energy:
+    enabled: true
+    variables: [FSDS, FSR, FLDS, FIRE, FSA, FIRA, FSH, EFLX_LH_TOT, FGR,
+                SABV, SABG]
+    plot_types:
+      timeseries: true
+      hovmuller: true
+      seasonal: true
+      anomaly: true
+      histogram: true
+      diurnal: true
+  soil_state:
+    enabled: true
+    variables: [TSOI, SOILLIQ, SOILICE]
+    plot_types:
+      timeseries: true
+      hovmuller: true
+      seasonal: true
+      anomaly: true
+      histogram: true
+      diurnal: true
+  vegetation:
+    enabled: true
+    variables: [TLAI, TSAI, HTOP, GPP, TOTVEGC]
+    plot_types:
+      timeseries: true
+      hovmuller: true
+      seasonal: true
+      anomaly: true
+      histogram: true
+      diurnal: true
