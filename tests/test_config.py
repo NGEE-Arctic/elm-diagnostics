@@ -12,7 +12,8 @@ def test_load_defaults():
     defaults = load_defaults()
     assert "report" in defaults
     assert "time" in defaults
-    assert "variables" in defaults
+    assert "variable_groups" in defaults
+    assert "variables" not in defaults
     assert "balances" not in defaults
 
 
@@ -21,6 +22,44 @@ def test_default_config_validates():
     assert isinstance(config, Config)
     assert config.balances.water.frame == "water_year"
     assert config.balances.energy.cumulative is False
+
+
+def test_variable_group_defaults():
+    config = load_config()
+    hydrology = config.variable_groups["hydrology"]
+    assert hydrology.enabled is True
+    assert "SOILLIQ" in hydrology.variables
+    assert "timeseries" in hydrology.plot_types.active_plot_types
+
+
+def test_variable_group_override_and_report_sections():
+    override = {
+        "report": {"sections": {"diagnostics": False}},
+        "variable_groups": {
+            "hydrology": {
+                "enabled": False,
+                "variables": ["SOILLIQ"],
+                "plot_types": {
+                    "timeseries": True,
+                    "hovmuller": False,
+                    "seasonal": False,
+                    "anomaly": False,
+                    "histogram": False,
+                    "diurnal": False,
+                },
+            }
+        },
+    }
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
+        yaml.dump(override, f)
+        f.flush()
+        config = load_config(path=f.name)
+
+    assert config.report.sections.diagnostics is False
+    assert config.variable_groups["hydrology"].enabled is False
+    assert config.variable_groups["hydrology"].plot_types.active_plot_types == [
+        "timeseries"
+    ]
 
 
 def test_corrected_variable_names():

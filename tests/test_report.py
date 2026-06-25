@@ -10,7 +10,7 @@ matplotlib.use("Agg")
 
 from elm_diagnostics.io.run import Comparison, Run
 from elm_diagnostics.report.build import Report
-from elm_diagnostics.config.schema import Config
+from elm_diagnostics.config.schema import Config, GroupPlotTypesConfig, VariableGroupConfig
 from tests.fixtures.synthetic_elm import (
     make_multicolumn_dataset,
     make_vertical_profile_dataset,
@@ -168,8 +168,20 @@ def test_report_includes_hovmuller_subsections():
         run = Run(tmpdir)
 
         cfg = Config()
-        cfg.variables.groups = {"hydrology": ["SOILLIQ"]}
-        cfg.report.plot_types.include = ["timeseries", "hovmuller"]
+        cfg.variable_groups = {
+            "hydrology": VariableGroupConfig(
+                enabled=True,
+                variables=["SOILLIQ"],
+                plot_types=GroupPlotTypesConfig(
+                    timeseries=True,
+                    hovmuller=True,
+                    seasonal=False,
+                    anomaly=False,
+                    histogram=False,
+                    diurnal=False,
+                ),
+            )
+        }
 
         rpt = Report(run, config=cfg)
         with tempfile.TemporaryDirectory() as outdir:
@@ -181,6 +193,77 @@ def test_report_includes_hovmuller_subsections():
             figdir = Path(outdir) / "figures"
             assert any("_timeseries" in p.name for p in figdir.glob("*.png"))
             assert any("_hovmuller" in p.name for p in figdir.glob("*.png"))
+
+        run.close()
+
+
+def test_report_skips_disabled_variable_group():
+    """Disabled variable groups should not render group sections."""
+    ds = make_vertical_profile_dataset(n_months=24, n_levels=8)
+    with tempfile.TemporaryDirectory() as tmpdir:
+        save_as_elm_files(ds, Path(tmpdir), casename="disabled_group_report", tape="h0")
+        run = Run(tmpdir)
+
+        cfg = Config()
+        cfg.variable_groups = {
+            "enabled_group": VariableGroupConfig(
+                enabled=True,
+                variables=["SOILLIQ"],
+                plot_types=GroupPlotTypesConfig(
+                    timeseries=True,
+                    hovmuller=False,
+                    seasonal=False,
+                    anomaly=False,
+                    histogram=False,
+                    diurnal=False,
+                ),
+            ),
+            "disabled_group": VariableGroupConfig(
+                enabled=False,
+                variables=["SOILLIQ"],
+                plot_types=GroupPlotTypesConfig(),
+            ),
+        }
+
+        rpt = Report(run, config=cfg)
+        with tempfile.TemporaryDirectory() as outdir:
+            html_path = rpt.build(outdir)
+            content = html_path.read_text()
+            assert "Enabled Group" in content
+            assert "Disabled Group" not in content
+
+        run.close()
+
+
+def test_report_uses_per_group_plot_type_flags():
+    """Per-group plot type flags should control generated plots."""
+    ds = make_vertical_profile_dataset(n_months=24, n_levels=8)
+    with tempfile.TemporaryDirectory() as tmpdir:
+        save_as_elm_files(ds, Path(tmpdir), casename="group_plot_type_report", tape="h0")
+        run = Run(tmpdir)
+
+        cfg = Config()
+        cfg.variable_groups = {
+            "hydrology": VariableGroupConfig(
+                enabled=True,
+                variables=["SOILLIQ"],
+                plot_types=GroupPlotTypesConfig(
+                    timeseries=True,
+                    hovmuller=False,
+                    seasonal=False,
+                    anomaly=False,
+                    histogram=False,
+                    diurnal=False,
+                ),
+            )
+        }
+
+        rpt = Report(run, config=cfg)
+        with tempfile.TemporaryDirectory() as outdir:
+            rpt.build(outdir)
+            figdir = Path(outdir) / "figures"
+            assert any("hydrology_SOILLIQ_timeseries" in p.name for p in figdir.glob("*.png"))
+            assert not any("hydrology_SOILLIQ_hovmuller" in p.name for p in figdir.glob("*.png"))
 
         run.close()
 
