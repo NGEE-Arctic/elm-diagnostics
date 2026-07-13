@@ -72,7 +72,10 @@ autodoc_default_options = {
 }
 
 # Suppress warnings from external libraries
-suppress_warnings = ["sphinx_autodoc_typehints.forward_reference"]
+suppress_warnings = [
+    "sphinx_autodoc_typehints.forward_reference",
+    "sphinx_autodoc_typehints.guarded_import",
+]
 
 # Intersphinx mapping
 intersphinx_mapping = {
