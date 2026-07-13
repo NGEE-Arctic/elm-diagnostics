@@ -131,7 +131,9 @@ class TimeConfig(BaseModel):
             and self.analysis_end_year is not None
             and self.analysis_start_year > self.analysis_end_year
         ):
-            raise ValueError("time.analysis_start_year must be <= time.analysis_end_year")
+            raise ValueError(
+                "time.analysis_start_year must be <= time.analysis_end_year"
+            )
         return self
 
 

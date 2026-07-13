@@ -293,6 +293,14 @@ def report(
 
         strict_combine = _get_run_strict_combine(config)
         chunk_mode, manual_chunks, chunk_target_mb = _get_run_chunk_options(config)
+
+        # Extract original analysis window from config before file-narrowing transformation
+        from elm_diagnostics.config.schema import load_config
+
+        original_cfg = load_config(path=config) if config else load_config()
+        original_analysis_year_min = original_cfg.time.analysis_start_year
+        original_analysis_year_max = original_cfg.time.analysis_end_year
+
         analysis_year_min, analysis_year_max = _resolve_analysis_year_filter(config)
 
         # Import here to avoid slow startup
@@ -379,6 +387,8 @@ def report(
             config=config,
             invocation_command=shlex.join(sys.argv),
             config_path=config,
+            analysis_year_min=original_analysis_year_min,
+            analysis_year_max=original_analysis_year_max,
         )
         html_path = rpt.build(out)
 

@@ -60,10 +60,14 @@ class Balance(ABC):
         year: int | None = None,
         by: SubgridLevel | None = None,
         config: Config | str | Path | None = None,
+        analysis_year_min: int | None = None,
+        analysis_year_max: int | None = None,
     ):
         self.run = run
         self.year = year
         self.by = by
+        self.analysis_year_min = analysis_year_min
+        self.analysis_year_max = analysis_year_max
 
         if config is None or isinstance(config, (str, Path)):
             self.config = load_config(config)
@@ -106,22 +110,74 @@ class Balance(ABC):
         return da
 
     def _select_year(self, ds_or_da):
-        """Subset to the requested year if set."""
-        if self.year is None:
-            return ds_or_da
-
+        """Subset to the requested year or analysis window if set."""
         start_month = self.config.time.water_year_start_month
-        if isinstance(ds_or_da, xr.Dataset):
-            return select_year(ds_or_da, self.year, self.frame, start_month)
 
-        # For DataArray: wrap in dataset, select, extract
-        tmp = ds_or_da.to_dataset(name="__tmp")
-        tmp = select_year(tmp, self.year, self.frame, start_month)
-        return tmp["__tmp"]
+        # If a specific year is requested, use single-year selection
+        if self.year is not None:
+            if isinstance(ds_or_da, xr.Dataset):
+                return select_year(ds_or_da, self.year, self.frame, start_month)
+
+            # For DataArray: wrap in dataset, select, extract
+            tmp = ds_or_da.to_dataset(name="__tmp")
+            tmp = select_year(tmp, self.year, self.frame, start_month)
+            return tmp["__tmp"]
+
+        # If an analysis window is requested, apply it
+        if self.analysis_year_min is not None or self.analysis_year_max is not None:
+            # Apply analysis window filtering
+            if isinstance(ds_or_da, xr.Dataset):
+                ds = ds_or_da
+            else:
+                ds = ds_or_da.to_dataset(name="__tmp")
+
+            # Extract year values from time coordinate
+            if "time" not in ds.dims or len(ds["time"]) == 0:
+                if isinstance(ds_or_da, xr.DataArray):
+                    return ds_or_da
+                return ds
+
+            import numpy as np
+
+            times = ds["time"].values
+            years = []
+            for t in times:
+                if hasattr(t, "year"):
+                    years.append(int(t.year))
+                else:
+                    years.append(int(np.datetime64(t, "Y").astype(int) + 1970))
+
+            # Apply window filter
+            min_yr = (
+                self.analysis_year_min
+                if self.analysis_year_min is not None
+                else min(years)
+            )
+            max_yr = (
+                self.analysis_year_max
+                if self.analysis_year_max is not None
+                else max(years)
+            )
+
+            mask = np.array([min_yr <= y <= max_yr for y in years])
+            ds = ds.isel(time=mask)
+
+            if isinstance(ds_or_da, xr.DataArray):
+                return ds["__tmp"]
+            return ds
+
+        # No filtering requested
+        return ds_or_da
 
     def _cache_key(self) -> tuple[Any, ...]:
         """Return a key describing the current balance state."""
-        return (self.year, self.by, self.frame)
+        return (
+            self.year,
+            self.by,
+            self.frame,
+            self.analysis_year_min,
+            self.analysis_year_max,
+        )
 
     @abstractmethod
     def _compute_components(self) -> dict[str, xr.DataArray]:

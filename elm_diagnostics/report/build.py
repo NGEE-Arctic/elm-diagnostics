@@ -150,9 +150,13 @@ class Report:
         year: int | None = None,
         invocation_command: str | None = None,
         config_path: str | Path | None = None,
+        analysis_year_min: int | None = None,
+        analysis_year_max: int | None = None,
     ):
         self.source = source
         self.year = year
+        self.analysis_year_min = analysis_year_min
+        self.analysis_year_max = analysis_year_max
         self._errors: list[dict[str, str]] = []
         self._warnings: list[str] = []
         self._generation_time = datetime.now()
@@ -232,6 +236,64 @@ class Report:
     def _is_comparison(self) -> bool:
         """Check if this is a comparison report."""
         return isinstance(self.source, Comparison)
+
+    def _apply_analysis_window(self, ds: xr.Dataset) -> xr.Dataset:
+        """Apply analysis_year_min/max window to a dataset.
+
+        Parameters
+        ----------
+        ds : xr.Dataset
+            Dataset with time dimension.
+
+        Returns
+        -------
+        xr.Dataset
+            Subset to the analysis window if bounds are set.
+        """
+        if self.analysis_year_min is None and self.analysis_year_max is None:
+            return ds
+
+        if "time" not in ds.dims or len(ds["time"]) == 0:
+            return ds
+
+        start_year = self.analysis_year_min or -1
+        end_year = self.analysis_year_max or -1
+
+        # Convert actual years to sentinel format for subset_climo_years
+        times = ds["time"].values
+        years = []
+        for t in times:
+            if hasattr(t, "year"):
+                years.append(int(t.year))
+            else:
+                import numpy as np
+
+                years.append(int(np.datetime64(t, "Y").astype(int) + 1970))
+
+        if not years:
+            return ds
+
+        min_year = min(years) if years else None
+        max_year = max(years) if years else None
+        if min_year is None or max_year is None:
+            return ds
+
+        # Create mask for time dimension
+        import numpy as np
+
+        mask = np.array(
+            [
+                (start_year == -1 or y >= start_year)
+                and (end_year == -1 or y <= end_year)
+                for y in years
+            ]
+        )
+
+        if not mask.any():
+            # No data in window, return empty
+            return ds.isel(time=slice(0, 0))
+
+        return ds.isel(time=mask)
 
     def _save_figure(
         self, fig: plt.Figure, figdir: Path, basename: str
@@ -480,14 +542,19 @@ class Report:
         metadata = {}
         metadata["Case Name"] = run.name
 
-        # Get time range from first stream
+        # Get time range from first stream, respecting analysis window
         if streams:
             first_stream = next(iter(streams.values()))
-            time_coord = first_stream.time
-            metadata["Time Range"] = (
-                f"{time_coord[0].values} to {time_coord[-1].values}"
-            )
-            metadata["Number of Time Steps"] = len(time_coord)
+            # Apply analysis window filter to get the actual reported time range
+            filtered_stream = self._apply_analysis_window(first_stream)
+            if len(filtered_stream.time) > 0:
+                metadata["Time Range"] = (
+                    f"{filtered_stream.time[0].values} to {filtered_stream.time[-1].values}"
+                )
+                metadata["Number of Time Steps"] = len(filtered_stream.time)
+            else:
+                metadata["Time Range"] = "No data in analysis window"
+                metadata["Number of Time Steps"] = 0
 
         # List available streams
         if streams:
@@ -529,7 +596,13 @@ class Report:
             self._announce_section_progress(section_title)
             try:
                 compute_start = time.perf_counter()
-                wb = WaterBalance(run, year=self.year, config=self.config)
+                wb = WaterBalance(
+                    run,
+                    year=self.year,
+                    config=self.config,
+                    analysis_year_min=self.analysis_year_min,
+                    analysis_year_max=self.analysis_year_max,
+                )
                 sec = _Section(section_title, "Column water budget closure.")
                 if self.config.report.balance_sections.show_statistics_table:
                     wb.components()
@@ -604,7 +677,13 @@ class Report:
             self._announce_section_progress(section_title)
             try:
                 compute_start = time.perf_counter()
-                eb = EnergyBalance(run, year=self.year, config=self.config)
+                eb = EnergyBalance(
+                    run,
+                    year=self.year,
+                    config=self.config,
+                    analysis_year_min=self.analysis_year_min,
+                    analysis_year_max=self.analysis_year_max,
+                )
                 sec = _Section(section_title, "Surface energy budget closure.")
                 if self.config.report.balance_sections.show_statistics_table:
                     eb.components()
@@ -674,7 +753,13 @@ class Report:
             self._announce_section_progress(section_title)
             try:
                 compute_start = time.perf_counter()
-                cb = CarbonBalance(run, year=self.year, config=self.config)
+                cb = CarbonBalance(
+                    run,
+                    year=self.year,
+                    config=self.config,
+                    analysis_year_min=self.analysis_year_min,
+                    analysis_year_max=self.analysis_year_max,
+                )
                 sec = _Section(section_title, "Ecosystem carbon budget closure.")
                 if self.config.report.balance_sections.show_statistics_table:
                     cb.components()
