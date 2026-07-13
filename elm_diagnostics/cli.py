@@ -144,20 +144,20 @@ def _get_run_chunk_options(
 
 def _resolve_analysis_year_filter(
     config_path: str | None,
-    year: int | None,
-    all_years: bool,
 ) -> tuple[int | None, int | None]:
     """Return inclusive year range for early loader narrowing when safe."""
-    if year is None or all_years:
-        return None, None
-
     from elm_diagnostics.config.schema import load_config
 
     cfg = load_config(path=config_path) if config_path else load_config()
+    lo = cfg.time.analysis_start_year
+    hi = cfg.time.analysis_end_year
+
+    if lo is None and hi is None:
+        return None, None
 
     # If any balance uses water-year framing and the water year does not
     # begin in January, we must include the previous calendar year so the
-    # selected water year can start at the configured boundary (e.g., Oct 1).
+    # selected window can start at the configured boundary (e.g., Oct 1).
     balance_frames = (
         cfg.balances.water.frame,
         cfg.balances.carbon.frame,
@@ -167,16 +167,23 @@ def _resolve_analysis_year_filter(
         "water_year" in balance_frames and cfg.time.water_year_start_month > 1
     )
 
-    lo = year - 1 if needs_prev_year else year
-    hi = year
+    if lo is not None and needs_prev_year:
+        lo -= 1
 
     if cfg.plots.climatology.include_climos:
         start = cfg.plots.climatology.climo_start_year
         end = cfg.plots.climatology.climo_end_year
         if start == -1 or end == -1:
             return None, None
-        lo = min(lo, start, end)
-        hi = max(hi, start, end)
+        if lo is None:
+            lo = min(start, end)
+        else:
+            lo = min(lo, start, end)
+
+        if hi is None:
+            hi = max(start, end)
+        else:
+            hi = max(hi, start, end)
         return lo, hi
     return lo, hi
 
@@ -239,19 +246,6 @@ def report(
     ),
     out: str = typer.Option("elm_report", "--out", help="Output directory."),
     config: Optional[str] = typer.Option(None, "--config", help="Path to config YAML."),
-    year: Optional[int] = typer.Option(
-        None, "--year", help="Specific year to analyze."
-    ),
-    all_years: bool = typer.Option(
-        False, "--all-years", help="Generate report for all available years."
-    ),
-    water_year_start: Optional[int] = typer.Option(
-        None,
-        "--water-year-start",
-        help="Water year start month (1-12). Overrides config.",
-        min=1,
-        max=12,
-    ),
     verbose: bool = typer.Option(False, "--verbose", "-v", help="Verbose output."),
     debug: bool = typer.Option(
         False, "--debug", help="Debug mode with full tracebacks."
@@ -272,24 +266,17 @@ def report(
         # Basic report
         elm-diagnostics report /path/to/elm/output
 
-        # Report for specific year
-        elm-diagnostics report /path/to/elm/output --year 2015
-
-        # Report for all years (separate sections per year)
-        elm-diagnostics report /path/to/elm/output --all-years
+        # Report using year window from config
+        elm-diagnostics report /path/to/elm/output --config config.yaml
 
         # Comparison report
         elm-diagnostics report /path/to/exp --compare /path/to/control
 
-        # Custom water year and output directory
-        elm-diagnostics report /path/to/output --water-year-start 10 --out my_report
+        # Custom output directory
+        elm-diagnostics report /path/to/output --out my_report
     """
     setup_logging(verbose=verbose, debug=debug)
     logger = logging.getLogger(__name__)
-
-    if year and all_years:
-        console.print("[red]Error:[/red] Cannot specify both --year and --all-years")
-        raise typer.Exit(code=1)
 
     if verbose and quiet:
         console.print("[red]Error:[/red] Cannot specify both --verbose and --quiet")
@@ -306,17 +293,15 @@ def report(
 
         strict_combine = _get_run_strict_combine(config)
         chunk_mode, manual_chunks, chunk_target_mb = _get_run_chunk_options(config)
-        analysis_year_min, analysis_year_max = _resolve_analysis_year_filter(
-            config,
-            year,
-            all_years,
-        )
 
-        if year is not None and analysis_year_min is None and not quiet:
-            console.print(
-                "[yellow]Note:[/yellow] Early file narrowing disabled because "
-                "climatology uses an open-ended year window; full range remains available."
-            )
+        # Extract original analysis window from config before file-narrowing transformation
+        from elm_diagnostics.config.schema import load_config
+
+        original_cfg = load_config(path=config) if config else load_config()
+        original_analysis_year_min = original_cfg.time.analysis_start_year
+        original_analysis_year_max = original_cfg.time.analysis_end_year
+
+        analysis_year_min, analysis_year_max = _resolve_analysis_year_filter(config)
 
         # Import here to avoid slow startup
         from elm_diagnostics.io.run import Comparison, Run
@@ -392,17 +377,6 @@ def report(
         else:
             source = run
 
-        # Override water year start if specified
-        if water_year_start:
-            if verbose:
-                logger.info(f"Using water year start month: {water_year_start}")
-            # This would need to be passed to Report or set in config
-            # For now, log a warning that this needs config support
-            console.print(
-                "[yellow]Note:[/yellow] Water year start override "
-                "requires config file support (not yet implemented)"
-            )
-
         # Build report
         if not quiet:
             console.print("\n[bold]Building diagnostics report...[/bold]")
@@ -411,9 +385,10 @@ def report(
         rpt = Report(
             source,
             config=config,
-            year=year,
             invocation_command=shlex.join(sys.argv),
             config_path=config,
+            analysis_year_min=original_analysis_year_min,
+            analysis_year_max=original_analysis_year_max,
         )
         html_path = rpt.build(out)
 
@@ -450,7 +425,6 @@ def balance(
         autocompletion=complete_balance_type,
     ),
     path: str = typer.Argument(..., help="Path to ELM history files directory."),
-    year: Optional[int] = typer.Option(None, "--year", help="Specific year."),
     out: Optional[str] = typer.Option(
         None, "--out", help="Output directory for plots/data."
     ),
@@ -470,9 +444,6 @@ def balance(
     two-panel plots: cumulative components and decomposition.
 
     Examples:
-
-        # Water balance for specific year
-        elm-diagnostics balance water /path/to/output --year 2015
 
         # Carbon balance, save to directory
         elm-diagnostics balance carbon /path/to/output --out ./results/
@@ -495,11 +466,7 @@ def balance(
 
         strict_combine = _get_run_strict_combine(config)
         chunk_mode, manual_chunks, chunk_target_mb = _get_run_chunk_options(config)
-        analysis_year_min, analysis_year_max = _resolve_analysis_year_filter(
-            config,
-            year,
-            False,  # all_years not available in balance command
-        )
+        analysis_year_min, analysis_year_max = _resolve_analysis_year_filter(config)
 
         from elm_diagnostics.balances.carbon import CarbonBalance
         from elm_diagnostics.balances.energy import EnergyBalance
@@ -561,15 +528,13 @@ def balance(
                 transient=True,
             ) as progress:
                 task = progress.add_task(f"Computing {kind} balance...", total=None)
-                bal = balance_classes[kind](run, year=year, config=config)
+                bal = balance_classes[kind](run, config=config)
                 progress.update(task, completed=True)
         else:
-            bal = balance_classes[kind](run, year=year, config=config)
+            bal = balance_classes[kind](run, config=config)
 
         if verbose:
             logger.info(f"Balance type: {kind}")
-            if year:
-                logger.info(f"Year: {year}")
 
         # Generate plots
         if not quiet:

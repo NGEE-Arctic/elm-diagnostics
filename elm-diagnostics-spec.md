@@ -115,7 +115,8 @@ plots:
 
 time:
   water_year_start_month: 10      # configurable per user
-  cumulative_years: "all"         # or list of ints, or "each"
+  analysis_start_year: null       # inclusive lower bound, null = open
+  analysis_end_year: null         # inclusive upper bound, null = open
 
 balances:
   water:
@@ -233,8 +234,8 @@ Produces `out/index.html` (single page, TOC sidebar, thumbnails linking to full-
 
 ```
 elm-diagnostics report PATH [--compare PATH2] [--out DIR] [--config YAML] \
-                      [--water-year-start 10] [--year YYYY | --all-years]
-elm-diagnostics balance {water,carbon,energy} PATH [--year YYYY] [--out DIR]
+                      [--verbose] [--debug] [--quiet]
+elm-diagnostics balance {water,carbon,energy} PATH [--config YAML] [--out DIR]
 elm-diagnostics plot VARNAME PATH [--kind timeseries|seasonal|anomaly|histogram]
 ```
 

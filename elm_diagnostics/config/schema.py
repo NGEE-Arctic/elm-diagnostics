@@ -7,10 +7,18 @@ from typing import Any, Literal
 
 import warnings
 import yaml
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 _DEFAULTS_PATH = Path(__file__).parent / "defaults.yaml"
 _USER_CONFIG_PATH = Path.home() / ".config" / "elm-diagnostics" / "config.yaml"
+_PLOT_TYPE_ORDER = (
+    "timeseries",
+    "hovmuller",
+    "seasonal",
+    "anomaly",
+    "histogram",
+    "diurnal",
+)
 
 
 # ---------------------------------------------------------------------------
@@ -51,15 +59,32 @@ class ThumbnailConfig(BaseModel):
     dpi: int = 72
 
 
-class ReportPlotTypesConfig(BaseModel):
-    include: list[str] = [
-        "timeseries",
-        "hovmuller",
-        "seasonal",
-        "anomaly",
-        "histogram",
-        "diurnal",
-    ]
+class ReportSectionsConfig(BaseModel):
+    metadata: bool = True
+    water_balance: bool = True
+    energy_balance: bool = True
+    carbon_balance: bool = True
+    variable_groups: bool = True
+    diagnostics: bool = True
+
+
+class GroupPlotTypesConfig(BaseModel):
+    timeseries: bool = True
+    hovmuller: bool = True
+    seasonal: bool = True
+    anomaly: bool = True
+    histogram: bool = True
+    diurnal: bool = True
+
+    @property
+    def active_plot_types(self) -> list[str]:
+        return [name for name in _PLOT_TYPE_ORDER if getattr(self, name)]
+
+
+class VariableGroupConfig(BaseModel):
+    enabled: bool = True
+    variables: list[str] = Field(default_factory=list)
+    plot_types: GroupPlotTypesConfig = GroupPlotTypesConfig()
 
 
 class VariableSectionsConfig(BaseModel):
@@ -87,7 +112,7 @@ class ReportConfig(BaseModel):
     title_template: str = "ELM diagnostics — {casename}"
     output_formats: list[str] = ["png", "netcdf"]
     thumbnails: ThumbnailConfig = ThumbnailConfig()
-    plot_types: ReportPlotTypesConfig = ReportPlotTypesConfig()
+    sections: ReportSectionsConfig = ReportSectionsConfig()
     variable_sections: VariableSectionsConfig = VariableSectionsConfig()
     balance_sections: BalanceSectionsConfig = BalanceSectionsConfig()
     comparison: ComparisonConfig = ComparisonConfig()
@@ -95,8 +120,21 @@ class ReportConfig(BaseModel):
 
 
 class TimeConfig(BaseModel):
-    water_year_start_month: int = 10
-    cumulative_years: str | list[int] = "all"
+    water_year_start_month: int = Field(default=10, ge=1, le=12)
+    analysis_start_year: int | None = None
+    analysis_end_year: int | None = None
+
+    @model_validator(mode="after")
+    def _validate_year_window(self) -> "TimeConfig":
+        if (
+            self.analysis_start_year is not None
+            and self.analysis_end_year is not None
+            and self.analysis_start_year > self.analysis_end_year
+        ):
+            raise ValueError(
+                "time.analysis_start_year must be <= time.analysis_end_year"
+            )
+        return self
 
 
 class WaterBalanceConfig(BaseModel):
@@ -189,10 +227,6 @@ class BalancesConfig(BaseModel):
     energy: EnergyBalanceConfig = EnergyBalanceConfig()
 
 
-class VariableGroupsConfig(BaseModel):
-    groups: dict[str, list[str]] = Field(default_factory=dict)
-
-
 class IOConfig(BaseModel):
     strict_combine: bool = False
     chunk_mode: Literal["off", "auto", "manual"] = "auto"
@@ -208,7 +242,7 @@ class Config(BaseModel):
     io: IOConfig = IOConfig()
     time: TimeConfig = TimeConfig()
     balances: BalancesConfig = BalancesConfig()
-    variables: VariableGroupsConfig = VariableGroupsConfig()
+    variable_groups: dict[str, VariableGroupConfig] = Field(default_factory=dict)
 
 
 # ---------------------------------------------------------------------------

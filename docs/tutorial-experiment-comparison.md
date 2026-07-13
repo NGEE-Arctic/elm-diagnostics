@@ -384,7 +384,7 @@ elm-diagnostics report tests/fixtures/data \
 # With specific year
 elm-diagnostics report ./experiment \
     --compare ./control \
-    --year 2001 \
+    --config year_2001.yaml \
     --out ./comparison_WY2001/
 
 # With custom configuration
@@ -406,12 +406,21 @@ report:
     show_delta_plots: true        # Include difference plots
     side_by_side_layout: true     # Side-by-side vs stacked
   
-  plot_types:
-    include: [timeseries, seasonal, anomaly]  # Which plot types
-  
   balance_sections:
     show_statistics_table: true
     show_residual_percentage: true
+
+variable_groups:
+    soil_state:
+        enabled: true
+        variables: [TSOI, SOILLIQ, SOILICE]
+        plot_types:
+            timeseries: true
+            hovmuller: true
+            seasonal: true
+            anomaly: true
+            histogram: false
+            diurnal: false
 ```
 
 ## Oak Harbor Comparison Example

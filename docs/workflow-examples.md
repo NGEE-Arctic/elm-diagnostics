@@ -263,7 +263,7 @@ for run in "${runs[@]}"; do
     echo "Processing $run..."
     elm-diagnostics report "./simulations/$run" \
         --out "$OUTPUT_BASE/$run" \
-        --year 2001 \
+        --config year_2001.yaml \
         --quiet &
 done
 
@@ -876,12 +876,21 @@ report:
     size: [400, 300]
     dpi: 72
   
-  plot_types:
-    include: [timeseries, seasonal, anomaly]  # Skip histogram, diurnal
-  
   metadata:
     show_run_info: true
     show_generation_timestamp: true
+
+variable_groups:
+    hydrology:
+        enabled: true
+        variables: [H2OSOI, QRUNOFF, SOILLIQ]
+        plot_types:
+            timeseries: true
+            hovmuller: false
+            seasonal: true
+            anomaly: true
+            histogram: false
+            diurnal: false
 ```
 
 ### Using Custom Config in Scripts
@@ -934,8 +943,18 @@ report:
   title_template: "Oak Harbor Analysis - {casename}"
   thumbnails:
     enabled: true
-  plot_types:
-    include: [timeseries, seasonal]
+
+variable_groups:
+    hydrology:
+        enabled: true
+        variables: [H2OSOI, QRUNOFF, SOILLIQ]
+        plot_types:
+            timeseries: true
+            hovmuller: false
+            seasonal: true
+            anomaly: false
+            histogram: false
+            diurnal: false
 ```
 
 Use in analysis script:
@@ -994,7 +1013,7 @@ find ./simulations -type d -name "run_*" | \
     parallel -j 4 \
         elm-diagnostics report {} \
             --out reports/{/} \
-            --year 2001 \
+            --config year_2001.yaml \
             --quiet
 
 echo "Parallel processing complete"
