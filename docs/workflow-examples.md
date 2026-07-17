@@ -891,7 +891,77 @@ variable_groups:
             anomaly: true
             histogram: false
             diurnal: false
+
+    # Restrict met_forcing to the most commonly available variables
+    met_forcing:
+        enabled: true
+        variables: [TBOT, RAIN, SNOW, PRECT, FSDS, FLDS, WIND]
+        plot_types:
+            timeseries: true
+            seasonal: true
+            histogram: true
+            hovmuller: false
+            anomaly: false
+            diurnal: false
 ```
+
+## Met Forcing Group
+
+The `met_forcing` variable group is enabled by default.  It shows time-series,
+seasonal-cycle, and histogram plots for the primary atmospheric inputs to ELM:
+TBOT, RAIN, SNOW, PRECT (derived), FSDS, FLDS, WIND, PBOT, QBOT.
+
+### Generate met forcing plots from a script
+
+```python
+from elm_diagnostics import Run
+from elm_diagnostics.plots import plot_timeseries, plot_seasonal, plot_histogram
+
+run = Run("/path/to/elm/output")
+
+met_vars = ["TBOT", "RAIN", "SNOW", "PRECT", "FSDS", "FLDS", "WIND", "PBOT", "QBOT"]
+
+for var in met_vars:
+    try:
+        fig = plot_timeseries(run, var)
+        fig.savefig(f"met_timeseries_{var}.png", dpi=150, bbox_inches="tight")
+    except KeyError:
+        print(f"  {var} not available in this run, skipping.")
+```
+
+### PRECT — derived total precipitation
+
+`PRECT` (total precipitation = RAIN + SNOW) is not a direct ELM output.
+`elm-diagnostics` computes it automatically when you call `run.get("PRECT")`,
+so it works transparently in any plot function or balance diagnostic:
+
+```python
+from elm_diagnostics import Run
+
+run = Run("/path/to/elm/output")
+prect = run.get("PRECT")          # computed as RAIN + SNOW
+print(prect.attrs["units"])       # mm/s
+print(prect.attrs["description"]) # Computed as RAIN + SNOW
+```
+
+### Disable or narrow the group
+
+To reduce report size, disable the group entirely or restrict the variable list
+in `~/.config/elm-diagnostics/config.yaml`:
+
+```yaml
+variable_groups:
+  met_forcing:
+    enabled: false          # omit the section from the report entirely
+```
+
+or keep the section but list only the variables you want:
+
+```yaml
+variable_groups:
+  met_forcing:
+    enabled: true
+    variables: [TBOT, PRECT, FSDS]   # override the full default list
 
 ### Using Custom Config in Scripts
 
