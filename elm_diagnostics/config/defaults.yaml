@@ -118,6 +118,16 @@ variable_groups:
       anomaly: true
       histogram: true
       diurnal: true
+  met_forcing:
+    enabled: true
+    variables: [TBOT, RAIN, SNOW, PRECT, FSDS, FLDS, WIND, PBOT, QBOT]
+    plot_types:
+      timeseries: true
+      hovmuller: false
+      seasonal: true
+      anomaly: false
+      histogram: true
+      diurnal: false
   vegetation:
     enabled: true
     variables: [TLAI, TSAI, HTOP, GPP, TOTVEGC]
