@@ -584,6 +584,118 @@ def make_vertical_profile_dataset(
     return ds
 
 
+def make_met_forcing_dataset(
+    start_year: int = 2000,
+    n_months: int = 12,
+    calendar: str = "noleap",
+) -> xr.Dataset:
+    """Build a synthetic dataset covering primary atmospheric forcing fields.
+
+    Variables match the ``met_forcing`` variable group in defaults.yaml:
+    TBOT, RAIN, SNOW, FSDS, FLDS, WIND, PBOT, QBOT.
+    Note: PRECT (= RAIN + SNOW) is a derived variable, not included here.
+
+    Seasonal cycles are added to TBOT, FSDS, and FLDS to make seasonal
+    plots meaningful.
+    """
+    rng = np.random.RandomState(99)
+    n = n_months
+
+    # Month-of-year index for seasonal signal (0 = Jan, etc.)
+    month_idx = np.arange(n) % 12
+    seasonal = np.cos(2 * np.pi * (month_idx - 6) / 12)  # peak in Jan (winter)
+
+    # TBOT: 270–295 K with seasonal cycle (cold winter, warm summer, NH)
+    tbot_base = 282.0
+    tbot_amp = 12.0
+    tbot = tbot_base - tbot_amp * seasonal + rng.normal(0, 0.5, size=n)
+
+    # FSDS: 50–400 W/m² — more radiation in summer
+    fsds_base = 200.0
+    fsds_amp = 150.0
+    fsds = np.clip(fsds_base + fsds_amp * (-seasonal) + rng.normal(0, 10, size=n), 5.0, 450.0)
+
+    # FLDS: 200–350 W/m² — weakly seasonal (higher in warm months)
+    flds_base = 280.0
+    flds_amp = 40.0
+    flds = np.clip(flds_base - flds_amp * seasonal + rng.normal(0, 5, size=n), 150.0, 380.0)
+
+    # WIND: 1–10 m/s with some noise
+    wind = np.clip(4.0 + rng.normal(0, 1.5, size=n), 0.5, 15.0)
+
+    # PBOT: ~100000 Pa with small noise
+    pbot = 101325.0 + rng.normal(0, 500.0, size=n)
+
+    # QBOT: 0.001–0.015 kg/kg — higher in warm months
+    qbot_base = 0.005
+    qbot_amp = 0.004
+    qbot = np.clip(qbot_base - qbot_amp * seasonal + rng.normal(0, 0.0003, size=n), 5e-4, 0.025)
+
+    # RAIN/SNOW: split total precip by temperature
+    total_precip = np.clip(rng.uniform(1e-6, 5e-5, size=n), 0, None)
+    snow_frac = np.clip((270.0 - tbot) / 10.0, 0.0, 1.0)
+    rain = total_precip * (1.0 - snow_frac)
+    snow = total_precip * snow_frac
+
+    variables = {
+        "TBOT": {
+            "data": tbot.astype(np.float64),
+            "units": "K",
+            "long_name": "atmospheric air temperature",
+            "cell_methods": "time: mean",
+        },
+        "RAIN": {
+            "data": rain.astype(np.float64),
+            "units": "mm/s",
+            "long_name": "atmospheric rain",
+            "cell_methods": "time: mean",
+        },
+        "SNOW": {
+            "data": snow.astype(np.float64),
+            "units": "mm/s",
+            "long_name": "atmospheric snow",
+            "cell_methods": "time: mean",
+        },
+        "FSDS": {
+            "data": fsds.astype(np.float64),
+            "units": "W/m^2",
+            "long_name": "atmospheric incident solar radiation",
+            "cell_methods": "time: mean",
+        },
+        "FLDS": {
+            "data": flds.astype(np.float64),
+            "units": "W/m^2",
+            "long_name": "atmospheric longwave radiation",
+            "cell_methods": "time: mean",
+        },
+        "WIND": {
+            "data": wind.astype(np.float64),
+            "units": "m/s",
+            "long_name": "atmospheric wind speed",
+            "cell_methods": "time: mean",
+        },
+        "PBOT": {
+            "data": pbot.astype(np.float64),
+            "units": "Pa",
+            "long_name": "atmospheric pressure",
+            "cell_methods": "time: mean",
+        },
+        "QBOT": {
+            "data": qbot.astype(np.float64),
+            "units": "kg/kg",
+            "long_name": "atmospheric specific humidity",
+            "cell_methods": "time: mean",
+        },
+    }
+
+    return make_single_point_dataset(
+        start_year=start_year,
+        n_months=n_months,
+        calendar=calendar,
+        variables=variables,
+    )
+
+
 def save_as_elm_files(
     ds: xr.Dataset,
     outdir: Path,
