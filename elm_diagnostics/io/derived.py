@@ -148,11 +148,57 @@ def compute_total_soil_water(run: Run) -> xr.DataArray:
     return total
 
 
+def compute_total_precip(run: Run) -> xr.DataArray:
+    """Compute total precipitation rate from liquid and frozen components.
+
+    Based on ELM forcing conventions:
+        PRECT = RAIN + SNOW
+
+    Where:
+        RAIN = liquid precipitation rate (forc_rain)
+        SNOW = frozen precipitation rate (forc_snow)
+
+    Parameters
+    ----------
+    run : Run
+        Run object containing RAIN and SNOW history variables.
+
+    Returns
+    -------
+    xr.DataArray
+        Total precipitation rate in the same units as RAIN (typically mm/s).
+
+    Raises
+    ------
+    ValueError
+        If either RAIN or SNOW is not available in the run.
+    """
+    required = ["RAIN", "SNOW"]
+    missing = [v for v in required if not run.has(v)]
+    if missing:
+        raise ValueError(
+            f"Cannot compute PRECT: missing required variables {missing}. "
+            f"Total precipitation = RAIN + SNOW."
+        )
+
+    rain = run.get("RAIN")
+    snow = run.get("SNOW")
+
+    prect = rain + snow
+    prect.attrs["long_name"] = "total precipitation rate (computed)"
+    prect.attrs["units"] = rain.attrs.get("units", "mm/s")
+    prect.attrs["description"] = "Computed as RAIN + SNOW"
+    prect.name = "PRECT"
+
+    return prect
+
+
 # Registry of derivable variables
 # Maps output variable name to the function that computes it
 DERIVABLE_VARS = {
     "QFLX_EVAP_TOT": compute_total_et,
     "TOTAL_SOIL_WATER": compute_total_soil_water,
+    "PRECT": compute_total_precip,
 }
 
 
