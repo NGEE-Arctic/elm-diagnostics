@@ -14,7 +14,7 @@ This document maps ELM history field names to their definitions, source code loc
 3. [Energy Balance Variables](#energy-balance-variables)
 4. [Atmospheric Forcing Variables](#atmospheric-forcing-variables)
 5. [Computed/Derived Variables](#computedderived-variables)
-5. [Common Issues and Solutions](#common-issues-and-solutions)
+6. [Common Issues and Solutions](#common-issues-and-solutions)
 
 ---
 
