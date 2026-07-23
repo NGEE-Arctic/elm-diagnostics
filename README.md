@@ -744,7 +744,7 @@ See [`elm_diagnostics/config/defaults.yaml`](elm_diagnostics/config/defaults.yam
 
 ## License
 
-MIT
+BSD-3-Clause
 
 ## Citation
 
