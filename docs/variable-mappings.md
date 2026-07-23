@@ -12,8 +12,9 @@ This document maps ELM history field names to their definitions, source code loc
 1. [Water Balance Variables](#water-balance-variables)
 2. [Carbon Balance Variables](#carbon-balance-variables)
 3. [Energy Balance Variables](#energy-balance-variables)
-4. [Computed/Derived Variables](#computedderived-variables)
-5. [Common Issues and Solutions](#common-issues-and-solutions)
+4. [Atmospheric Forcing Variables](#atmospheric-forcing-variables)
+5. [Computed/Derived Variables](#computedderived-variables)
+6. [Common Issues and Solutions](#common-issues-and-solutions)
 
 ---
 
@@ -343,6 +344,46 @@ All CH4 fluxes have been verified to use `_SAT` / `_UNSAT` suffixes (not `_SOIL`
 
 ---
 
+## Atmospheric Forcing Variables
+
+These fields are the primary atmospheric inputs that drive ELM.  In offline
+(I-case) runs they originate from a meteorological dataset (e.g. GSWP3,
+CRUNCEP); in coupled runs they arrive from the atmosphere component.  ELM
+writes them back to the history stream so they can be audited alongside model
+response variables.
+
+They are grouped in the report under the **`met_forcing`** variable group,
+which is enabled by default and generates time-series, seasonal-cycle, and
+histogram plots.
+
+| Variable | Long name | Units | Typical h0 availability |
+|----------|-----------|-------|--------------------------|
+| `TBOT`   | Atmospheric air temperature | K | Yes ✓ |
+| `RAIN`   | Atmospheric rain (liquid precip) | mm/s | Yes ✓ |
+| `SNOW`   | Atmospheric snow (frozen precip, water equivalent) | mm/s | Yes ✓ |
+| `PRECT`  | Total precipitation rate | mm/s | **Derived** (RAIN + SNOW) |
+| `FSDS`   | Atmospheric incident solar (shortwave) radiation | W/m² | Yes ✓ |
+| `FLDS`   | Atmospheric longwave radiation | W/m² | Yes ✓ |
+| `WIND`   | Atmospheric wind speed | m/s | Yes ✓ |
+| `PBOT`   | Atmospheric pressure | Pa | Yes ✓ |
+| `QBOT`   | Atmospheric specific humidity | kg/kg | Yes ✓ |
+
+### Notes
+
+- `PRECT` is not a direct ELM output; it is derived on-the-fly by
+  `elm-diagnostics` as `RAIN + SNOW`.  See the
+  [Computed/Derived Variables](#computedderived-variables) section below.
+- `FSDS` and `FLDS` also appear in the **`energy`** variable group because
+  they are inputs to the surface energy balance.
+- If a forcing variable is missing from a particular run's history stream
+  (e.g., excluded from `fincl1`), `elm-diagnostics` skips it silently and
+  no plot is generated for that variable.
+- To disable the entire group or restrict to a subset of variables, override
+  `variable_groups.met_forcing` in your user config (see
+  [workflow examples](workflow-examples.md#met-forcing-group)).
+
+---
+
 ## Computed/Derived Variables
 
 These variables are automatically computed by `elm-diagnostics` if not present in the history output:
@@ -357,6 +398,13 @@ These variables are automatically computed by `elm-diagnostics` if not present i
 - **Computation:** `sum(SOILLIQ) + sum(SOILICE)` over `levgrnd` dimension
 - **Required components:** SOILLIQ and SOILICE with vertical profiles
 - **Implementation:** `elm_diagnostics/io/derived.py:compute_total_soil_water()`
+
+### `PRECT` (Total Precipitation Rate)
+- **Computation:** `RAIN + SNOW`
+- **Required components:** Both `RAIN` and `SNOW` must be in history output
+- **Implementation:** `elm_diagnostics/io/derived.py:compute_total_precip()`
+- **Usage:** Automatically invoked by `Run.get("PRECT")`; appears in the
+  `met_forcing` variable group alongside its components
 
 ### Adding New Derived Variables
 
