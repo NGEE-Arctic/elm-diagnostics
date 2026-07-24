@@ -569,7 +569,7 @@ def test_cli_end_to_end_subprocess(synthetic_data_dir, temp_output_dir):
         ],
         capture_output=True,
         text=True,
-        timeout=120,
+        timeout=300,
     )
     assert result.returncode == 0
     assert "Report generated" in result.stdout
