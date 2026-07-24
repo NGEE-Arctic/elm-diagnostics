@@ -263,34 +263,12 @@ balances:
 - **[Assumptions](docs/assumptions.md)** - Verified assumptions from ELM source and real output files
 - **[Design Specification](elm-diagnostics-spec.md)** - Detailed design document
 
-### Where to Start
-
-**I'm new to elm-diagnostics:**  
-→ Start with the Quick Start section above
-
-**I need to check budget closure:**  
-→ Use `elm-diagnostics balance <type> /path/to/output`
-
-**I want to compare two simulations:**  
-→ Use `elm-diagnostics report /path/to/exp --compare /path/to/base`
-
-**I need examples for specific tasks:**  
-→ Browse [Workflow Examples](docs/workflow-examples.md)
-
-**I want to use the Python API:**  
-→ See [Python API Reference](docs/python-api.md)
-
-**I want to understand variable definitions:**  
-→ Check [Variable Mappings](docs/variable-mappings.md)
-
 ## Testing
 
 Run the test suite:
 ```bash
 pytest tests/
 ```
-
-Current status: **161 tests passing** (including 45 sub-gridcell tests, 17 report tests, 35 CLI tests)
 
 ### Test Data
 
@@ -303,25 +281,6 @@ See [`tests/fixtures/README.md`](tests/fixtures/README.md) for details about tes
 - Python ≥ 3.10
 - Core: xarray, numpy, pandas, matplotlib, pint, pint-xarray, typer, rich
 - Optional: dask (parallel processing), plotly (interactive plots), cartopy (maps)
-
-## Development Status
-
-**Current Phase:** Phase 7 Complete (CLI Implementation)
-
-✅ **Completed:**
-- Phase 0: ELM source code verification and variable name corrections
-- Phase 1: I/O, Run, Comparison classes with auto-derivation
-- Phase 2: Time handling, water-year support, unit-aware integration
-- Phase 3: Water, Carbon, Energy balance classes
-- Phase 3.5: Real data validation with oakharbor h0 file
-- Phase 4: General variable plots (timeseries, seasonal, anomaly, histogram, diurnal)
-- Phase 5: Sub-gridcell support (column, pft, landunit faceting for all plots and balances)
-- Phase 6: HTML report generation (thumbnails, lightbox, statistics, error handling, comprehensive testing)
-- Phase 7: CLI implementation (rich progress indicators, enhanced error handling, verbose/debug/quiet modes, 35 comprehensive tests)
-- All 161 tests passing
-
-🚧 **Next Phase:**
-- Phase 8: User documentation, tutorials, and worked examples
 
 ## License
 
@@ -342,7 +301,7 @@ Issues and pull requests welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for gui
 ## Acknowledgments
 
 - Variable definitions verified against E3SM IM1 ELM source code
-- Design inspired by CLM diagnostics package (NCAR) and ILAMB
+- Design inspired by packages such as  CLM diagnostics package (NCAR) and ILAMB
 - Test data: Oak Harbor single-point simulation
 
 ---
