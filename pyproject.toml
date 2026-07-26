@@ -38,6 +38,7 @@ dev = [
     "pytest>=7.0",
     "pytest-mpl>=0.16",
     "dask[complete]",
+    "ruff==0.16.0",
 ]
 docs = [
     "sphinx>=7.0",
@@ -53,3 +54,10 @@ packages = ["elm_diagnostics"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+
+# Linting is pinned to ruff 0.16.0 (see [project.optional-dependencies].dev and
+# .github/workflows/lint.yml). The default rule set of that version is enforced;
+# it is intentionally left implicit so `ruff check` locally matches CI exactly.
+[tool.ruff]
+line-length = 88
+target-version = "py310"

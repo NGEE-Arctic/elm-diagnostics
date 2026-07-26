@@ -12,7 +12,6 @@
 
 from __future__ import annotations
 
-
 import matplotlib.pyplot as plt
 import numpy as np
 import xarray as xr
@@ -28,7 +27,6 @@ from elm_diagnostics.plots.dimension_helpers import (
     resolve_dimension_axis,
     squeeze_spatial_dims,
 )
-
 
 _MONTH_LABELS = ["J", "F", "M", "A", "M", "J", "J", "A", "S", "O", "N", "D"]
 
