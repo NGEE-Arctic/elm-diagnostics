@@ -56,8 +56,16 @@ packages = ["elm_diagnostics"]
 testpaths = ["tests"]
 
 # Linting is pinned to ruff 0.16.0 (see [project.optional-dependencies].dev and
-# .github/workflows/lint.yml). The default rule set of that version is enforced;
-# it is intentionally left implicit so `ruff check` locally matches CI exactly.
+# .github/workflows/lint.yml) so `ruff check` locally matches CI exactly.
 [tool.ruff]
 line-length = 88
 target-version = "py310"
+
+# ruff 0.16.0's curated default rule set is enforced, minus three rules that
+# clash with intentional patterns in this codebase:
+#   BLE001 - blind `except Exception:` is used deliberately for report-generation
+#            resilience (one failing section must not abort the whole report)
+#   DTZ005 - report "generated at" timestamps use local naive time by design
+#   TRY004 - config validation raises ValueError intentionally
+[tool.ruff.lint]
+ignore = ["BLE001", "DTZ005", "TRY004"]
