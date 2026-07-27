@@ -12,7 +12,6 @@
 
 from __future__ import annotations
 
-
 import matplotlib.pyplot as plt
 import xarray as xr
 

@@ -13,6 +13,7 @@
 from __future__ import annotations
 
 import getpass
+import logging
 import os
 import re
 import socket
@@ -48,6 +49,8 @@ from elm_diagnostics.plots import (
     plot_timeseries,
 )
 
+logger = logging.getLogger(__name__)
+
 _TEMPLATE_DIR = Path(__file__).parent / "templates"
 _ASSETS_DIR = Path(__file__).parent / "assets"
 _DEFAULT_USER_CONFIG_PATH = Path.home() / ".config" / "elm-diagnostics" / "config.yaml"
@@ -69,7 +72,7 @@ class _Section:
         self.extra_tables: list[dict[str, Any]] = []
         self.extra_text_blocks: list[dict[str, str]] = []
 
-    def add_subsection(self, title: str) -> "_Subsection":
+    def add_subsection(self, title: str) -> _Subsection:
         """Create a named subsection for grouped figures."""
         subsection = _Subsection(self.id, title)
         self.subsections.append(subsection)
@@ -227,7 +230,9 @@ class Report:
                     self._config_source_path.read_text(),
                 )
             except Exception:
-                pass
+                logger.debug(
+                    "Could not read config source file for report", exc_info=True
+                )
 
         merged_yaml = yaml.safe_dump(self.config.model_dump(), sort_keys=False)
         return ("Configuration (merged)", merged_yaml)
@@ -732,7 +737,11 @@ class Report:
                         components_ds.to_netcdf(nc_file)
                         io_seconds += time.perf_counter() - io_start
                     except Exception:
-                        pass  # Skip if can't save
+                        # Skip if can't save
+                        logger.debug(
+                            "Could not save energy balance components to netCDF",
+                            exc_info=True,
+                        )
 
                 sections.append(sec)
             except Exception as e:
@@ -808,7 +817,11 @@ class Report:
                         components_ds.to_netcdf(nc_file)
                         io_seconds += time.perf_counter() - io_start
                     except Exception:
-                        pass  # Skip if can't save
+                        # Skip if can't save
+                        logger.debug(
+                            "Could not save carbon balance components to netCDF",
+                            exc_info=True,
+                        )
 
                 sections.append(sec)
             except Exception as e:
@@ -1143,13 +1156,15 @@ class Report:
     ):
         """Cache active variable lookups for plot helpers during one plot call."""
         if isinstance(self.source, Comparison) and base_var is not None:
-            with self._cached_get_for_var(
-                self.source.experiment,
-                varname,
-                experiment_var,
+            with (
+                self._cached_get_for_var(
+                    self.source.experiment,
+                    varname,
+                    experiment_var,
+                ),
+                self._cached_get_for_var(self.source.base, varname, base_var),
             ):
-                with self._cached_get_for_var(self.source.base, varname, base_var):
-                    yield
+                yield
             return
 
         with self._cached_get_for_var(self._run, varname, experiment_var):
@@ -1251,7 +1266,9 @@ class Report:
                         except Exception:
                             # Silently skip individual plot failures
                             # (e.g., diurnal for monthly data, seasonal for insufficient data)
-                            pass
+                            logger.debug(
+                                "Skipping individual plot after failure", exc_info=True
+                            )
                         finally:
                             if fig is not None:
                                 plt.close(fig)

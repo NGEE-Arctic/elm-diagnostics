@@ -28,7 +28,6 @@ from elm_diagnostics.time.calendars import (
     select_year,
 )
 
-
 _PLOT_TIME_CACHE: dict[tuple[int, int], list] = {}
 _PLOT_TIME_CACHE_MAX = 4096
 

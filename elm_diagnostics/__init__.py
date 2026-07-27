@@ -17,10 +17,10 @@ from elm_diagnostics.io.run import Comparison, Run
 from elm_diagnostics.report.build import Report
 
 __all__ = [
-    "Run",
-    "Comparison",
-    "WaterBalance",
     "CarbonBalance",
+    "Comparison",
     "EnergyBalance",
     "Report",
+    "Run",
+    "WaterBalance",
 ]

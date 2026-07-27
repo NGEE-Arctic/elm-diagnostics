@@ -17,7 +17,6 @@ import shlex
 import sys
 import time
 from pathlib import Path
-from typing import List, Optional
 
 import typer
 from rich.console import Console
@@ -115,13 +114,13 @@ def validate_config(config_path: str) -> Path:
     return p
 
 
-def complete_balance_type(incomplete: str) -> List[str]:
+def complete_balance_type(incomplete: str) -> list[str]:
     """Auto-complete balance types."""
     types = ["water", "carbon", "energy"]
     return [t for t in types if t.startswith(incomplete)]
 
 
-def complete_plot_kind(incomplete: str) -> List[str]:
+def complete_plot_kind(incomplete: str) -> list[str]:
     """Auto-complete plot kinds."""
     kinds = ["timeseries", "hovmuller", "seasonal", "anomaly", "histogram", "diurnal"]
     return [k for k in kinds if k.startswith(incomplete)]
@@ -251,11 +250,11 @@ def _print_report_section_timings(
 @app.command()
 def report(
     path: str = typer.Argument(..., help="Path to ELM history files directory."),
-    compare: Optional[str] = typer.Option(
+    compare: str | None = typer.Option(
         None, "--compare", help="Path to comparison run."
     ),
     out: str = typer.Option("elm_report", "--out", help="Output directory."),
-    config: Optional[str] = typer.Option(None, "--config", help="Path to config YAML."),
+    config: str | None = typer.Option(None, "--config", help="Path to config YAML."),
     verbose: bool = typer.Option(False, "--verbose", "-v", help="Verbose output."),
     debug: bool = typer.Option(
         False, "--debug", help="Debug mode with full tracebacks."
@@ -422,7 +421,7 @@ def report(
     except Exception as e:
         if debug:
             raise
-        console.print(f"\n[red]Error:[/red] {str(e)}")
+        console.print(f"\n[red]Error:[/red] {e!s}")
         console.print("\nRun with --debug for full traceback")
         raise typer.Exit(code=1)
 
@@ -435,10 +434,10 @@ def balance(
         autocompletion=complete_balance_type,
     ),
     path: str = typer.Argument(..., help="Path to ELM history files directory."),
-    out: Optional[str] = typer.Option(
+    out: str | None = typer.Option(
         None, "--out", help="Output directory for plots/data."
     ),
-    config: Optional[str] = typer.Option(None, "--config", help="Path to config YAML."),
+    config: str | None = typer.Option(None, "--config", help="Path to config YAML."),
     verbose: bool = typer.Option(False, "--verbose", "-v", help="Verbose output."),
     debug: bool = typer.Option(
         False, "--debug", help="Debug mode with full tracebacks."
@@ -581,7 +580,7 @@ def balance(
     except Exception as e:
         if debug:
             raise
-        console.print(f"\n[red]Error:[/red] {str(e)}")
+        console.print(f"\n[red]Error:[/red] {e!s}")
         console.print("\nRun with --debug for full traceback")
         raise typer.Exit(code=1)
 
@@ -596,10 +595,10 @@ def plot(
         help="Plot type: timeseries, hovmuller, seasonal, anomaly, histogram, or diurnal.",
         autocompletion=complete_plot_kind,
     ),
-    out: Optional[str] = typer.Option(
+    out: str | None = typer.Option(
         None, "--out", help="Output file path (e.g. plot.png)."
     ),
-    config: Optional[str] = typer.Option(None, "--config", help="Path to config YAML."),
+    config: str | None = typer.Option(None, "--config", help="Path to config YAML."),
     verbose: bool = typer.Option(False, "--verbose", "-v", help="Verbose output."),
     debug: bool = typer.Option(
         False, "--debug", help="Debug mode with full tracebacks."
@@ -649,8 +648,8 @@ def plot(
         from elm_diagnostics.io.run import Run
         from elm_diagnostics.plots import (
             plot_anomaly,
-            plot_hovmuller,
             plot_histogram,
+            plot_hovmuller,
             plot_seasonal,
             plot_timeseries,
         )
@@ -731,7 +730,7 @@ def plot(
     except Exception as e:
         if debug:
             raise
-        console.print(f"\n[red]Error:[/red] {str(e)}")
+        console.print(f"\n[red]Error:[/red] {e!s}")
         console.print("\nRun with --debug for full traceback")
         raise typer.Exit(code=1)
 

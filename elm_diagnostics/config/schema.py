@@ -12,10 +12,10 @@
 
 from __future__ import annotations
 
+import warnings
 from pathlib import Path
 from typing import Any, Literal
 
-import warnings
 import yaml
 from pydantic import BaseModel, Field, model_validator
 
@@ -135,7 +135,7 @@ class TimeConfig(BaseModel):
     analysis_end_year: int | None = None
 
     @model_validator(mode="after")
-    def _validate_year_window(self) -> "TimeConfig":
+    def _validate_year_window(self) -> TimeConfig:
         if (
             self.analysis_start_year is not None
             and self.analysis_end_year is not None

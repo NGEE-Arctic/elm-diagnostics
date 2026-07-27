@@ -344,7 +344,7 @@ class WaterBalance(Balance):
         )
 
         # Get subgrid units from first component
-        first_comp = list(comps.values())[0]
+        first_comp = next(iter(comps.values()))
         units = get_subgrid_units(first_comp, self.by)
 
         # Create faceted figures

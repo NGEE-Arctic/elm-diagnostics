@@ -257,12 +257,15 @@ class Run:
         ):
             analysis_year_min = analysis_year
             analysis_year_max = analysis_year
-        if analysis_year_min is not None and analysis_year_max is not None:
-            if analysis_year_min > analysis_year_max:
-                analysis_year_min, analysis_year_max = (
-                    analysis_year_max,
-                    analysis_year_min,
-                )
+        if (
+            analysis_year_min is not None
+            and analysis_year_max is not None
+            and analysis_year_min > analysis_year_max
+        ):
+            analysis_year_min, analysis_year_max = (
+                analysis_year_max,
+                analysis_year_min,
+            )
         self._analysis_year_min = analysis_year_min
         self._analysis_year_max = analysis_year_max
         self._analysis_year_tolerance = max(0, int(analysis_year_tolerance))
@@ -334,10 +337,10 @@ class Run:
                 raise FileNotFoundError(f"No files for stream {tape}")
             if strict_combine is None:
                 strict_combine = self._strict_combine
-            kwargs: dict = dict(
-                combine="by_coords",
-                data_vars="all",
-            )
+            kwargs: dict = {
+                "combine": "by_coords",
+                "data_vars": "all",
+            }
             if strict_combine:
                 # Set options to strict choice for debugging
                 kwargs["combine"] = "by_coords"
