@@ -398,3 +398,77 @@ def test_report_water_balance_section_with_january_water_year_start(report_run):
         html_path = rpt.build(outdir)
         content = html_path.read_text()
         assert "Water Balance" in content
+
+
+def test_report_includes_lnd_in_when_present(report_run):
+    """Test that lnd_in file is included in report when it exists."""
+    # Create a sample lnd_in file in the run directory
+    lnd_in_path = Path(report_run.path) / "lnd_in"
+    lnd_in_content = """&clm_inparm
+ dtime = 1800
+ hist_nhtfrq = -24
+ hist_mfilt = 30
+/"""
+    lnd_in_path.write_text(lnd_in_content)
+
+    rpt = Report(report_run)
+    with tempfile.TemporaryDirectory() as outdir:
+        html_path = rpt.build(outdir)
+        content = html_path.read_text()
+        assert "lnd_in namelist file" in content
+        # Content is HTML-escaped in the template
+        assert "&amp;clm_inparm" in content
+        assert "dtime = 1800" in content
+
+
+def test_report_handles_missing_lnd_in(report_run, caplog):
+    """Test that report generates successfully when lnd_in is missing."""
+    import logging
+
+    # Ensure no lnd_in file exists
+    lnd_in_path = Path(report_run.path) / "lnd_in"
+    if lnd_in_path.exists():
+        lnd_in_path.unlink()
+
+    rpt = Report(report_run)
+    with tempfile.TemporaryDirectory() as outdir:
+        with caplog.at_level(logging.WARNING):
+            html_path = rpt.build(outdir)
+            assert html_path.exists()
+            content = html_path.read_text()
+            # Report should still be generated
+            assert "report_test" in content
+            # lnd_in should not be in the content
+            assert "lnd_in namelist file" not in content
+            # Warning should be logged
+            assert any("lnd_in file not found" in record.message for record in caplog.records)
+
+
+def test_report_handles_unreadable_lnd_in(report_run, caplog, monkeypatch):
+    """Test that report handles read errors gracefully."""
+    import logging
+    from pathlib import Path as PathlibPath
+
+    # Create a lnd_in file that will exist but fail to read
+    lnd_in_path = Path(report_run.path) / "lnd_in"
+    lnd_in_path.write_text("test content")
+
+    # Mock read_text to raise an exception
+    original_read_text = PathlibPath.read_text
+    def mock_read_text(self, *args, **kwargs):
+        if self.name == "lnd_in":
+            raise PermissionError("Cannot read file")
+        return original_read_text(self, *args, **kwargs)
+
+    monkeypatch.setattr(PathlibPath, "read_text", mock_read_text)
+
+    rpt = Report(report_run)
+    with tempfile.TemporaryDirectory() as outdir:
+        with caplog.at_level(logging.DEBUG):
+            html_path = rpt.build(outdir)
+            assert html_path.exists()
+            content = html_path.read_text()
+            # Report should still be generated
+            assert "report_test" in content
+            # lnd_in should not be in the content
+            assert "lnd_in namelist file" not in content
