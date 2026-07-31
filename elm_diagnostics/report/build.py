@@ -245,9 +245,7 @@ class Report:
         """
         lnd_in_path = self._run.path / "lnd_in"
         if not lnd_in_path.exists():
-            logger.warning(
-                f"lnd_in file not found in run directory: {self._run.path}"
-            )
+            logger.warning(f"lnd_in file not found in run directory: {self._run.path}")
             return None
 
         try:
