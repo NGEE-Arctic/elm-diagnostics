@@ -237,6 +237,23 @@ class Report:
         merged_yaml = yaml.safe_dump(self.config.model_dump(), sort_keys=False)
         return ("Configuration (merged)", merged_yaml)
 
+    def _read_lnd_in_file(self) -> tuple[str, str] | None:
+        """Read lnd_in namelist file from run directory.
+
+        Returns:
+            Tuple of (title, content) if file exists and is readable, None otherwise.
+        """
+        lnd_in_path = self._run.path / "lnd_in"
+        if not lnd_in_path.exists():
+            logger.warning(f"lnd_in file not found in run directory: {self._run.path}")
+            return None
+
+        try:
+            return ("lnd_in namelist file", lnd_in_path.read_text())
+        except Exception:
+            logger.debug("Could not read lnd_in file for report", exc_info=True)
+            return None
+
     @property
     def _run(self) -> Run:
         if isinstance(self.source, Comparison):
@@ -1478,6 +1495,12 @@ class Report:
             )
         config_title, config_yaml = self._diagnostics_config_yaml()
         sec.add_text_block(config_title, config_yaml)
+
+        lnd_in_data = self._read_lnd_in_file()
+        if lnd_in_data is not None:
+            lnd_in_title, lnd_in_content = lnd_in_data
+            sec.add_text_block(lnd_in_title, lnd_in_content)
+
         self._record_section_timing(section_title, start_time)
         return sec
 
