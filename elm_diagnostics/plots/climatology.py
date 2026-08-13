@@ -14,9 +14,10 @@ from __future__ import annotations
 
 from typing import Literal
 
+import numpy as np
 import xarray as xr
 
-from elm_diagnostics.time.calendars import subset_climo_years
+from elm_diagnostics.time.calendars import _get_year, subset_climo_years
 
 
 def compute_climo_stats(
@@ -71,3 +72,59 @@ def compute_climo_stats(
         hi = mean
 
     return mean, lo, hi
+
+
+def compute_individual_year_seasonal_cycles(
+    da: xr.DataArray,
+    climo_start_year: int = -1,
+    climo_end_year: int = -1,
+) -> tuple[list[int], list[xr.DataArray]]:
+    """Return individual year seasonal cycles as (years, seasonal_arrays).
+
+    Each seasonal array in the returned list has shape (12,) for the month
+    dimension, representing the monthly means for that specific year.
+    Additional dimensions (e.g., levgrnd) are preserved.
+
+    Parameters
+    ----------
+    da : xr.DataArray
+        Input data with a time dimension.
+    climo_start_year : int, optional
+        Start year for filtering (-1 = earliest available).
+    climo_end_year : int, optional
+        End year for filtering (-1 = latest available).
+
+    Returns
+    -------
+    years : list[int]
+        Sorted list of years present in the filtered data.
+    seasonal_arrays : list[xr.DataArray]
+        One DataArray per year with monthly means (grouped by time.month).
+        Each has shape (12,) for month dimension plus any additional dimensions.
+    """
+    # Filter to requested year range
+    da = subset_climo_years(da, climo_start_year, climo_end_year)
+
+    if len(da.time) == 0:
+        return [], []
+
+    # Extract unique years
+    times = da.time.values
+    years = sorted({_get_year(t) for t in times})
+
+    # Compute seasonal cycle for each year
+    seasonal_arrays = []
+    for year in years:
+        # Select data for this year
+        year_mask = np.array([_get_year(t) == year for t in times])
+        da_year = da.isel(time=year_mask)
+
+        if len(da_year.time) == 0:
+            continue
+
+        # Compute monthly means for this year
+        monthly_mean = da_year.groupby("time.month").mean()
+
+        seasonal_arrays.append(monthly_mean)
+
+    return years, seasonal_arrays
