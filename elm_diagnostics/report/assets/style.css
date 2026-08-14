@@ -11,6 +11,10 @@ body { font-family: sans-serif;
 #sidebar li { margin: 0.4rem 0; }
 #sidebar a { color: #bdc3c7; text-decoration: none; font-size: 0.85rem; }
 #sidebar a:hover { color: #fff; }
+#sidebar a.active { color: #fff; font-weight: bold; background: rgba(255, 255, 255, 0.1);
+                    padding: 0.2rem 0.5rem; border-radius: 3px; display: inline-block; }
+#sidebar ul.subsection-links { margin-left: 1rem; margin-top: 0.25rem; }
+#sidebar ul.subsection-links li { font-size: 0.9rem; }
 #sidebar .meta { font-size: 0.7rem; color: #7f8c8d; margin-top: 2rem; }
 main { margin-left: 240px; padding: 2rem; max-width: 1100px; }
 h1 { font-size: 1.6rem; margin-bottom: 0.5rem; }

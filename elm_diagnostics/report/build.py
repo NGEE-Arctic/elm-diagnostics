@@ -65,6 +65,7 @@ class _Section:
     def __init__(self, title: str, description: str = ""):
         self.title = title
         self.id = re.sub(r"[^a-z0-9]+", "-", title.lower()).strip("-")
+        self.filename = ""  # HTML filename for this section (assigned later)
         self.description = description
         self.figures: list[dict[str, str]] = []
         self.subsections: list[_Subsection] = []
@@ -501,8 +502,10 @@ class Report:
         outdir = Path(outdir)
         figdir = outdir / "figures"
         datadir = outdir / "data"
+        assetsdir = outdir / "assets"  # NEW: assets directory
         figdir.mkdir(parents=True, exist_ok=True)
         datadir.mkdir(parents=True, exist_ok=True)
+        assetsdir.mkdir(parents=True, exist_ok=True)  # NEW: create assets directory
         self._section_timings = []
         self._rendered_section_titles = []
         self._build_total_seconds = None
@@ -556,11 +559,17 @@ class Report:
             plt.close("all")
             threading.excepthook = _orig_excepthook
 
-        # Render HTML
+        # Copy assets to output
+        self._copy_assets(assetsdir)
+
+        # Assign filenames to sections
+        self._assign_section_filenames(sections)
+
+        # Render multi-page HTML
         self._rendered_section_titles = [section.title for section in sections]
-        html_path = self._render_html(outdir, sections)
+        html_paths = self._render_multi_page_html(outdir, sections)
         self._build_total_seconds = time.perf_counter() - build_start
-        return html_path
+        return html_paths[0]  # Return landing page (index.html)
 
     def _build_metadata_section(self) -> _Section:
         """Build metadata section with run information."""
@@ -1585,3 +1594,118 @@ class Report:
         html_path = outdir / "index.html"
         html_path.write_text(html)
         return html_path
+
+    def _assign_section_filenames(self, sections: list[_Section]) -> None:
+        """Assign URL-friendly HTML filenames to each section."""
+        for idx, section in enumerate(sections):
+            if idx == 0 and section.title == "Run Information":
+                section.filename = "index.html"
+            else:
+                # Use existing slug logic (same as ID generation)
+                slug = re.sub(r"[^a-z0-9]+", "-", section.title.lower()).strip("-")
+                section.filename = f"{slug}.html"
+
+    def _copy_assets(self, assetsdir: Path) -> None:
+        """Copy CSS and JS assets to output assets/ directory."""
+        import shutil
+
+        shutil.copy2(_ASSETS_DIR / "style.css", assetsdir / "style.css")
+        shutil.copy2(_ASSETS_DIR / "lightbox.js", assetsdir / "lightbox.js")
+
+    def _render_multi_page_html(
+        self, outdir: Path, sections: list[_Section]
+    ) -> list[Path]:
+        """Render each section as separate HTML file with shared navigation."""
+        env = Environment(
+            loader=FileSystemLoader(str(_TEMPLATE_DIR)),
+            autoescape=True,
+        )
+
+        # Prepare navigation data (same for all pages)
+        all_sections_for_nav = [
+            {
+                "id": s.id,
+                "title": s.title,
+                "filename": s.filename,
+                "subsections": [
+                    {"id": sub.id, "title": sub.title} for sub in s.subsections
+                ],
+            }
+            for s in sections
+        ]
+
+        # Generate summary statistics (for landing page)
+        total_figures = sum(
+            len(s.figures) + sum(len(sub.figures) for sub in s.subsections)
+            for s in sections
+        )
+        total_errors = len(self._errors)
+        total_warnings = len(self._warnings)
+
+        # Determine status
+        if total_errors > 5:
+            status = "error"
+            status_message = f"{total_errors} errors encountered"
+        elif total_errors > 0:
+            status = "warning"
+            status_message = f"{total_errors} errors, report partially complete"
+        elif total_warnings > 0:
+            status = "warning"
+            status_message = f"{total_warnings} warnings"
+        else:
+            status = "success"
+            status_message = "All sections generated successfully"
+
+        summary = {
+            "total_sections": len(sections),
+            "total_figures": total_figures,
+            "total_errors": total_errors,
+            "total_warnings": total_warnings,
+            "status": status,
+            "status_message": status_message,
+        }
+
+        html_paths = []
+        section_template = env.get_template("section.html.j2")
+
+        # Render each section to its own file
+        for section in sections:
+            html_path = outdir / section.filename
+
+            # Convert section to dict for template
+            section_dict = {
+                "id": section.id,
+                "title": section.title,
+                "description": section.description,
+                "figures": section.figures,
+                "subsections": [
+                    {
+                        "id": sub.id,
+                        "title": sub.title,
+                        "figures": sub.figures,
+                    }
+                    for sub in section.subsections
+                ],
+                "statistics": section.statistics,
+                "extra_tables": section.extra_tables,
+                "extra_text_blocks": section.extra_text_blocks,
+            }
+
+            # Only include summary on landing page (Run Information)
+            template_vars = {
+                "casename": self._casename,
+                "all_sections": all_sections_for_nav,
+                "current_section_id": section.id,
+                "section_title": section.title,
+                "section": section_dict,
+                "thumbnails_enabled": self.config.report.thumbnails.enabled,
+            }
+
+            if section.filename == "index.html":
+                template_vars["summary"] = summary
+
+            html = section_template.render(**template_vars)
+            html_path.write_text(html)
+            html_paths.append(html_path)
+
+        return html_paths

@@ -347,8 +347,13 @@ def test_report_responsive_css(report_run):
         content = html_path.read_text()
         # Check for viewport meta tag
         assert "viewport" in content
-        # Check for CSS grid or flex
-        assert "grid" in content or "flex" in content
+        # Check for external CSS reference (CSS is now in external file)
+        assert 'href="assets/style.css"' in content
+        # Check that CSS file exists and contains grid/flex
+        css_path = Path(outdir) / "assets" / "style.css"
+        assert css_path.exists()
+        css_content = css_path.read_text()
+        assert "grid" in css_content or "flex" in css_content
 
 
 def test_report_generation_timestamp(report_run):
@@ -371,7 +376,10 @@ def test_report_diagnostics_include_provenance(report_run, monkeypatch):
 
     with tempfile.TemporaryDirectory() as outdir:
         html_path = rpt.build(outdir)
-        content = html_path.read_text()
+        # Diagnostics content is now in diagnostics.html, not index.html
+        diagnostics_path = Path(outdir) / "diagnostics.html"
+        assert diagnostics_path.exists()
+        content = diagnostics_path.read_text()
         assert "Diagnostics" in content
         assert "Git version" in content
         assert "test-git-version" in content
@@ -414,7 +422,10 @@ def test_report_includes_lnd_in_when_present(report_run):
     rpt = Report(report_run)
     with tempfile.TemporaryDirectory() as outdir:
         html_path = rpt.build(outdir)
-        content = html_path.read_text()
+        # lnd_in content is now in diagnostics.html, not index.html
+        diagnostics_path = Path(outdir) / "diagnostics.html"
+        assert diagnostics_path.exists()
+        content = diagnostics_path.read_text()
         assert "lnd_in namelist file" in content
         # Content is HTML-escaped in the template
         assert "&amp;clm_inparm" in content
@@ -472,3 +483,106 @@ def test_report_handles_unreadable_lnd_in(report_run, caplog, monkeypatch):
             assert "report_test" in content
             # lnd_in should not be in the content
             assert "lnd_in namelist file" not in content
+
+
+def test_report_multipage_structure(report_run):
+    """Test that report generates multiple HTML pages."""
+    rpt = Report(report_run)
+    with tempfile.TemporaryDirectory() as outdir:
+        html_path = rpt.build(outdir)
+
+        # Landing page returned
+        assert html_path.name == "index.html"
+        assert html_path.exists()
+
+        # Assets directory created with CSS and JS
+        assets_dir = Path(outdir) / "assets"
+        assert assets_dir.exists()
+        assert (assets_dir / "style.css").exists()
+        assert (assets_dir / "lightbox.js").exists()
+
+        # Section pages exist - check what files are actually there
+        html_files = sorted([f.name for f in Path(outdir).glob("*.html")])
+        # Should have at least index.html, water-balance, diagnostics, and some variable groups
+        assert len(html_files) >= 4, f"Expected at least 4 HTML files, got {len(html_files)}: {html_files}"
+        assert "index.html" in html_files
+        assert "water-balance.html" in html_files
+        assert "diagnostics.html" in html_files
+        # Each file should be its own page (not just index.html)
+        assert len(html_files) > 1
+
+        # Figures directory unchanged
+        assert (Path(outdir) / "figures").exists()
+
+
+def test_report_navigation_links(report_run):
+    """Test that navigation menu appears on all pages with correct active state."""
+    rpt = Report(report_run)
+    with tempfile.TemporaryDirectory() as outdir:
+        rpt.build(outdir)
+
+        # Check water balance page
+        water_page = (Path(outdir) / "water-balance.html").read_text()
+        assert 'href="water-balance.html"' in water_page
+        assert 'class="active"' in water_page  # Active state present
+        assert 'href="index.html"' in water_page  # Link to landing
+        assert 'href="diagnostics.html"' in water_page  # Link to another section
+
+        # Check that navigation menu is present
+        assert '<nav id="sidebar">' in water_page
+
+        # Check that active class is on the correct link
+        # Should find the active link on water-balance page
+        assert 'href="water-balance.html" class="active"' in water_page
+
+
+def test_report_external_assets(report_run):
+    """Test that pages link to external CSS/JS assets."""
+    rpt = Report(report_run)
+    with tempfile.TemporaryDirectory() as outdir:
+        html_path = rpt.build(outdir)
+        content = html_path.read_text()
+
+        # Check for external asset links (not inline)
+        assert 'href="assets/style.css"' in content
+        assert 'src="assets/lightbox.js"' in content
+        # Should NOT have inline CSS/JS
+        assert "<style>" not in content
+
+
+def test_report_subsection_anchors(report_run):
+    """Test that subsections render as anchors within parent page."""
+    rpt = Report(report_run)
+    with tempfile.TemporaryDirectory() as outdir:
+        rpt.build(outdir)
+
+        # Look for variable group pages with subsections
+        pages = list(Path(outdir).glob("*.html"))
+        found_subsection = False
+
+        for page in pages:
+            if page.name in ["index.html", "diagnostics.html", "water-balance.html"]:
+                continue
+            content = page.read_text()
+            # Look for subsection ID anchors (plot types with section prefix)
+            # IDs are formatted as "section-plottype-plots" (e.g., "hydrology-timeseries-plots")
+            if "-timeseries-plots" in content or "-seasonal-plots" in content:
+                # Found a subsection anchor
+                found_subsection = True
+                break
+
+        # Should find at least one subsection
+        assert found_subsection, "No subsections found in variable group pages"
+
+
+def test_report_landing_page_summary(report_run):
+    """Test that landing page (index.html) contains summary bar."""
+    rpt = Report(report_run)
+    with tempfile.TemporaryDirectory() as outdir:
+        html_path = rpt.build(outdir)
+        content = html_path.read_text()
+
+        # Summary bar should be on landing page
+        assert "summary-bar" in content
+        assert "Sections" in content
+        assert "Figures" in content
