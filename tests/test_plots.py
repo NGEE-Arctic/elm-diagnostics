@@ -137,7 +137,9 @@ def test_seasonal_vertical_depth_coloring_and_legend():
     ds["levgrnd"].attrs["units"] = "m"
 
     with tempfile.TemporaryDirectory() as tmpdir:
-        save_as_elm_files(ds, Path(tmpdir), casename="vertical_seasonal_test", tape="h0")
+        save_as_elm_files(
+            ds, Path(tmpdir), casename="vertical_seasonal_test", tape="h0"
+        )
         run = Run(tmpdir)
         fig = plot_seasonal(run, "SOILLIQ")
         ax = fig.axes[0]
@@ -294,7 +296,9 @@ def test_hovmuller_max_depth_m_clips_when_coordinate_available():
         deep_full = max(fig_full.axes[0].get_ylim())
 
         cfg_path = Path(tmpdir) / "cfg.yaml"
-        cfg_path.write_text(yaml.safe_dump({"plots": {"hovmuller": {"max_depth_m": 0.6}}}))
+        cfg_path.write_text(
+            yaml.safe_dump({"plots": {"hovmuller": {"max_depth_m": 0.6}}})
+        )
         cfg_limited = load_config(path=cfg_path)
         fig_limited = plot_hovmuller(run, "SOILLIQ", config=cfg_limited)
         deep_limited = max(fig_limited.axes[0].get_ylim())
@@ -330,7 +334,9 @@ def test_hovmuller_max_depth_m_warns_and_ignored_for_index_axis():
     )
 
     with tempfile.TemporaryDirectory() as tmpdir:
-        save_as_elm_files(ds, Path(tmpdir), casename="hov_index_max_depth_test", tape="h0")
+        save_as_elm_files(
+            ds, Path(tmpdir), casename="hov_index_max_depth_test", tape="h0"
+        )
         run = Run(tmpdir)
 
         cfg_default = load_config()
@@ -338,7 +344,9 @@ def test_hovmuller_max_depth_m_warns_and_ignored_for_index_axis():
         deep_full = max(fig_full.axes[0].get_ylim())
 
         cfg_path = Path(tmpdir) / "cfg.yaml"
-        cfg_path.write_text(yaml.safe_dump({"plots": {"hovmuller": {"max_depth_m": 0.3}}}))
+        cfg_path.write_text(
+            yaml.safe_dump({"plots": {"hovmuller": {"max_depth_m": 0.3}}})
+        )
         cfg_limited = load_config(path=cfg_path)
 
         with pytest.warns(UserWarning, match="max_depth_m=.*ignored"):
@@ -532,7 +540,9 @@ def test_hovmuller_color_limit_quantile_reduces_outlier_influence():
     ds["levgrnd"].attrs["units"] = "m"
 
     with tempfile.TemporaryDirectory() as tmpdir:
-        save_as_elm_files(ds, Path(tmpdir), casename="hov_quantile_color_test", tape="h0")
+        save_as_elm_files(
+            ds, Path(tmpdir), casename="hov_quantile_color_test", tape="h0"
+        )
         run = Run(tmpdir)
 
         fig_full = plot_hovmuller(run, "SOILLIQ", config=load_config())
@@ -558,7 +568,11 @@ def test_hovmuller_color_limit_quantile_reduces_outlier_influence():
         vmax_quantile = fig_quantile.axes[0].collections[0].get_clim()[1]
 
         assert vmax_quantile < vmax_full
-        assert fig_quantile.axes[0].collections[0].colorbar.extend in {"min", "max", "both"}
+        assert fig_quantile.axes[0].collections[0].colorbar.extend in {
+            "min",
+            "max",
+            "both",
+        }
 
         run.close()
 

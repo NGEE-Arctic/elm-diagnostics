@@ -69,7 +69,8 @@ def test_report_command_help():
     assert "Generate a full diagnostics report" in result.output
     # Strip ANSI codes to handle CI terminal width differences
     import re
-    output_clean = re.sub(r'\x1b\[[0-9;]*m', '', result.output)
+
+    output_clean = re.sub(r"\x1b\[[0-9;]*m", "", result.output)
     assert "--compare" in output_clean
     assert "--config" in output_clean
     assert "--year" not in output_clean
@@ -104,7 +105,9 @@ def test_report_command_basic(synthetic_data_dir, temp_output_dir):
     assert (temp_output_dir / "index.html").exists()
 
 
-def test_report_with_analysis_window_config(synthetic_data_dir, temp_output_dir, tmp_path):
+def test_report_with_analysis_window_config(
+    synthetic_data_dir, temp_output_dir, tmp_path
+):
     """Test report generation using year window in config."""
     config_file = tmp_path / "analysis_window.yaml"
     config_file.write_text(
@@ -611,7 +614,9 @@ plots:
     assert (temp_output_dir / "index.html").exists()
 
 
-def test_balance_with_analysis_window_config(synthetic_data_dir, temp_output_dir, tmp_path):
+def test_balance_with_analysis_window_config(
+    synthetic_data_dir, temp_output_dir, tmp_path
+):
     """Test balance command uses year window in config."""
     config_file = tmp_path / "analysis_window.yaml"
     config_file.write_text(

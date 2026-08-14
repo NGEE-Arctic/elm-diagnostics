@@ -318,7 +318,11 @@ def _plot_seasonal_single(
                         months, lo_b.values, hi_b.values, alpha=0.2, color="gray"
                     )
                 ax.plot(
-                    months, mean_b.values, color="gray", label=source.base.name, linewidth=2
+                    months,
+                    mean_b.values,
+                    color="gray",
+                    label=source.base.name,
+                    linewidth=2,
                 )
 
                 if include_climos:
@@ -535,8 +539,10 @@ def _plot_seasonal_faceted(
 
                     # Use threshold: show individual years if EITHER run has ≤ threshold years
                     if (
-                        n_years_b <= config.plots.climatology.show_individual_years_threshold
-                        or n_years_e <= config.plots.climatology.show_individual_years_threshold
+                        n_years_b
+                        <= config.plots.climatology.show_individual_years_threshold
+                        or n_years_e
+                        <= config.plots.climatology.show_individual_years_threshold
                     ):
                         # Plot individual year lines for base (thin, semi-transparent)
                         for year_mean in year_cycles_b:
@@ -581,7 +587,11 @@ def _plot_seasonal_faceted(
                         # Original behavior: envelope + mean line
                         if include_climos:
                             ax_i.fill_between(
-                                months, lo_b.values, hi_b.values, alpha=0.2, color="gray"
+                                months,
+                                lo_b.values,
+                                hi_b.values,
+                                alpha=0.2,
+                                color="gray",
                             )
                         ax_i.plot(
                             months,
@@ -639,7 +649,10 @@ def _plot_seasonal_faceted(
                     )
                     n_years = len(years)
 
-                    if n_years <= config.plots.climatology.show_individual_years_threshold:
+                    if (
+                        n_years
+                        <= config.plots.climatology.show_individual_years_threshold
+                    ):
                         # Plot individual year lines (thin, semi-transparent)
                         for year_mean in year_cycles:
                             ax_i.plot(
@@ -661,7 +674,11 @@ def _plot_seasonal_faceted(
                         # Original behavior: envelope + mean line
                         if include_climos:
                             ax_i.fill_between(
-                                months, lo.values, hi.values, alpha=0.2, color="tab:blue"
+                                months,
+                                lo.values,
+                                hi.values,
+                                alpha=0.2,
+                                color="tab:blue",
                             )
                         ax_i.plot(months, mean.values, color="tab:blue", linewidth=2)
 
