@@ -237,7 +237,7 @@ class Run:
         name: str | None = None,
         streams: dict[str, str] | None = None,
         chunks: dict | None = None,
-        chunk_mode: Literal["off", "auto", "manual"] = "off",
+        chunk_mode: Literal["off", "auto", "manual"] = "auto",
         chunk_target_mb: int = 64,
         analysis_year: int | None = None,
         analysis_year_min: int | None = None,
@@ -379,8 +379,9 @@ class Run:
                     "dask" in str(e).lower() or "chunk manager" in str(e).lower()
                 ):
                     warnings.warn(
-                        "Chunked loading unavailable in this environment; retrying "
-                        "without chunks.",
+                        f"Chunked loading requested but unavailable (chunk_mode={self._chunk_mode}). "
+                        f"Retrying without chunks. For better performance with large datasets, "
+                        f"install dask: pip install elm-diagnostics[dask]",
                         RuntimeWarning,
                     )
                     kwargs["chunks"] = None
@@ -497,6 +498,33 @@ class Run:
         return f"Run(name={self.name!r}, tapes=[{tapes}])"
 
 
+def _lazy_align(
+    da_base: xr.DataArray,
+    da_exp: xr.DataArray,
+    join: Literal["inner", "outer"],
+) -> tuple[xr.DataArray, xr.DataArray]:
+    """Align arrays on coordinates while preserving chunking.
+
+    Uses xarray's align with copy=False to avoid triggering computation
+    on dask-backed arrays.
+
+    Parameters
+    ----------
+    da_base, da_exp : xr.DataArray
+        Arrays to align, potentially with dask chunks
+    join : {"inner", "outer"}
+        How to combine coordinate indices
+
+    Returns
+    -------
+    tuple of aligned arrays, still chunked if inputs were chunked
+    """
+    # copy=False is critical - returns views/references rather than
+    # materializing new arrays
+    aligned = xr.align(da_base, da_exp, join=join, copy=False)
+    return aligned
+
+
 class Comparison:
     """Pair of runs for side-by-side diagnostics.
 
@@ -526,6 +554,9 @@ class Comparison:
     ) -> tuple[xr.DataArray, xr.DataArray]:
         """Retrieve a variable from both runs, time-aligned.
 
+        Alignment preserves dask chunks for lazy evaluation. Computation
+        is deferred until the data is actually used in plot generation.
+
         Returns
         -------
         tuple of (base_da, experiment_da)
@@ -533,12 +564,8 @@ class Comparison:
         da_base = self.base.get(varname, tape=tape)
         da_exp = self.experiment.get(varname, tape=tape)
 
-        if self.align == "intersect":
-            common = xr.align(da_base, da_exp, join="inner")
-        else:
-            common = xr.align(da_base, da_exp, join="outer")
-
-        return common  # type: ignore[return-value]
+        join = "inner" if self.align == "intersect" else "outer"
+        return _lazy_align(da_base, da_exp, join=join)
 
     def __repr__(self) -> str:
         return (

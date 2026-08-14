@@ -118,6 +118,39 @@ class MetadataConfig(BaseModel):
     show_generation_timestamp: bool = True
 
 
+class PerformanceConfig(BaseModel):
+    """Performance and memory tuning options."""
+
+    chunk_size_mb: int = Field(
+        default=64,
+        ge=1,
+        le=1024,
+        description="Target chunk size in MB for dask arrays. "
+        "Larger chunks = less overhead but more memory. "
+        "Smaller chunks = more memory-efficient but slower.",
+    )
+
+    lazy_evaluation: bool = Field(
+        default=True,
+        description="Use lazy evaluation with dask for large arrays. "
+        "Disable only if experiencing issues with chunked arrays.",
+    )
+
+    progress_verbosity: Literal["quiet", "normal", "verbose"] = Field(
+        default="normal",
+        description="Level of progress reporting. "
+        "quiet: section-level only, "
+        "normal: section + variable level, "
+        "verbose: section + variable + plot level",
+    )
+
+    slow_operation_threshold_seconds: int = Field(
+        default=30,
+        ge=10,
+        description="Warn when an operation takes longer than this threshold.",
+    )
+
+
 class ReportConfig(BaseModel):
     title_template: str = "ELM diagnostics — {casename}"
     output_formats: list[str] = ["png", "netcdf"]
@@ -127,6 +160,10 @@ class ReportConfig(BaseModel):
     balance_sections: BalanceSectionsConfig = BalanceSectionsConfig()
     comparison: ComparisonConfig = ComparisonConfig()
     metadata: MetadataConfig = MetadataConfig()
+    performance: PerformanceConfig = Field(
+        default_factory=PerformanceConfig,
+        description="Performance and memory tuning options",
+    )
 
 
 class TimeConfig(BaseModel):
