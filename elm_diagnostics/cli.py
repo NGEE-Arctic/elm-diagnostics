@@ -735,5 +735,179 @@ def plot(
         raise typer.Exit(code=1)
 
 
+@app.command()
+def map(
+    varname: str = typer.Argument(..., help="Variable name to map."),
+    path: str = typer.Argument(..., help="Path to ELM history files directory."),
+    time_agg: str = typer.Option(
+        "mean",
+        "--time-agg",
+        help="Time aggregation: mean, median, sum, std, min, max, or integer index.",
+    ),
+    projection: str = typer.Option(
+        "PlateCarree", "--projection", help="Cartopy projection name."
+    ),
+    boundary: str | None = typer.Option(
+        None, "--boundary", help="Path to watershed boundary file (GeoJSON/shapefile)."
+    ),
+    domain_file: str | None = typer.Option(
+        None, "--domain-file", help="Path to ELM domain file (for lndgrid data)."
+    ),
+    out: str | None = typer.Option(
+        None, "--out", help="Output file path (e.g. map.png)."
+    ),
+    config: str | None = typer.Option(None, "--config", help="Path to config YAML."),
+    verbose: bool = typer.Option(False, "--verbose", "-v", help="Verbose output."),
+    debug: bool = typer.Option(
+        False, "--debug", help="Debug mode with full tracebacks."
+    ),
+    quiet: bool = typer.Option(
+        False, "--quiet", "-q", help="Suppress progress output."
+    ),
+) -> None:
+    """
+    Create spatial map of a variable for multi-gridcell data.
+
+    Generate spatial maps showing the distribution of variables across
+    a watershed or region. Requires multi-gridcell ELM output (lat/lon
+    or lndgrid format).
+
+    Examples:
+
+        # Mean GPP across watershed
+        elm-diagnostics map GPP /path/to/output
+
+        # Median RAIN with custom projection
+        elm-diagnostics map RAIN /path/to/output --time-agg median --projection Orthographic
+
+        # With watershed boundary overlay
+        elm-diagnostics map QOVER /path/to/output --boundary watershed.geojson
+
+        # Save to file
+        elm-diagnostics map TWS /path/to/output --out tws_map.png
+
+        # Specific timestep
+        elm-diagnostics map GPP /path/to/output --time-agg 0
+    """
+    setup_logging(verbose=verbose, debug=debug)
+    logger = logging.getLogger(__name__)
+
+    if verbose and quiet:
+        console.print("[red]Error:[/red] Cannot specify both --verbose and --quiet")
+        raise typer.Exit(code=1)
+
+    try:
+        # Validate inputs
+        elm_path = validate_path(path)
+        if config:
+            validate_config(config)
+
+        # Check cartopy availability
+        try:
+            import cartopy  # noqa: F401
+        except ImportError:
+            console.print(
+                "[red]Error:[/red] Spatial mapping requires cartopy. "
+                "Install with: pip install 'elm-diagnostics[maps]'"
+            )
+            raise typer.Exit(code=1)
+
+        strict_combine = _get_run_strict_combine(config)
+        chunk_mode, manual_chunks, chunk_target_mb = _get_run_chunk_options(config)
+
+        from elm_diagnostics.config.schema import load_config as load_config_obj
+        from elm_diagnostics.io.run import Run
+        from elm_diagnostics.plots import plot_map
+        from elm_diagnostics.plots.dimension_helpers import has_multiple_spatial_cells
+
+        cfg = load_config_obj(config)
+
+        if not quiet:
+            with Progress() as progress:
+                task = progress.add_task("[cyan]Loading ELM data...", total=None)
+                run = Run(
+                    str(elm_path),
+                    strict_combine=strict_combine,
+                    chunk_mode=chunk_mode,
+                    chunks=manual_chunks,
+                    chunk_target_mb=chunk_target_mb,
+                )
+                progress.update(task, completed=True)
+        else:
+            run = Run(
+                str(elm_path),
+                strict_combine=strict_combine,
+                chunk_mode=chunk_mode,
+                chunks=manual_chunks,
+                chunk_target_mb=chunk_target_mb,
+            )
+
+        # Check if variable exists
+        if not run.has(varname):
+            console.print(f"[red]Error:[/red] Variable '{varname}' not found")
+            raise typer.Exit(code=1)
+
+        # Check if data has spatial variation
+        var = run.get(varname)
+        if not has_multiple_spatial_cells(var):
+            console.print(
+                f"[red]Error:[/red] Variable '{varname}' has no spatial variation "
+                "(single-point data). Spatial maps require multi-gridcell output."
+            )
+            raise typer.Exit(code=1)
+
+        # Parse time aggregation (could be string method or integer index)
+        time_agg_parsed: str | int = time_agg
+        try:
+            time_agg_parsed = int(time_agg)
+        except ValueError:
+            pass  # Keep as string
+
+        # Create the map
+        if not quiet:
+            with Progress() as progress:
+                task = progress.add_task("[cyan]Creating spatial map...", total=None)
+                fig = plot_map(
+                    run,
+                    varname,
+                    time_agg=time_agg_parsed,
+                    projection=projection,
+                    watershed_boundary=Path(boundary) if boundary else None,
+                    domain_file=Path(domain_file) if domain_file else None,
+                    config=cfg,
+                )
+                progress.update(task, completed=True)
+        else:
+            fig = plot_map(
+                run,
+                varname,
+                time_agg=time_agg_parsed,
+                projection=projection,
+                watershed_boundary=Path(boundary) if boundary else None,
+                domain_file=Path(domain_file) if domain_file else None,
+                config=cfg,
+            )
+
+        # Save or show
+        if out:
+            import matplotlib.pyplot as plt
+
+            out_path = Path(out)
+            fig.savefig(out_path, bbox_inches="tight", dpi=cfg.plots.style.dpi)
+            if not quiet:
+                console.print(f"[green]✓[/green] Saved map to {out_path}")
+        else:
+            import matplotlib.pyplot as plt
+
+            plt.show()
+
+    except Exception as e:
+        if debug:
+            raise
+        console.print(f"\n[red]Error:[/red] {e!s}")
+        console.print("\nRun with --debug for full traceback")
+        raise typer.Exit(code=1)
+
+
 if __name__ == "__main__":
     app()
