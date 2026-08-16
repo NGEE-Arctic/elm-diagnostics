@@ -18,11 +18,10 @@ from tests.fixtures.synthetic_elm import (
 
 runner = CliRunner()
 
-# Subprocess timeouts. CI runners (especially the optional-deps job, which pulls in
-# dask/plotly/cartopy) are several times slower than a dev laptop, so allow generous
-# budgets and let them be tuned via the environment.
+# Subprocess timeouts. CI runners are much slower and far more variable than a dev
+# laptop, so allow generous budgets and let them be tuned via the environment.
 CLI_HELP_TIMEOUT = int(os.environ.get("ELM_DIAGNOSTICS_TEST_HELP_TIMEOUT", "60"))
-CLI_REPORT_TIMEOUT = int(os.environ.get("ELM_DIAGNOSTICS_TEST_REPORT_TIMEOUT", "1200"))
+CLI_REPORT_TIMEOUT = int(os.environ.get("ELM_DIAGNOSTICS_TEST_REPORT_TIMEOUT", "600"))
 
 
 @pytest.fixture
@@ -566,8 +565,27 @@ def test_cli_entry_point_version():
 
 
 @pytest.mark.slow
-def test_cli_end_to_end_subprocess(synthetic_data_dir, temp_output_dir):
-    """Integration test: full report generation via subprocess."""
+def test_cli_end_to_end_subprocess(synthetic_data_dir, temp_output_dir, tmp_path):
+    """Integration test: report generation via the installed console script.
+
+    This test exists to verify the packaging path — that ``elm-diagnostics`` is
+    on PATH, imports cleanly in a fresh interpreter, and writes a report — not
+    to re-check plot content. The variable-group sections render ~250 figures
+    and account for the large majority of report runtime, so they are disabled
+    here; ``test_report_command_basic`` still exercises the full default report
+    in-process. Balance sections are kept so the run remains a real report.
+    """
+    config_file = tmp_path / "end_to_end_config.yaml"
+    config_file.write_text(
+        """
+report:
+  sections:
+    variable_groups: false
+  thumbnails:
+    enabled: false
+"""
+    )
+
     result = subprocess.run(
         [
             "elm-diagnostics",
@@ -575,6 +593,8 @@ def test_cli_end_to_end_subprocess(synthetic_data_dir, temp_output_dir):
             str(synthetic_data_dir),
             "--out",
             str(temp_output_dir),
+            "--config",
+            str(config_file),
             "--quiet",
         ],
         capture_output=True,
