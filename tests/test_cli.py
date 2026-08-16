@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import signal
 import subprocess
 
 import pytest
@@ -22,6 +23,45 @@ runner = CliRunner()
 # laptop, so allow generous budgets and let them be tuned via the environment.
 CLI_HELP_TIMEOUT = int(os.environ.get("ELM_DIAGNOSTICS_TEST_HELP_TIMEOUT", "60"))
 CLI_REPORT_TIMEOUT = int(os.environ.get("ELM_DIAGNOSTICS_TEST_REPORT_TIMEOUT", "600"))
+
+
+def run_cli(args: list[str], timeout: int) -> subprocess.CompletedProcess:
+    """Run the installed ``elm-diagnostics`` console script, dumping stacks on hang.
+
+    ``report`` has hung on CI a handful of times: the run never finishes, while
+    every other test on the same runner keeps normal pace, so it is a deadlock
+    rather than a slow machine. Plot rendering pulls data through dask's threaded
+    scheduler onto netCDF4/HDF5, which serializes on a global lock, and that
+    combination is a known intermittent-deadlock surface.
+
+    A bare ``TimeoutExpired`` says nothing about where the process was stuck, so
+    run the child with faulthandler enabled and SIGABRT it on timeout. That makes
+    it print a traceback for every thread, turning the next occurrence into a
+    diagnosis instead of another blind timeout bump.
+    """
+    env = dict(os.environ, PYTHONFAULTHANDLER="1")
+    proc = subprocess.Popen(
+        args,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        env=env,
+    )
+    try:
+        stdout, stderr = proc.communicate(timeout=timeout)
+    except subprocess.TimeoutExpired:
+        proc.send_signal(signal.SIGABRT)
+        try:
+            _, stacks = proc.communicate(timeout=60)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+            _, stacks = proc.communicate()
+            stacks = f"(child ignored SIGABRT; killed)\n{stacks}"
+        pytest.fail(
+            f"{' '.join(args)} did not finish within {timeout}s.\n"
+            f"Thread stacks at the time of the hang:\n{stacks}"
+        )
+    return subprocess.CompletedProcess(args, proc.returncode, stdout, stderr)
 
 
 @pytest.fixture
@@ -540,24 +580,14 @@ def test_help_exit_code():
 
 def test_cli_installed():
     """Integration test: verify CLI command is in PATH."""
-    result = subprocess.run(
-        ["elm-diagnostics", "--help"],
-        capture_output=True,
-        text=True,
-        timeout=CLI_HELP_TIMEOUT,
-    )
+    result = run_cli(["elm-diagnostics", "--help"], timeout=CLI_HELP_TIMEOUT)
     assert result.returncode == 0
     assert "Diagnostics and budget-closure" in result.stdout
 
 
 def test_cli_entry_point_version():
     """Integration test: verify CLI entry point works."""
-    result = subprocess.run(
-        ["elm-diagnostics", "--help"],
-        capture_output=True,
-        text=True,
-        timeout=CLI_HELP_TIMEOUT,
-    )
+    result = run_cli(["elm-diagnostics", "--help"], timeout=CLI_HELP_TIMEOUT)
     assert result.returncode == 0
     assert "report" in result.stdout
     assert "balance" in result.stdout
@@ -586,7 +616,7 @@ report:
 """
     )
 
-    result = subprocess.run(
+    result = run_cli(
         [
             "elm-diagnostics",
             "report",
@@ -597,8 +627,6 @@ report:
             str(config_file),
             "--quiet",
         ],
-        capture_output=True,
-        text=True,
         timeout=CLI_REPORT_TIMEOUT,
     )
     assert result.returncode == 0
