@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import subprocess
 
 import pytest
@@ -16,6 +17,12 @@ from tests.fixtures.synthetic_elm import (
 )
 
 runner = CliRunner()
+
+# Subprocess timeouts. CI runners (especially the optional-deps job, which pulls in
+# dask/plotly/cartopy) are several times slower than a dev laptop, so allow generous
+# budgets and let them be tuned via the environment.
+CLI_HELP_TIMEOUT = int(os.environ.get("ELM_DIAGNOSTICS_TEST_HELP_TIMEOUT", "60"))
+CLI_REPORT_TIMEOUT = int(os.environ.get("ELM_DIAGNOSTICS_TEST_REPORT_TIMEOUT", "1200"))
 
 
 @pytest.fixture
@@ -538,7 +545,7 @@ def test_cli_installed():
         ["elm-diagnostics", "--help"],
         capture_output=True,
         text=True,
-        timeout=10,
+        timeout=CLI_HELP_TIMEOUT,
     )
     assert result.returncode == 0
     assert "Diagnostics and budget-closure" in result.stdout
@@ -550,7 +557,7 @@ def test_cli_entry_point_version():
         ["elm-diagnostics", "--help"],
         capture_output=True,
         text=True,
-        timeout=10,
+        timeout=CLI_HELP_TIMEOUT,
     )
     assert result.returncode == 0
     assert "report" in result.stdout
@@ -572,7 +579,7 @@ def test_cli_end_to_end_subprocess(synthetic_data_dir, temp_output_dir):
         ],
         capture_output=True,
         text=True,
-        timeout=300,
+        timeout=CLI_REPORT_TIMEOUT,
     )
     assert result.returncode == 0
     assert "Report generated" in result.stdout
