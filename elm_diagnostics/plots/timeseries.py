@@ -416,11 +416,12 @@ def _add_climatology_envelope(
 
     # Map climatology values to actual dates from the timeseries
     plot_times = _plot_time(da)
-    months = da.time.dt.month.values  # Array of month numbers (1-12) for each time point
+    # Array of month numbers (1-12) for each time point
+    months = da.time.dt.month.values
 
     # Map climatology values: for each time point, get the climo value for that month
-    lo_mapped = np.array([lo.sel(month=m).values for m in months])
-    hi_mapped = np.array([hi.sel(month=m).values for m in months])
+    lo_mapped = lo.sel(month=xr.DataArray(months, dims="time")).values
+    hi_mapped = hi.sel(month=xr.DataArray(months, dims="time")).values
 
     # Plot using actual dates (not month indices 1-12)
     ax_twin = ax.twinx()
