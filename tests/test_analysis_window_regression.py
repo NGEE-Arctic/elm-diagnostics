@@ -61,7 +61,10 @@ def _extract_time_range_from_html(html_path: Path) -> tuple[str, str] | None:
     try:
         content = html_path.read_text()
         # Look for "Time Range" followed by dates
-        match = re.search(r"Time Range[^0-9]*([0-9]{4}-[0-9]{2}-[0-9]{2})[^0-9]*to[^0-9]*([0-9]{4}-[0-9]{2}-[0-9]{2})", content)
+        match = re.search(
+            r"Time Range[^0-9]*([0-9]{4}-[0-9]{2}-[0-9]{2})[^0-9]*to[^0-9]*([0-9]{4}-[0-9]{2}-[0-9]{2})",
+            content,
+        )
         if match:
             return (match.group(1), match.group(2))
     except Exception:
@@ -105,10 +108,10 @@ class TestAnalysisWindowFiltering:
             ],
         )
         assert result.exit_code == 0
-        
+
         html_path = Path(temp_output_dir) / "index.html"
         assert html_path.exists()
-        
+
         # Extract time range from metadata in HTML
         time_range = _extract_time_range_from_html(html_path)
         if time_range:
@@ -150,18 +153,22 @@ class TestAnalysisWindowFiltering:
             ],
         )
         assert result.exit_code == 0
-        
+
         html_path = Path(temp_output_dir) / "index.html"
         assert html_path.exists()
-        
+
         # For water year 2001 (Oct 2000-Sep 2001), start should be in 2000
         time_range = _extract_time_range_from_html(html_path)
         if time_range:
             start, end = time_range
             # Water year 2001 should start in Oct 2000
-            assert start.startswith("2000"), f"Water year 2001 start {start} should be in 2000"
+            assert start.startswith("2000"), (
+                f"Water year 2001 start {start} should be in 2000"
+            )
             # And end in Sep 2001
-            assert end.startswith("2001"), f"Water year 2001 end {end} should be in 2001"
+            assert end.startswith("2001"), (
+                f"Water year 2001 end {end} should be in 2001"
+            )
 
     def test_report_multi_year_window(
         self, multi_year_data_dir, temp_output_dir, tmp_path
@@ -196,10 +203,10 @@ class TestAnalysisWindowFiltering:
             ],
         )
         assert result.exit_code == 0
-        
+
         html_path = Path(temp_output_dir) / "index.html"
         assert html_path.exists()
-        
+
         time_range = _extract_time_range_from_html(html_path)
         if time_range:
             start, end = time_range
@@ -248,7 +255,7 @@ class TestAnalysisWindowFiltering:
         self, multi_year_data_dir, temp_output_dir, tmp_path
     ):
         """Analysis window should be enforced even with default climatology sentinels.
-        
+
         This was the main regression: with climatology.include_climos=true and
         climo_start/end_year=-1, the analysis window was completely ignored.
         """
@@ -283,13 +290,17 @@ class TestAnalysisWindowFiltering:
             ],
         )
         assert result.exit_code == 0
-        
+
         html_path = Path(temp_output_dir) / "index.html"
         assert html_path.exists()
-        
+
         # Even with climatology enabled, analysis window should be respected
         time_range = _extract_time_range_from_html(html_path)
         if time_range:
             start, end = time_range
-            assert start.startswith("2001"), f"Start {start} should be in 2001 despite climatology"
-            assert end.startswith("2001"), f"End {end} should be in 2001 despite climatology"
+            assert start.startswith("2001"), (
+                f"Start {start} should be in 2001 despite climatology"
+            )
+            assert end.startswith("2001"), (
+                f"End {end} should be in 2001 despite climatology"
+            )

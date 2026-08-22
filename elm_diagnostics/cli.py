@@ -790,7 +790,6 @@ def map(
         elm-diagnostics map GPP /path/to/output --time-agg 0
     """
     setup_logging(verbose=verbose, debug=debug)
-    logger = logging.getLogger(__name__)
 
     if verbose and quiet:
         console.print("[red]Error:[/red] Cannot specify both --verbose and --quiet")

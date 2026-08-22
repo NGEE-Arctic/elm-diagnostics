@@ -32,12 +32,16 @@ def gridded_comparison(tmp_path: Path) -> Comparison:
     exp_dir.mkdir()
 
     # Base run
-    ds_base = make_gridded_dataset(nlat=3, nlon=3, n_months=12, add_spatial_gradient=True)
+    ds_base = make_gridded_dataset(
+        nlat=3, nlon=3, n_months=12, add_spatial_gradient=True
+    )
     fname_base = base_dir / "base.elm.h0.2000-01.nc"
     ds_base.to_netcdf(fname_base)
 
     # Experiment run (slightly different values)
-    ds_exp = make_gridded_dataset(nlat=3, nlon=3, n_months=12, add_spatial_gradient=True)
+    ds_exp = make_gridded_dataset(
+        nlat=3, nlon=3, n_months=12, add_spatial_gradient=True
+    )
     # Modify GPP to create difference
     ds_exp["GPP"] = ds_exp["GPP"] * 1.1
     fname_exp = exp_dir / "exp.elm.h0.2000-01.nc"
@@ -83,11 +87,7 @@ class TestSpatialReportIntegration:
         """Test that spatial section can be disabled via config."""
         from elm_diagnostics.config.schema import Config, PlotsConfig, SpatialPlotConfig
 
-        config = Config(
-            plots=PlotsConfig(
-                spatial=SpatialPlotConfig(enabled=False)
-            )
-        )
+        config = Config(plots=PlotsConfig(spatial=SpatialPlotConfig(enabled=False)))
 
         with TemporaryDirectory() as outdir:
             report = Report(gridded_run, config=config)
@@ -104,7 +104,7 @@ class TestSpatialReportIntegration:
             plots=PlotsConfig(
                 spatial=SpatialPlotConfig(
                     enabled=True,
-                    variables=["GPP", "RAIN"]  # Only these two
+                    variables=["GPP", "RAIN"],  # Only these two
                 )
             )
         )
@@ -136,9 +136,7 @@ class TestSpatialReportIntegration:
             config = Config(
                 plots=PlotsConfig(
                     spatial=SpatialPlotConfig(
-                        enabled=True,
-                        time_aggregation=agg_method,
-                        variables=["GPP"]
+                        enabled=True, time_aggregation=agg_method, variables=["GPP"]
                     )
                 )
             )
@@ -159,7 +157,7 @@ class TestSpatialReportIntegration:
             "GPP": {
                 "data": np.random.rand(12),
                 "units": "gC/m^2/s",
-                "cell_methods": "time: mean"
+                "cell_methods": "time: mean",
             }
         }
         ds = make_single_point_dataset(n_months=12, variables=variables)

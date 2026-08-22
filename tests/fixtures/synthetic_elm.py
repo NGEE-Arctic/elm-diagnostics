@@ -613,12 +613,16 @@ def make_met_forcing_dataset(
     # FSDS: 50–400 W/m² — more radiation in summer
     fsds_base = 200.0
     fsds_amp = 150.0
-    fsds = np.clip(fsds_base + fsds_amp * (-seasonal) + rng.normal(0, 10, size=n), 5.0, 450.0)
+    fsds = np.clip(
+        fsds_base + fsds_amp * (-seasonal) + rng.normal(0, 10, size=n), 5.0, 450.0
+    )
 
     # FLDS: 200–350 W/m² — weakly seasonal (higher in warm months)
     flds_base = 280.0
     flds_amp = 40.0
-    flds = np.clip(flds_base - flds_amp * seasonal + rng.normal(0, 5, size=n), 150.0, 380.0)
+    flds = np.clip(
+        flds_base - flds_amp * seasonal + rng.normal(0, 5, size=n), 150.0, 380.0
+    )
 
     # WIND: 1–10 m/s with some noise
     wind = np.clip(4.0 + rng.normal(0, 1.5, size=n), 0.5, 15.0)
@@ -629,7 +633,9 @@ def make_met_forcing_dataset(
     # QBOT: 0.001–0.015 kg/kg — higher in warm months
     qbot_base = 0.005
     qbot_amp = 0.004
-    qbot = np.clip(qbot_base - qbot_amp * seasonal + rng.normal(0, 0.0003, size=n), 5e-4, 0.025)
+    qbot = np.clip(
+        qbot_base - qbot_amp * seasonal + rng.normal(0, 0.0003, size=n), 5e-4, 0.025
+    )
 
     # RAIN/SNOW: split total precip by temperature
     total_precip = np.clip(rng.uniform(1e-6, 5e-5, size=n), 0, None)
@@ -797,7 +803,9 @@ def make_gridded_dataset(
 
     # Cumulative storage per grid cell
     ds_cumulative = np.cumsum(ds_dt_rate * dts[:, None, None], axis=0)
-    initial_storage = 500.0 + rng.uniform(-50, 50, size=(nlat, nlon))  # Spatial variation
+    initial_storage = 500.0 + rng.uniform(
+        -50, 50, size=(nlat, nlon)
+    )  # Spatial variation
     storage_3d = initial_storage[None, :, :] + ds_cumulative
 
     # Partition storage

@@ -73,9 +73,7 @@ def _check_cartopy_available() -> None:
         )
 
 
-def _apply_time_aggregation(
-    da: xr.DataArray, method: TimeAgg | int
-) -> xr.DataArray:
+def _apply_time_aggregation(da: xr.DataArray, method: TimeAgg | int) -> xr.DataArray:
     """Apply time aggregation to reduce data to single spatial map.
 
     Parameters
@@ -111,7 +109,9 @@ def _apply_time_aggregation(
     return agg_func(dim="time")
 
 
-def _load_domain_coords(run: Run, domain_file: Path | None = None) -> tuple[np.ndarray, np.ndarray]:
+def _load_domain_coords(
+    run: Run, domain_file: Path | None = None
+) -> tuple[np.ndarray, np.ndarray]:
     """Load lndgrid coordinates from ELM domain file.
 
     Parameters
@@ -306,9 +306,7 @@ def plot_map(
 
     # Plot based on spatial format
     if spatial_format == "latlon":
-        _plot_latlon_map(
-            ax, da_agg, cmap=cmap, vmin=vmin, vmax=vmax, boundary=boundary
-        )
+        _plot_latlon_map(ax, da_agg, cmap=cmap, vmin=vmin, vmax=vmax, boundary=boundary)
     else:  # lndgrid
         lon, lat = _load_domain_coords(run, domain_file)
         _plot_lndgrid_map(

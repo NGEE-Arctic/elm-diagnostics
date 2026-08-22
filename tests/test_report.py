@@ -10,7 +10,11 @@ matplotlib.use("Agg")
 
 from elm_diagnostics.io.run import Comparison, Run
 from elm_diagnostics.report.build import Report
-from elm_diagnostics.config.schema import Config, GroupPlotTypesConfig, VariableGroupConfig
+from elm_diagnostics.config.schema import (
+    Config,
+    GroupPlotTypesConfig,
+    VariableGroupConfig,
+)
 from tests.fixtures.synthetic_elm import (
     make_multicolumn_dataset,
     make_vertical_profile_dataset,
@@ -239,7 +243,9 @@ def test_report_uses_per_group_plot_type_flags():
     """Per-group plot type flags should control generated plots."""
     ds = make_vertical_profile_dataset(n_months=24, n_levels=8)
     with tempfile.TemporaryDirectory() as tmpdir:
-        save_as_elm_files(ds, Path(tmpdir), casename="group_plot_type_report", tape="h0")
+        save_as_elm_files(
+            ds, Path(tmpdir), casename="group_plot_type_report", tape="h0"
+        )
         run = Run(tmpdir)
 
         cfg = Config()
@@ -262,8 +268,12 @@ def test_report_uses_per_group_plot_type_flags():
         with tempfile.TemporaryDirectory() as outdir:
             rpt.build(outdir)
             figdir = Path(outdir) / "figures"
-            assert any("hydrology_SOILLIQ_timeseries" in p.name for p in figdir.glob("*.png"))
-            assert not any("hydrology_SOILLIQ_hovmuller" in p.name for p in figdir.glob("*.png"))
+            assert any(
+                "hydrology_SOILLIQ_timeseries" in p.name for p in figdir.glob("*.png")
+            )
+            assert not any(
+                "hydrology_SOILLIQ_hovmuller" in p.name for p in figdir.glob("*.png")
+            )
 
         run.close()
 
@@ -441,7 +451,9 @@ def test_report_handles_missing_lnd_in(report_run, caplog):
             # lnd_in should not be in the content
             assert "lnd_in namelist file" not in content
             # Warning should be logged
-            assert any("lnd_in file not found" in record.message for record in caplog.records)
+            assert any(
+                "lnd_in file not found" in record.message for record in caplog.records
+            )
 
 
 def test_report_handles_unreadable_lnd_in(report_run, caplog, monkeypatch):
@@ -455,6 +467,7 @@ def test_report_handles_unreadable_lnd_in(report_run, caplog, monkeypatch):
 
     # Mock read_text to raise an exception
     original_read_text = PathlibPath.read_text
+
     def mock_read_text(self, *args, **kwargs):
         if self.name == "lnd_in":
             raise PermissionError("Cannot read file")

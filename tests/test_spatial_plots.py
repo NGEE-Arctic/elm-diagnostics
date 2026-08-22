@@ -55,12 +55,16 @@ def gridded_comparison(tmp_path: Path) -> Comparison:
     exp_dir.mkdir()
 
     # Base run
-    ds_base = make_gridded_dataset(nlat=3, nlon=3, n_months=12, add_spatial_gradient=True)
+    ds_base = make_gridded_dataset(
+        nlat=3, nlon=3, n_months=12, add_spatial_gradient=True
+    )
     fname_base = base_dir / "base.elm.h0.2000-01.nc"
     ds_base.to_netcdf(fname_base)
 
     # Experiment run (slightly different values)
-    ds_exp = make_gridded_dataset(nlat=3, nlon=3, n_months=12, add_spatial_gradient=True)
+    ds_exp = make_gridded_dataset(
+        nlat=3, nlon=3, n_months=12, add_spatial_gradient=True
+    )
     # Modify GPP to create difference
     ds_exp["GPP"] = ds_exp["GPP"] * 1.1
     fname_exp = exp_dir / "exp.elm.h0.2000-01.nc"
@@ -86,12 +90,13 @@ class TestDetectSpatialFormat:
     def test_single_point(self):
         with TemporaryDirectory() as tmpdir:
             import numpy as np
+
             # Create single point dataset with some variables
             variables = {
                 "RAIN": {
                     "data": np.random.rand(12),
                     "units": "mm/s",
-                    "cell_methods": "time: mean"
+                    "cell_methods": "time: mean",
                 }
             }
             ds = make_single_point_dataset(n_months=12, variables=variables)
@@ -149,11 +154,12 @@ class TestPlotMap:
         """Test that single-point data raises ValueError."""
         with TemporaryDirectory() as tmpdir:
             import numpy as np
+
             variables = {
                 "RAIN": {
                     "data": np.random.rand(12),
                     "units": "mm/s",
-                    "cell_methods": "time: mean"
+                    "cell_methods": "time: mean",
                 }
             }
             ds = make_single_point_dataset(n_months=12, variables=variables)
@@ -184,7 +190,9 @@ class TestPlotMap:
         fig = plot_map(gridded_run, "GPP", time_agg="mean", vmin=0, vmax=1e-5)
         assert fig is not None
 
-    @pytest.mark.skip(reason="Orthographic projection has issues with small regional grids")
+    @pytest.mark.skip(
+        reason="Orthographic projection has issues with small regional grids"
+    )
     def test_projection_orthographic(self, gridded_run: Run):
         """Test different projection."""
         fig = plot_map(gridded_run, "GPP", time_agg="mean", projection="Orthographic")
@@ -225,6 +233,7 @@ class TestPlotMapComparison:
         """Test that single-point comparison raises error."""
         with TemporaryDirectory() as tmpdir:
             import numpy as np
+
             base_dir = Path(tmpdir) / "base"
             exp_dir = Path(tmpdir) / "exp"
             base_dir.mkdir()
@@ -234,7 +243,7 @@ class TestPlotMapComparison:
                 "RAIN": {
                     "data": np.random.rand(12),
                     "units": "mm/s",
-                    "cell_methods": "time: mean"
+                    "cell_methods": "time: mean",
                 }
             }
             ds_base = make_single_point_dataset(n_months=12, variables=variables)
@@ -296,7 +305,7 @@ class TestDomainFileHandling:
         run, domain_file = lndgrid_run
 
         # First call loads domain
-        fig1 = plot_map(run, "GPP", time_agg="mean", domain_file=domain_file)
+        _fig1 = plot_map(run, "GPP", time_agg="mean", domain_file=domain_file)
         assert hasattr(run, "_domain_coords")
 
         # Second call should use cached coords
@@ -312,12 +321,15 @@ class TestAreaWeightedStatistics:
         # Our synthetic gridded data should include AREA
         ds = gridded_run.get("AREA")
         assert ds is not None
-        assert "area" in ds.attrs.get("units", "").lower() or ds.attrs.get("long_name", "") != ""
+        assert (
+            "area" in ds.attrs.get("units", "").lower()
+            or ds.attrs.get("long_name", "") != ""
+        )
 
 
 # Image comparison tests (if pytest-mpl available)
 try:
-    import pytest_mpl
+    import pytest_mpl  # noqa: F401
 
     @pytest.mark.mpl_image_compare(baseline_dir="baseline/spatial", tolerance=10)
     def test_plot_map_latlon_image(gridded_run: Run):

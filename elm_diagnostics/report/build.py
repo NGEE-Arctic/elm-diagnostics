@@ -1392,7 +1392,9 @@ class Report:
             )
         elif plot_type == "spatial":
             # Check if data has multiple spatial cells
-            from elm_diagnostics.plots.dimension_helpers import has_multiple_spatial_cells
+            from elm_diagnostics.plots.dimension_helpers import (
+                has_multiple_spatial_cells,
+            )
             from elm_diagnostics.plots import plot_map, plot_map_comparison
 
             compute_start = time.perf_counter()
