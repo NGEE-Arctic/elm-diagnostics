@@ -287,21 +287,25 @@ class Config(BaseModel):
 
         # Check variable groups for one that contains this variable and has hovmuller config
         for group_config in self.variable_groups.values():
-            if group_config.enabled and varname in group_config.variables and group_config.hovmuller is not None:
-                    # Merge group-specific overrides into base config
-                    # For most fields, only override non-None values from group config
-                    # For max_levels/max_depth_m, always use group value (even if None)
-                    # since None is a valid "unset" value for these mutually-exclusive options
-                    group_overrides = group_config.hovmuller.model_dump()
-                    merged = base_config.copy()
-                    for key, value in group_overrides.items():
-                        if key in ["max_levels", "max_depth_m"]:
-                            # Always override these, even if None
-                            merged[key] = value
-                        elif value is not None:
-                            # For other fields, only override if not None
-                            merged[key] = value
-                    return HovmullerConfig(**merged)
+            if (
+                group_config.enabled
+                and varname in group_config.variables
+                and group_config.hovmuller is not None
+            ):
+                # Merge group-specific overrides into base config
+                # For most fields, only override non-None values from group config
+                # For max_levels/max_depth_m, always use group value (even if None)
+                # since None is a valid "unset" value for these mutually-exclusive options
+                group_overrides = group_config.hovmuller.model_dump()
+                merged = base_config.copy()
+                for key, value in group_overrides.items():
+                    if key in ["max_levels", "max_depth_m"]:
+                        # Always override these, even if None
+                        merged[key] = value
+                    elif value is not None:
+                        # For other fields, only override if not None
+                        merged[key] = value
+                return HovmullerConfig(**merged)
 
         # No group-specific config found, return global config
         return self.plots.hovmuller

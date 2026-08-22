@@ -183,7 +183,9 @@ def _plot_timeseries_single(
         da_base = squeeze_spatial_dims(source.base.get(varname))
         da_exp = squeeze_spatial_dims(source.experiment.get(varname))
         title_da = da_exp
-        level_dim = _plot_multilevel_lines(ax, da_exp, varname, config=config, linestyle="-", alpha=1.0)
+        level_dim = _plot_multilevel_lines(
+            ax, da_exp, varname, config=config, linestyle="-", alpha=1.0
+        )
         if level_dim is not None:
             # Overlay base as dashed lines with same depth colormap.
             _plot_multilevel_lines(
