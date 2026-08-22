@@ -73,7 +73,8 @@ def _plot_multilevel_lines(
     if dim is None:
         return None
 
-    # Apply max_levels filter if configured (check group-specific config first)
+    # Apply max_levels filter if configured
+    # Note: hovmuller config controls vertical dimension behavior for all plot types
     hov_config = config.get_variable_group_hovmuller_config(varname)
     da = apply_max_levels(da, dim, hov_config.max_levels)
 

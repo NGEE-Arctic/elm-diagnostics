@@ -190,6 +190,9 @@ def apply_max_levels(
     -----
     Assumes level 0 is at top (surface). Works with both indexed
     dimensions and physical coordinate dimensions.
+
+    When data is truncated, a warning is issued to inform the user
+    that only partial depth profiles are shown for visualization clarity.
     """
     if max_levels is None or dim not in da.dims:
         return da
@@ -197,6 +200,15 @@ def apply_max_levels(
     n_levels = da.sizes[dim]
     if n_levels <= max_levels:
         return da  # Already within limit
+
+    # Warn user about truncation
+    import warnings
+
+    warnings.warn(
+        f"Limiting {dim} to {max_levels} of {n_levels} levels for clearer visualization.",
+        UserWarning,
+        stacklevel=3,
+    )
 
     # Select first max_levels (0:max_levels)
     return da.isel({dim: slice(0, max_levels)})

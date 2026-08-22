@@ -21,8 +21,8 @@ from elm_diagnostics.plots import (
     plot_timeseries,
 )
 from tests.fixtures.synthetic_elm import (
-    make_vertical_profile_dataset,
     make_single_point_dataset,
+    make_vertical_profile_dataset,
     make_water_balance_dataset,
     save_as_elm_files,
 )

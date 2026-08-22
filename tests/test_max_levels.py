@@ -61,6 +61,31 @@ def test_apply_max_levels_already_within_limit():
     xr.testing.assert_identical(result, da)
 
 
+def test_apply_max_levels_zero():
+    """Test max_levels=0 returns empty slice."""
+    da = xr.DataArray(
+        np.arange(45).reshape(15, 3),
+        dims=["levgrnd", "time"],
+        coords={"levgrnd": np.arange(15)},
+    )
+    with pytest.warns(UserWarning, match="Limiting levgrnd to 0 of 15 levels"):
+        result = apply_max_levels(da, "levgrnd", 0)
+    assert result.sizes["levgrnd"] == 0
+
+
+def test_apply_max_levels_one():
+    """Test max_levels=1 returns only surface level."""
+    da = xr.DataArray(
+        np.arange(45).reshape(15, 3),
+        dims=["levgrnd", "time"],
+        coords={"levgrnd": np.arange(15)},
+    )
+    with pytest.warns(UserWarning, match="Limiting levgrnd to 1 of 15 levels"):
+        result = apply_max_levels(da, "levgrnd", 1)
+    assert result.sizes["levgrnd"] == 1
+    assert result.levgrnd.values[0] == 0
+
+
 def test_apply_max_levels_none():
     """Test that max_levels=None returns data unchanged."""
     da = xr.DataArray(
@@ -122,8 +147,9 @@ def test_default_config_max_levels_is_none():
 def test_user_can_set_max_levels():
     """Test that users can configure max_levels via config."""
     import tempfile
-    import yaml
     from pathlib import Path
+
+    import yaml
 
     with tempfile.TemporaryDirectory() as tmpdir:
         cfg_path = Path(tmpdir) / "config.yaml"
@@ -178,8 +204,9 @@ def test_get_variable_group_hovmuller_config_fallback():
 def test_group_config_overrides_global():
     """Test that group-specific config takes precedence over global."""
     import tempfile
-    import yaml
     from pathlib import Path
+
+    import yaml
 
     with tempfile.TemporaryDirectory() as tmpdir:
         cfg_path = Path(tmpdir) / "config.yaml"
