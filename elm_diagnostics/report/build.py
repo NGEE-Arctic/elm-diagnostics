@@ -444,10 +444,10 @@ class Report:
             )
             if duration > 60:
                 print(
-                    f"     For large datasets, this is normal. Consider:\n"
-                    f"     - Reducing analysis_year_min/max window\n"
-                    f"     - Using analysis_year to process one year at a time\n"
-                    f"     - Reducing max_variables_per_group in config",
+                    "     For large datasets, this is normal. Consider:\n"
+                    "     - Reducing analysis_year_min/max window\n"
+                    "     - Using analysis_year to process one year at a time\n"
+                    "     - Reducing max_variables_per_group in config",
                     flush=True,
                 )
 
