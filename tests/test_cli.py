@@ -560,7 +560,15 @@ def test_cli_entry_point_version():
 def test_cli_end_to_end_subprocess(synthetic_data_dir, temp_output_dir):
     """Integration test: full report generation via subprocess."""
     env = os.environ.copy()
-    env["DASK_DISTRIBUTED__SCHEDULER"] = "synchronous"
+    # Use synchronous scheduler to prevent dask threading issues
+    env["DASK_SCHEDULER"] = "synchronous"
+    # Ensure matplotlib uses non-interactive backend
+    env["MPLBACKEND"] = "Agg"
+    # Limit threads to prevent resource contention in CI
+    env["OMP_NUM_THREADS"] = "1"
+    env["MKL_NUM_THREADS"] = "1"
+    env["OPENBLAS_NUM_THREADS"] = "1"
+
     result = subprocess.run(
         [
             "elm-diagnostics",
