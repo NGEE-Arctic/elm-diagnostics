@@ -286,9 +286,8 @@ class Config(BaseModel):
         base_config = self.plots.hovmuller.model_dump()
 
         # Check variable groups for one that contains this variable and has hovmuller config
-        for group_name, group_config in self.variable_groups.items():
-            if group_config.enabled and varname in group_config.variables:
-                if group_config.hovmuller is not None:
+        for group_config in self.variable_groups.values():
+            if group_config.enabled and varname in group_config.variables and group_config.hovmuller is not None:
                     # Merge group-specific overrides into base config
                     # For most fields, only override non-None values from group config
                     # For max_levels/max_depth_m, always use group value (even if None)
