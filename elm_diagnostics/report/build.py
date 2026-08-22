@@ -438,8 +438,7 @@ class Report:
         """
         if duration > threshold:
             print(
-                f"  ⚠ {operation} took {duration:.1f}s "
-                f"(threshold: {threshold:.0f}s)",
+                f"  ⚠ {operation} took {duration:.1f}s (threshold: {threshold:.0f}s)",
                 flush=True,
             )
             if duration > 60:
