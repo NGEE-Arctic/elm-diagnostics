@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import subprocess
 
 import pytest
@@ -558,6 +559,8 @@ def test_cli_entry_point_version():
 @pytest.mark.slow
 def test_cli_end_to_end_subprocess(synthetic_data_dir, temp_output_dir):
     """Integration test: full report generation via subprocess."""
+    env = os.environ.copy()
+    env["DASK_DISTRIBUTED__SCHEDULER"] = "synchronous"
     result = subprocess.run(
         [
             "elm-diagnostics",
@@ -570,6 +573,7 @@ def test_cli_end_to_end_subprocess(synthetic_data_dir, temp_output_dir):
         capture_output=True,
         text=True,
         timeout=300,
+        env=env,
     )
     assert result.returncode == 0
     assert "Report generated" in result.stdout
