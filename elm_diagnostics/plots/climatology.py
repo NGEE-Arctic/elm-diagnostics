@@ -123,7 +123,7 @@ def compute_individual_year_seasonal_cycles(
             continue
 
         # Compute monthly means for this year
-        monthly_mean = da_year.groupby("time.month").mean()
+        monthly_mean = da_year.groupby("time.month").mean().compute()
 
         seasonal_arrays.append(monthly_mean)
 
