@@ -28,12 +28,12 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+import jinja2
 import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 import xarray as xr
 import yaml
-import jinja2
 from jinja2 import Environment, FileSystemLoader
 from PIL import Image
 
@@ -1599,7 +1599,7 @@ class Report:
                 f"Required asset file missing from {_ASSETS_DIR}. "
                 "Report generation cannot continue."
             ) from e
-        except (OSError, IOError) as e:
+        except OSError as e:
             logger.error(f"Failed to copy assets to {assetsdir}: {e}")
             raise RuntimeError(
                 f"Cannot write to output directory {assetsdir}. "

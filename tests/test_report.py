@@ -8,9 +8,13 @@ import pytest
 
 matplotlib.use("Agg")
 
+from elm_diagnostics.config.schema import (
+    Config,
+    GroupPlotTypesConfig,
+    VariableGroupConfig,
+)
 from elm_diagnostics.io.run import Comparison, Run
 from elm_diagnostics.report.build import Report
-from elm_diagnostics.config.schema import Config, GroupPlotTypesConfig, VariableGroupConfig
 from tests.fixtures.synthetic_elm import (
     make_multicolumn_dataset,
     make_vertical_profile_dataset,
@@ -35,16 +39,15 @@ def comparison_runs():
     ds_base = make_water_balance_dataset(start_year=2000, n_months=12)
     ds_exp = make_water_balance_dataset(start_year=2001, n_months=12)
 
-    with tempfile.TemporaryDirectory() as tmpdir1:
-        with tempfile.TemporaryDirectory() as tmpdir2:
-            save_as_elm_files(ds_base, Path(tmpdir1), casename="base", tape="h0")
-            save_as_elm_files(ds_exp, Path(tmpdir2), casename="experiment", tape="h0")
-            base_run = Run(tmpdir1, name="base")
-            exp_run = Run(tmpdir2, name="experiment")
-            comparison = Comparison(base=base_run, experiment=exp_run)
-            yield comparison
-            base_run.close()
-            exp_run.close()
+    with tempfile.TemporaryDirectory() as tmpdir1, tempfile.TemporaryDirectory() as tmpdir2:
+        save_as_elm_files(ds_base, Path(tmpdir1), casename="base", tape="h0")
+        save_as_elm_files(ds_exp, Path(tmpdir2), casename="experiment", tape="h0")
+        base_run = Run(tmpdir1, name="base")
+        exp_run = Run(tmpdir2, name="experiment")
+        comparison = Comparison(base=base_run, experiment=exp_run)
+        yield comparison
+        base_run.close()
+        exp_run.close()
 
 
 def test_report_build(report_run):
@@ -375,7 +378,7 @@ def test_report_diagnostics_include_provenance(report_run, monkeypatch):
     rpt = Report(report_run, invocation_command="elm-diagnostics report /tmp/run")
 
     with tempfile.TemporaryDirectory() as outdir:
-        html_path = rpt.build(outdir)
+        rpt.build(outdir)
         # Diagnostics content is now in diagnostics.html, not index.html
         diagnostics_path = Path(outdir) / "diagnostics.html"
         assert diagnostics_path.exists()
@@ -421,7 +424,7 @@ def test_report_includes_lnd_in_when_present(report_run):
 
     rpt = Report(report_run)
     with tempfile.TemporaryDirectory() as outdir:
-        html_path = rpt.build(outdir)
+        rpt.build(outdir)
         # lnd_in content is now in diagnostics.html, not index.html
         diagnostics_path = Path(outdir) / "diagnostics.html"
         assert diagnostics_path.exists()
@@ -442,17 +445,16 @@ def test_report_handles_missing_lnd_in(report_run, caplog):
         lnd_in_path.unlink()
 
     rpt = Report(report_run)
-    with tempfile.TemporaryDirectory() as outdir:
-        with caplog.at_level(logging.WARNING):
-            html_path = rpt.build(outdir)
-            assert html_path.exists()
-            content = html_path.read_text()
-            # Report should still be generated
-            assert "report_test" in content
-            # lnd_in should not be in the content
-            assert "lnd_in namelist file" not in content
-            # Warning should be logged
-            assert any("lnd_in file not found" in record.message for record in caplog.records)
+    with tempfile.TemporaryDirectory() as outdir, caplog.at_level(logging.WARNING):
+        html_path = rpt.build(outdir)
+        assert html_path.exists()
+        content = html_path.read_text()
+        # Report should still be generated
+        assert "report_test" in content
+        # lnd_in should not be in the content
+        assert "lnd_in namelist file" not in content
+        # Warning should be logged
+        assert any("lnd_in file not found" in record.message for record in caplog.records)
 
 
 def test_report_handles_unreadable_lnd_in(report_run, caplog, monkeypatch):
@@ -474,15 +476,14 @@ def test_report_handles_unreadable_lnd_in(report_run, caplog, monkeypatch):
     monkeypatch.setattr(PathlibPath, "read_text", mock_read_text)
 
     rpt = Report(report_run)
-    with tempfile.TemporaryDirectory() as outdir:
-        with caplog.at_level(logging.DEBUG):
-            html_path = rpt.build(outdir)
-            assert html_path.exists()
-            content = html_path.read_text()
-            # Report should still be generated
-            assert "report_test" in content
-            # lnd_in should not be in the content
-            assert "lnd_in namelist file" not in content
+    with tempfile.TemporaryDirectory() as outdir, caplog.at_level(logging.DEBUG):
+        html_path = rpt.build(outdir)
+        assert html_path.exists()
+        content = html_path.read_text()
+        # Report should still be generated
+        assert "report_test" in content
+        # lnd_in should not be in the content
+        assert "lnd_in namelist file" not in content
 
 
 def test_report_multipage_structure(report_run):
@@ -496,7 +497,7 @@ def test_report_multipage_structure(report_run):
         assert html_path.exists()
 
         # Section pages exist - check what files are actually there
-        html_files = set([f.name for f in Path(outdir).glob("*.html")])
+        html_files = {f.name for f in Path(outdir).glob("*.html")}
         expected_files = {"index.html", "water-balance.html", "diagnostics.html"}
         assert expected_files.issubset(html_files), \
             f"Missing expected files. Found: {sorted(html_files)}"
@@ -586,6 +587,5 @@ def test_report_handles_missing_assets(report_run, monkeypatch, tmp_path):
     monkeypatch.setattr(build_module, "_ASSETS_DIR", tmp_path / "nonexistent")
 
     rpt = Report(report_run)
-    with tempfile.TemporaryDirectory() as outdir:
-        with pytest.raises(RuntimeError, match="Required asset file missing"):
-            rpt.build(outdir)
+    with tempfile.TemporaryDirectory() as outdir, pytest.raises(RuntimeError, match="Required asset file missing"):
+        rpt.build(outdir)
