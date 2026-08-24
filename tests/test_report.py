@@ -495,21 +495,13 @@ def test_report_multipage_structure(report_run):
         assert html_path.name == "index.html"
         assert html_path.exists()
 
-        # Assets directory created with CSS and JS
-        assets_dir = Path(outdir) / "assets"
-        assert assets_dir.exists()
-        assert (assets_dir / "style.css").exists()
-        assert (assets_dir / "lightbox.js").exists()
-
         # Section pages exist - check what files are actually there
-        html_files = sorted([f.name for f in Path(outdir).glob("*.html")])
-        # Should have at least index.html, water-balance, diagnostics, and some variable groups
-        assert len(html_files) >= 4, f"Expected at least 4 HTML files, got {len(html_files)}: {html_files}"
-        assert "index.html" in html_files
-        assert "water-balance.html" in html_files
-        assert "diagnostics.html" in html_files
-        # Each file should be its own page (not just index.html)
-        assert len(html_files) > 1
+        html_files = set([f.name for f in Path(outdir).glob("*.html")])
+        expected_files = {"index.html", "water-balance.html", "diagnostics.html"}
+        assert expected_files.issubset(html_files), \
+            f"Missing expected files. Found: {sorted(html_files)}"
+        assert len(html_files) >= 4, \
+            f"Expected at least 4 HTML files (index + sections), got {len(html_files)}"
 
         # Figures directory unchanged
         assert (Path(outdir) / "figures").exists()

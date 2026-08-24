@@ -62,18 +62,82 @@ _PNG_PIL_KWARGS = {"compress_level": 1, "optimize": False}
 
 
 class _Section:
-    """Container for a report section."""
+    """Container for a report section.
 
-    def __init__(self, title: str, description: str = ""):
+    Attributes
+    ----------
+    title : str
+        Section display title.
+    id : str
+        URL-friendly identifier derived from title.
+    filename : str
+        HTML filename for this section. Computed at construction time based on
+        whether this is the landing page (index.html) or a regular section
+        ({id}.html).
+    description : str
+        Section description text.
+    figures : list[dict]
+        List of figure dictionaries with path, thumb_path, caption, plot_type.
+    subsections : list[_Subsection]
+        List of subsections for grouped figures.
+    statistics : Any
+        Statistics data to render as a table.
+    extra_tables : list[dict]
+        Additional tables to render beneath primary statistics.
+    extra_text_blocks : list[dict]
+        Additional text content blocks.
+    """
+
+    def __init__(self, title: str, description: str = "", is_landing: bool = False):
+        """Initialize section.
+
+        Parameters
+        ----------
+        title : str
+            Section display title.
+        description : str, optional
+            Section description text.
+        is_landing : bool, optional
+            Whether this is the landing page. If True, filename is set to
+            "index.html"; otherwise computed from title as "{id}.html".
+        """
         self.title = title
         self.id = re.sub(r"[^a-z0-9]+", "-", title.lower()).strip("-")
-        self.filename = ""  # HTML filename for this section (assigned later)
+        self.filename = "index.html" if is_landing else f"{self.id}.html"
         self.description = description
         self.figures: list[dict[str, str]] = []
         self.subsections: list[_Subsection] = []
         self.statistics: Any = {}
         self.extra_tables: list[dict[str, Any]] = []
         self.extra_text_blocks: list[dict[str, str]] = []
+
+    def to_dict(self) -> dict:
+        """Convert section to dictionary for template rendering.
+
+        Returns
+        -------
+        dict
+            Dictionary with keys: id, title, filename, description, figures,
+            subsections (list of dicts), statistics, extra_tables, extra_text_blocks.
+        """
+        return {
+            "id": self.id,
+            "title": self.title,
+            "filename": self.filename,
+            "description": self.description,
+            "figures": self.figures,
+            "subsections": [
+                {
+                    "id": sub.id,
+                    "title": sub.title,
+                    "figures": sub.figures,
+                }
+                for sub in self.subsections
+            ],
+            "statistics": self.statistics,
+            "extra_tables": self.extra_tables,
+            "extra_text_blocks": self.extra_text_blocks,
+        }
 
     def add_subsection(self, title: str) -> _Subsection:
         """Create a named subsection for grouped figures."""
@@ -512,10 +576,10 @@ class Report:
         outdir = Path(outdir)
         figdir = outdir / "figures"
         datadir = outdir / "data"
-        assetsdir = outdir / "assets"  # NEW: assets directory
+        assetsdir = outdir / "assets"
         figdir.mkdir(parents=True, exist_ok=True)
         datadir.mkdir(parents=True, exist_ok=True)
-        assetsdir.mkdir(parents=True, exist_ok=True)  # NEW: create assets directory
+        assetsdir.mkdir(parents=True, exist_ok=True)
         self._section_timings = []
         self._rendered_section_titles = []
         self._build_total_seconds = None
@@ -572,9 +636,6 @@ class Report:
         # Copy assets to output
         self._copy_assets(assetsdir)
 
-        # Assign filenames to sections
-        self._assign_section_filenames(sections)
-
         # Render multi-page HTML
         self._rendered_section_titles = [section.title for section in sections]
         html_paths = self._render_multi_page_html(outdir, sections)
@@ -584,7 +645,9 @@ class Report:
     def _build_metadata_section(self) -> _Section:
         """Build metadata section with run information."""
         start_time = time.perf_counter()
-        sec = _Section("Run Information", "Metadata about the ELM simulation(s).")
+        sec = _Section(
+            "Run Information", "Metadata about the ELM simulation(s).", is_landing=True
+        )
 
         run = self._run
         streams = run.streams
@@ -1523,16 +1586,6 @@ class Report:
         self._record_section_timing(section_title, start_time)
         return sec
 
-    def _assign_section_filenames(self, sections: list[_Section]) -> None:
-        """Assign URL-friendly HTML filenames to each section."""
-        for idx, section in enumerate(sections):
-            if idx == 0:  # First section is always landing page
-                section.filename = "index.html"
-            else:
-                # Use existing slug logic (same as ID generation)
-                slug = re.sub(r"[^a-z0-9]+", "-", section.title.lower()).strip("-")
-                section.filename = f"{slug}.html"
-
     def _copy_assets(self, assetsdir: Path) -> None:
         """Copy CSS and JS assets to output assets/ directory."""
         import shutil
@@ -1552,6 +1605,49 @@ class Report:
                 f"Cannot write to output directory {assetsdir}. "
                 "Check permissions."
             ) from e
+
+    def _compute_summary_stats(self, sections: list[_Section]) -> dict:
+        """Compute summary statistics for report landing page.
+
+        Parameters
+        ----------
+        sections : list[_Section]
+            Report sections to compute statistics from.
+
+        Returns
+        -------
+        dict
+            Summary statistics with keys: total_sections, total_figures,
+            total_errors, total_warnings, status, status_message.
+        """
+        total_figures = sum(
+            len(s.figures) + sum(len(sub.figures) for sub in s.subsections)
+            for s in sections
+        )
+        total_errors = len(self._errors)
+        total_warnings = len(self._warnings)
+
+        if total_errors > 5:
+            status = "error"
+            status_message = f"{total_errors} errors encountered"
+        elif total_errors > 0:
+            status = "warning"
+            status_message = f"{total_errors} errors, report partially complete"
+        elif total_warnings > 0:
+            status = "warning"
+            status_message = f"{total_warnings} warnings"
+        else:
+            status = "success"
+            status_message = "All sections generated successfully"
+
+        return {
+            "total_sections": len(sections),
+            "total_figures": total_figures,
+            "total_errors": total_errors,
+            "total_warnings": total_warnings,
+            "status": status,
+            "status_message": status_message,
+        }
 
     def _render_multi_page_html(
         self, outdir: Path, sections: list[_Section]
@@ -1573,35 +1669,7 @@ class Report:
         ]
 
         # Generate summary statistics (for landing page)
-        total_figures = sum(
-            len(s.figures) + sum(len(sub.figures) for sub in s.subsections)
-            for s in sections
-        )
-        total_errors = len(self._errors)
-        total_warnings = len(self._warnings)
-
-        # Determine status
-        if total_errors > 5:
-            status = "error"
-            status_message = f"{total_errors} errors encountered"
-        elif total_errors > 0:
-            status = "warning"
-            status_message = f"{total_errors} errors, report partially complete"
-        elif total_warnings > 0:
-            status = "warning"
-            status_message = f"{total_warnings} warnings"
-        else:
-            status = "success"
-            status_message = "All sections generated successfully"
-
-        summary = {
-            "total_sections": len(sections),
-            "total_figures": total_figures,
-            "total_errors": total_errors,
-            "total_warnings": total_warnings,
-            "status": status,
-            "status_message": status_message,
-        }
+        summary = self._compute_summary_stats(sections)
 
         html_paths = []
         try:
@@ -1618,23 +1686,7 @@ class Report:
             html_path = outdir / section.filename
 
             # Convert section to dict for template
-            section_dict = {
-                "id": section.id,
-                "title": section.title,
-                "description": section.description,
-                "figures": section.figures,
-                "subsections": [
-                    {
-                        "id": sub.id,
-                        "title": sub.title,
-                        "figures": sub.figures,
-                    }
-                    for sub in section.subsections
-                ],
-                "statistics": section.statistics,
-                "extra_tables": section.extra_tables,
-                "extra_text_blocks": section.extra_text_blocks,
-            }
+            section_dict = section.to_dict()
 
             # Only include summary on landing page (Run Information)
             template_vars = {
