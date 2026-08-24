@@ -184,7 +184,9 @@ elm_diagnostics/
 ├── report/
 │   ├── build.py             # Report orchestrator
 │   ├── templates/
-│   │   └── single_page.html.j2
+│   │   ├── base.html.j2     # Base template with navigation
+│   │   ├── section.html.j2  # Section page template
+│   │   └── _section_content.html.j2  # Reusable section content
 │   └── assets/              # CSS, JS for TOC sidebar
 ├── config/
 │   ├── schema.py            # YAML schema validation (pydantic)

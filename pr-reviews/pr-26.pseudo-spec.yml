@@ -1,0 +1,47 @@
+spec_id: pr-26
+spec_type: synthetic-pr-review
+spec_version: 1
+title: "Restructure HTML report to multi-page layout with navigation menu"
+author: "rfiorella"
+source_url: "https://github.com/NGEE-Arctic/elm-diagnostics/pull/26"
+
+inputs:
+  source_files:
+    - elm_diagnostics/report/assets/style.css
+    - elm_diagnostics/report/build.py
+    - elm_diagnostics/report/templates/_section_content.html.j2
+    - elm_diagnostics/report/templates/base.html.j2
+    - elm_diagnostics/report/templates/section.html.j2
+    - tests/test_cli.py
+    - tests/test_report.py
+  data: []
+  baseline: null
+
+deliverables:
+  - New files: base.html.j2 - Base template with shared navigation and layout
+  - New files: section.html.j2 - Individual section page template (extends base)
+  - New files: _section_content.html.j2 - Reusable fragment for section body content
+  - Uses Jinja2 template inheritance to eliminate duplication
+  - Added `filename` attribute to `_Section` class to store HTML filename
+  - Implemented `_assign_section_filenames()` - assigns URL-friendly names
+  - Implemented `_copy_assets()` - copies CSS/JS to `assets/` directory
+  - Implemented `_render_multi_page_html()` - renders each section as separate HTML file
+  - Updated `build()` method to create assets directory and use multi-page rendering
+  - Moved CSS from inline to external `assets/style.css`
+  - Moved JavaScript from inline to external `assets/lightbox.js`
+  - Added active navigation state styling (`.active` class with highlighting)
+  - Enhanced subsection link indentation
+  - Added 5 new tests for multi-page functionality
+  - Updated 3 existing tests to check `diagnostics.html` instead of `index.html` for diagnostics content
+  - All 30 report tests pass
+
+success_criteria: []
+
+out_of_scope: []
+
+resolved_decisions: []
+
+model_specific:
+  synthetic: true
+  base_ref: "main"
+  head_ref: "feat/multipage-report"

@@ -586,3 +586,14 @@ def test_report_landing_page_summary(report_run):
         assert "summary-bar" in content
         assert "Sections" in content
         assert "Figures" in content
+
+
+def test_report_handles_missing_assets(report_run, monkeypatch, tmp_path):
+    """Test that missing asset files produce helpful error."""
+    import elm_diagnostics.report.build as build_module
+    monkeypatch.setattr(build_module, "_ASSETS_DIR", tmp_path / "nonexistent")
+
+    rpt = Report(report_run)
+    with tempfile.TemporaryDirectory() as outdir:
+        with pytest.raises(RuntimeError, match="Required asset file missing"):
+            rpt.build(outdir)

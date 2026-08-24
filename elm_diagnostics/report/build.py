@@ -12,6 +12,7 @@
 
 from __future__ import annotations
 
+import functools
 import getpass
 import logging
 import os
@@ -32,6 +33,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import xarray as xr
 import yaml
+import jinja2
 from jinja2 import Environment, FileSystemLoader
 from PIL import Image
 
@@ -269,6 +271,14 @@ class Report:
     def _is_comparison(self) -> bool:
         """Check if this is a comparison report."""
         return isinstance(self.source, Comparison)
+
+    @functools.cached_property
+    def _template_env(self) -> Environment:
+        """Cached Jinja2 environment for template rendering."""
+        return Environment(
+            loader=FileSystemLoader(str(_TEMPLATE_DIR)),
+            autoescape=True,
+        )
 
     def _apply_analysis_window(self, ds: xr.Dataset) -> xr.Dataset:
         """Apply analysis_year_min/max window to a dataset.
@@ -1513,92 +1523,10 @@ class Report:
         self._record_section_timing(section_title, start_time)
         return sec
 
-    def _render_html(self, outdir: Path, sections: list[_Section]) -> Path:
-        env = Environment(
-            loader=FileSystemLoader(str(_TEMPLATE_DIR)),
-            autoescape=True,
-        )
-        template = env.get_template("single_page.html.j2")
-
-        # Load CSS
-        css_path = _ASSETS_DIR / "style.css"
-        css = css_path.read_text()
-
-        # Load JavaScript for lightbox
-        js_path = _ASSETS_DIR / "lightbox.js"
-        if js_path.exists():
-            js = js_path.read_text()
-        else:
-            js = ""  # Will be created next
-
-        title = self.config.report.title_template.format(casename=self._casename)
-
-        # Generate summary statistics
-        total_figures = sum(
-            len(s.figures) + sum(len(sub.figures) for sub in s.subsections)
-            for s in sections
-        )
-        total_errors = len(self._errors)
-        total_warnings = len(self._warnings)
-
-        # Determine status
-        if total_errors > 5:
-            status = "error"
-            status_message = f"{total_errors} errors encountered"
-        elif total_errors > 0:
-            status = "warning"
-            status_message = f"{total_errors} errors, report partially complete"
-        elif total_warnings > 0:
-            status = "warning"
-            status_message = f"{total_warnings} warnings"
-        else:
-            status = "success"
-            status_message = "All sections generated successfully"
-
-        html = template.render(
-            title=title,
-            casename=self._casename,
-            css=css,
-            js=js,
-            thumbnails_enabled=self.config.report.thumbnails.enabled,
-            summary={
-                "total_sections": len(sections),
-                "total_figures": total_figures,
-                "total_errors": total_errors,
-                "total_warnings": total_warnings,
-                "status": status,
-                "status_message": status_message,
-            },
-            sections=[
-                {
-                    "id": s.id,
-                    "title": s.title,
-                    "description": s.description,
-                    "figures": s.figures,
-                    "subsections": [
-                        {
-                            "id": sub.id,
-                            "title": sub.title,
-                            "figures": sub.figures,
-                        }
-                        for sub in s.subsections
-                    ],
-                    "statistics": s.statistics,
-                    "extra_tables": s.extra_tables,
-                    "extra_text_blocks": s.extra_text_blocks,
-                }
-                for s in sections
-            ],
-        )
-
-        html_path = outdir / "index.html"
-        html_path.write_text(html)
-        return html_path
-
     def _assign_section_filenames(self, sections: list[_Section]) -> None:
         """Assign URL-friendly HTML filenames to each section."""
         for idx, section in enumerate(sections):
-            if idx == 0 and section.title == "Run Information":
+            if idx == 0:  # First section is always landing page
                 section.filename = "index.html"
             else:
                 # Use existing slug logic (same as ID generation)
@@ -1609,17 +1537,27 @@ class Report:
         """Copy CSS and JS assets to output assets/ directory."""
         import shutil
 
-        shutil.copy2(_ASSETS_DIR / "style.css", assetsdir / "style.css")
-        shutil.copy2(_ASSETS_DIR / "lightbox.js", assetsdir / "lightbox.js")
+        try:
+            shutil.copyfile(_ASSETS_DIR / "style.css", assetsdir / "style.css")
+            shutil.copyfile(_ASSETS_DIR / "lightbox.js", assetsdir / "lightbox.js")
+        except FileNotFoundError as e:
+            logger.error(f"Asset file not found: {e}")
+            raise RuntimeError(
+                f"Required asset file missing from {_ASSETS_DIR}. "
+                "Report generation cannot continue."
+            ) from e
+        except (OSError, IOError) as e:
+            logger.error(f"Failed to copy assets to {assetsdir}: {e}")
+            raise RuntimeError(
+                f"Cannot write to output directory {assetsdir}. "
+                "Check permissions."
+            ) from e
 
     def _render_multi_page_html(
         self, outdir: Path, sections: list[_Section]
     ) -> list[Path]:
         """Render each section as separate HTML file with shared navigation."""
-        env = Environment(
-            loader=FileSystemLoader(str(_TEMPLATE_DIR)),
-            autoescape=True,
-        )
+        env = self._template_env
 
         # Prepare navigation data (same for all pages)
         all_sections_for_nav = [
@@ -1666,7 +1604,14 @@ class Report:
         }
 
         html_paths = []
-        section_template = env.get_template("section.html.j2")
+        try:
+            section_template = env.get_template("section.html.j2")
+        except jinja2.TemplateNotFound as e:
+            logger.error(f"Template not found: {e}")
+            raise RuntimeError(
+                f"Report template 'section.html.j2' not found in {_TEMPLATE_DIR}. "
+                "Package installation may be corrupted."
+            ) from e
 
         # Render each section to its own file
         for section in sections:

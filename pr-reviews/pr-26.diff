@@ -1,0 +1,594 @@
+diff --git a/elm_diagnostics/report/assets/style.css b/elm_diagnostics/report/assets/style.css
+index cbd5e15..95a6f85 100644
+--- a/elm_diagnostics/report/assets/style.css
++++ b/elm_diagnostics/report/assets/style.css
+@@ -11,6 +11,10 @@ body { font-family: sans-serif;
+ #sidebar li { margin: 0.4rem 0; }
+ #sidebar a { color: #bdc3c7; text-decoration: none; font-size: 0.85rem; }
+ #sidebar a:hover { color: #fff; }
++#sidebar a.active { color: #fff; font-weight: bold; background: rgba(255, 255, 255, 0.1);
++                    padding: 0.2rem 0.5rem; border-radius: 3px; display: inline-block; }
++#sidebar ul.subsection-links { margin-left: 1rem; margin-top: 0.25rem; }
++#sidebar ul.subsection-links li { font-size: 0.9rem; }
+ #sidebar .meta { font-size: 0.7rem; color: #7f8c8d; margin-top: 2rem; }
+ main { margin-left: 240px; padding: 2rem; max-width: 1100px; }
+ h1 { font-size: 1.6rem; margin-bottom: 0.5rem; }
+diff --git a/elm_diagnostics/report/build.py b/elm_diagnostics/report/build.py
+index 439bed7..bf4a6fe 100644
+--- a/elm_diagnostics/report/build.py
++++ b/elm_diagnostics/report/build.py
+@@ -65,6 +65,7 @@ class _Section:
+     def __init__(self, title: str, description: str = ""):
+         self.title = title
+         self.id = re.sub(r"[^a-z0-9]+", "-", title.lower()).strip("-")
++        self.filename = ""  # HTML filename for this section (assigned later)
+         self.description = description
+         self.figures: list[dict[str, str]] = []
+         self.subsections: list[_Subsection] = []
+@@ -501,8 +502,10 @@ def build(self, outdir: str | Path) -> Path:
+         outdir = Path(outdir)
+         figdir = outdir / "figures"
+         datadir = outdir / "data"
++        assetsdir = outdir / "assets"  # NEW: assets directory
+         figdir.mkdir(parents=True, exist_ok=True)
+         datadir.mkdir(parents=True, exist_ok=True)
++        assetsdir.mkdir(parents=True, exist_ok=True)  # NEW: create assets directory
+         self._section_timings = []
+         self._rendered_section_titles = []
+         self._build_total_seconds = None
+@@ -556,11 +559,17 @@ def _resilient_excepthook(args):
+             plt.close("all")
+             threading.excepthook = _orig_excepthook
+ 
+-        # Render HTML
++        # Copy assets to output
++        self._copy_assets(assetsdir)
++
++        # Assign filenames to sections
++        self._assign_section_filenames(sections)
++
++        # Render multi-page HTML
+         self._rendered_section_titles = [section.title for section in sections]
+-        html_path = self._render_html(outdir, sections)
++        html_paths = self._render_multi_page_html(outdir, sections)
+         self._build_total_seconds = time.perf_counter() - build_start
+-        return html_path
++        return html_paths[0]  # Return landing page (index.html)
+ 
+     def _build_metadata_section(self) -> _Section:
+         """Build metadata section with run information."""
+@@ -1585,3 +1594,118 @@ def _render_html(self, outdir: Path, sections: list[_Section]) -> Path:
+         html_path = outdir / "index.html"
+         html_path.write_text(html)
+         return html_path
++
++    def _assign_section_filenames(self, sections: list[_Section]) -> None:
++        """Assign URL-friendly HTML filenames to each section."""
++        for idx, section in enumerate(sections):
++            if idx == 0 and section.title == "Run Information":
++                section.filename = "index.html"
++            else:
++                # Use existing slug logic (same as ID generation)
++                slug = re.sub(r"[^a-z0-9]+", "-", section.title.lower()).strip("-")
++                section.filename = f"{slug}.html"
++
++    def _copy_assets(self, assetsdir: Path) -> None:
++        """Copy CSS and JS assets to output assets/ directory."""
++        import shutil
++
++        shutil.copy2(_ASSETS_DIR / "style.css", assetsdir / "style.css")
++        shutil.copy2(_ASSETS_DIR / "lightbox.js", assetsdir / "lightbox.js")
++
++    def _render_multi_page_html(
++        self, outdir: Path, sections: list[_Section]
++    ) -> list[Path]:
++        """Render each section as separate HTML file with shared navigation."""
++        env = Environment(
++            loader=FileSystemLoader(str(_TEMPLATE_DIR)),
++            autoescape=True,
++        )
++
++        # Prepare navigation data (same for all pages)
++        all_sections_for_nav = [
++            {
++                "id": s.id,
++                "title": s.title,
++                "filename": s.filename,
++                "subsections": [
++                    {"id": sub.id, "title": sub.title} for sub in s.subsections
++                ],
++            }
++            for s in sections
++        ]
++
++        # Generate summary statistics (for landing page)
++        total_figures = sum(
++            len(s.figures) + sum(len(sub.figures) for sub in s.subsections)
++            for s in sections
++        )
++        total_errors = len(self._errors)
++        total_warnings = len(self._warnings)
++
++        # Determine status
++        if total_errors > 5:
++            status = "error"
++            status_message = f"{total_errors} errors encountered"
++        elif total_errors > 0:
++            status = "warning"
++            status_message = f"{total_errors} errors, report partially complete"
++        elif total_warnings > 0:
++            status = "warning"
++            status_message = f"{total_warnings} warnings"
++        else:
++            status = "success"
++            status_message = "All sections generated successfully"
++
++        summary = {
++            "total_sections": len(sections),
++            "total_figures": total_figures,
++            "total_errors": total_errors,
++            "total_warnings": total_warnings,
++            "status": status,
++            "status_message": status_message,
++        }
++
++        html_paths = []
++        section_template = env.get_template("section.html.j2")
++
++        # Render each section to its own file
++        for section in sections:
++            html_path = outdir / section.filename
++
++            # Convert section to dict for template
++            section_dict = {
++                "id": section.id,
++                "title": section.title,
++                "description": section.description,
++                "figures": section.figures,
++                "subsections": [
++                    {
++                        "id": sub.id,
++                        "title": sub.title,
++                        "figures": sub.figures,
++                    }
++                    for sub in section.subsections
++                ],
++                "statistics": section.statistics,
++                "extra_tables": section.extra_tables,
++                "extra_text_blocks": section.extra_text_blocks,
++            }
++
++            # Only include summary on landing page (Run Information)
++            template_vars = {
++                "casename": self._casename,
++                "all_sections": all_sections_for_nav,
++                "current_section_id": section.id,
++                "section_title": section.title,
++                "section": section_dict,
++                "thumbnails_enabled": self.config.report.thumbnails.enabled,
++            }
++
++            if section.filename == "index.html":
++                template_vars["summary"] = summary
++
++            html = section_template.render(**template_vars)
++            html_path.write_text(html)
++            html_paths.append(html_path)
++
++        return html_paths
+diff --git a/elm_diagnostics/report/templates/_section_content.html.j2 b/elm_diagnostics/report/templates/_section_content.html.j2
+new file mode 100644
+index 0000000..e4cbd80
+--- /dev/null
++++ b/elm_diagnostics/report/templates/_section_content.html.j2
+@@ -0,0 +1,142 @@
++{# Section content fragment - renders a single section's body #}
++<section id="{{ section.id }}">
++  {% if section.description %}
++  <p>{{ section.description }}</p>
++  {% endif %}
++
++  {# Statistics table if present #}
++  {% if section.statistics %}
++  <table class="stats-table">
++    {% if section.statistics.table_kind and section.statistics.rows %}
++    <thead>
++      <tr>
++        <th>Metric</th>
++        <th>Long Name</th>
++        <th>Value</th>
++      </tr>
++    </thead>
++    <tbody>
++      {% for row in section.statistics.rows %}
++      <tr class="stats-row-{{ row.kind }}{% if row.indent %} stats-row-indented{% endif %}">
++        <td>
++          {% if row.kind == 'group' %}
++          <strong>{{ row.metric }}</strong>
++          {% else %}
++          <span class="stats-indent-{{ row.indent }}">{{ row.metric }}</span>
++          {% endif %}
++        </td>
++        <td>{{ row.long_name }}</td>
++        <td>{{ row.value }}</td>
++      </tr>
++      {% endfor %}
++    </tbody>
++    {% else %}
++    <thead>
++      <tr>
++        <th>Metric</th>
++        <th>Value</th>
++      </tr>
++    </thead>
++    <tbody>
++      {% for key, value in section.statistics.items() %}
++      <tr>
++        <td><strong>{{ key }}</strong></td>
++        <td>
++          {% if value is string %}
++            {{ value }}
++          {% elif value is iterable and value is not string %}
++            <ul>
++            {% for item in value %}
++              <li>{{ item }}</li>
++            {% endfor %}
++            </ul>
++          {% else %}
++            {{ value }}
++          {% endif %}
++        </td>
++      </tr>
++      {% endfor %}
++    </tbody>
++    {% endif %}
++  </table>
++  {% endif %}
++
++  {# Additional tables for section-specific structured data #}
++  {% if section.extra_tables %}
++  {% for table in section.extra_tables %}
++  <h3>{{ table.title }}</h3>
++  <table class="stats-table">
++    <thead>
++      <tr>
++        {% for column in table.columns %}
++        <th>{{ column }}</th>
++        {% endfor %}
++      </tr>
++    </thead>
++    <tbody>
++      {% for row in table.rows %}
++      <tr>
++        {% for cell in row %}
++        <td>{{ cell }}</td>
++        {% endfor %}
++      </tr>
++      {% endfor %}
++    </tbody>
++  </table>
++  {% endfor %}
++  {% endif %}
++
++  {% if section.extra_text_blocks %}
++  {% for block in section.extra_text_blocks %}
++  <h3>{{ block.title }}</h3>
++  <pre>{{ block.content }}</pre>
++  {% endfor %}
++  {% endif %}
++
++  {# Figures grouped by subsection #}
++  {% if section.subsections %}
++  {% for subsection in section.subsections %}
++  {% if subsection.figures %}
++  <h3 class="plot-subsection" id="{{ subsection.id }}">{{ subsection.title }}</h3>
++  <div class="figure-grid">
++    {% for fig in subsection.figures %}
++    <div class="figure-card">
++      {% if thumbnails_enabled %}
++      <img src="{{ fig.thumb_path }}" alt="{{ fig.caption }}" data-full-path="{{ fig.path }}">
++      {% else %}
++      <img src="{{ fig.path }}" alt="{{ fig.caption }}">
++      {% endif %}
++      <p class="caption">
++        {% if fig.plot_type %}
++        <span class="plot-type-badge">{{ fig.plot_type }}</span>
++        {% endif %}
++        {{ fig.caption }}
++      </p>
++    </div>
++    {% endfor %}
++  </div>
++  {% endif %}
++  {% endfor %}
++  {% endif %}
++
++  {# Backward-compatible flat figure grid #}
++  {% if section.figures %}
++  <div class="figure-grid">
++    {% for fig in section.figures %}
++    <div class="figure-card">
++      {% if thumbnails_enabled %}
++      <img src="{{ fig.thumb_path }}" alt="{{ fig.caption }}" data-full-path="{{ fig.path }}">
++      {% else %}
++      <img src="{{ fig.path }}" alt="{{ fig.caption }}">
++      {% endif %}
++      <p class="caption">
++        {% if fig.plot_type %}
++        <span class="plot-type-badge">{{ fig.plot_type }}</span>
++        {% endif %}
++        {{ fig.caption }}
++      </p>
++    </div>
++    {% endfor %}
++  </div>
++  {% endif %}
++</section>
+diff --git a/elm_diagnostics/report/templates/base.html.j2 b/elm_diagnostics/report/templates/base.html.j2
+new file mode 100644
+index 0000000..ce84439
+--- /dev/null
++++ b/elm_diagnostics/report/templates/base.html.j2
+@@ -0,0 +1,37 @@
++<!DOCTYPE html>
++<html lang="en">
++<head>
++<meta charset="utf-8">
++<meta name="viewport" content="width=device-width, initial-scale=1">
++<title>{% block title %}{% endblock %}</title>
++<link rel="stylesheet" href="assets/style.css">
++</head>
++<body>
++<nav id="sidebar">
++  <h2>Contents</h2>
++  <ul>
++  {% for section in all_sections %}
++    <li>
++      <a href="{{ section.filename }}" class="{% if section.id == current_section_id %}active{% endif %}">
++        {{ section.title }}
++      </a>
++      {% if section.subsections %}
++      <ul class="subsection-links">
++        {% for subsection in section.subsections %}
++        <li><a href="{{ section.filename }}#{{ subsection.id }}">{{ subsection.title }}</a></li>
++        {% endfor %}
++      </ul>
++      {% endif %}
++    </li>
++  {% endfor %}
++  </ul>
++  <p class="meta">Generated by elm-diagnostics</p>
++</nav>
++
++<main>
++  {% block content %}{% endblock %}
++</main>
++
++<script src="assets/lightbox.js"></script>
++</body>
++</html>
+diff --git a/elm_diagnostics/report/templates/section.html.j2 b/elm_diagnostics/report/templates/section.html.j2
+new file mode 100644
+index 0000000..1ad3fc9
+--- /dev/null
++++ b/elm_diagnostics/report/templates/section.html.j2
+@@ -0,0 +1,39 @@
++{% extends "base.html.j2" %}
++
++{% block title %}{{ section_title }} — {{ casename }}{% endblock %}
++
++{% block content %}
++  <h1>{{ section_title }}</h1>
++  <p class="meta">Case: <code>{{ casename }}</code></p>
++
++  {# Summary bar - only shown on landing page (Run Information) #}
++  {% if summary %}
++  <div class="summary-bar {{ summary.status }}">
++    <strong>{{ summary.status_message }}</strong>
++    <div class="summary-stats">
++      <div class="summary-stat">
++        <div class="value">{{ summary.total_sections }}</div>
++        <div class="label">Sections</div>
++      </div>
++      <div class="summary-stat">
++        <div class="value">{{ summary.total_figures }}</div>
++        <div class="label">Figures</div>
++      </div>
++      {% if summary.total_errors > 0 %}
++      <div class="summary-stat">
++        <div class="value">{{ summary.total_errors }}</div>
++        <div class="label">Errors</div>
++      </div>
++      {% endif %}
++      {% if summary.total_warnings > 0 %}
++      <div class="summary-stat">
++        <div class="value">{{ summary.total_warnings }}</div>
++        <div class="label">Warnings</div>
++      </div>
++      {% endif %}
++    </div>
++  </div>
++  {% endif %}
++
++  {% include "_section_content.html.j2" %}
++{% endblock %}
+diff --git a/tests/test_cli.py b/tests/test_cli.py
+index bddead1..2804a53 100644
+--- a/tests/test_cli.py
++++ b/tests/test_cli.py
+@@ -2,6 +2,7 @@
+ 
+ from __future__ import annotations
+ 
++import os
+ import subprocess
+ 
+ import pytest
+@@ -558,6 +559,8 @@ def test_cli_entry_point_version():
+ @pytest.mark.slow
+ def test_cli_end_to_end_subprocess(synthetic_data_dir, temp_output_dir):
+     """Integration test: full report generation via subprocess."""
++    env = os.environ.copy()
++    env["DASK_DISTRIBUTED__SCHEDULER"] = "synchronous"
+     result = subprocess.run(
+         [
+             "elm-diagnostics",
+@@ -570,6 +573,7 @@ def test_cli_end_to_end_subprocess(synthetic_data_dir, temp_output_dir):
+         capture_output=True,
+         text=True,
+         timeout=300,
++        env=env,
+     )
+     assert result.returncode == 0
+     assert "Report generated" in result.stdout
+diff --git a/tests/test_report.py b/tests/test_report.py
+index 43066c6..69ee511 100644
+--- a/tests/test_report.py
++++ b/tests/test_report.py
+@@ -347,8 +347,13 @@ def test_report_responsive_css(report_run):
+         content = html_path.read_text()
+         # Check for viewport meta tag
+         assert "viewport" in content
+-        # Check for CSS grid or flex
+-        assert "grid" in content or "flex" in content
++        # Check for external CSS reference (CSS is now in external file)
++        assert 'href="assets/style.css"' in content
++        # Check that CSS file exists and contains grid/flex
++        css_path = Path(outdir) / "assets" / "style.css"
++        assert css_path.exists()
++        css_content = css_path.read_text()
++        assert "grid" in css_content or "flex" in css_content
+ 
+ 
+ def test_report_generation_timestamp(report_run):
+@@ -371,7 +376,10 @@ def test_report_diagnostics_include_provenance(report_run, monkeypatch):
+ 
+     with tempfile.TemporaryDirectory() as outdir:
+         html_path = rpt.build(outdir)
+-        content = html_path.read_text()
++        # Diagnostics content is now in diagnostics.html, not index.html
++        diagnostics_path = Path(outdir) / "diagnostics.html"
++        assert diagnostics_path.exists()
++        content = diagnostics_path.read_text()
+         assert "Diagnostics" in content
+         assert "Git version" in content
+         assert "test-git-version" in content
+@@ -414,7 +422,10 @@ def test_report_includes_lnd_in_when_present(report_run):
+     rpt = Report(report_run)
+     with tempfile.TemporaryDirectory() as outdir:
+         html_path = rpt.build(outdir)
+-        content = html_path.read_text()
++        # lnd_in content is now in diagnostics.html, not index.html
++        diagnostics_path = Path(outdir) / "diagnostics.html"
++        assert diagnostics_path.exists()
++        content = diagnostics_path.read_text()
+         assert "lnd_in namelist file" in content
+         # Content is HTML-escaped in the template
+         assert "&amp;clm_inparm" in content
+@@ -472,3 +483,106 @@ def mock_read_text(self, *args, **kwargs):
+             assert "report_test" in content
+             # lnd_in should not be in the content
+             assert "lnd_in namelist file" not in content
++
++
++def test_report_multipage_structure(report_run):
++    """Test that report generates multiple HTML pages."""
++    rpt = Report(report_run)
++    with tempfile.TemporaryDirectory() as outdir:
++        html_path = rpt.build(outdir)
++
++        # Landing page returned
++        assert html_path.name == "index.html"
++        assert html_path.exists()
++
++        # Assets directory created with CSS and JS
++        assets_dir = Path(outdir) / "assets"
++        assert assets_dir.exists()
++        assert (assets_dir / "style.css").exists()
++        assert (assets_dir / "lightbox.js").exists()
++
++        # Section pages exist - check what files are actually there
++        html_files = sorted([f.name for f in Path(outdir).glob("*.html")])
++        # Should have at least index.html, water-balance, diagnostics, and some variable groups
++        assert len(html_files) >= 4, f"Expected at least 4 HTML files, got {len(html_files)}: {html_files}"
++        assert "index.html" in html_files
++        assert "water-balance.html" in html_files
++        assert "diagnostics.html" in html_files
++        # Each file should be its own page (not just index.html)
++        assert len(html_files) > 1
++
++        # Figures directory unchanged
++        assert (Path(outdir) / "figures").exists()
++
++
++def test_report_navigation_links(report_run):
++    """Test that navigation menu appears on all pages with correct active state."""
++    rpt = Report(report_run)
++    with tempfile.TemporaryDirectory() as outdir:
++        rpt.build(outdir)
++
++        # Check water balance page
++        water_page = (Path(outdir) / "water-balance.html").read_text()
++        assert 'href="water-balance.html"' in water_page
++        assert 'class="active"' in water_page  # Active state present
++        assert 'href="index.html"' in water_page  # Link to landing
++        assert 'href="diagnostics.html"' in water_page  # Link to another section
++
++        # Check that navigation menu is present
++        assert '<nav id="sidebar">' in water_page
++
++        # Check that active class is on the correct link
++        # Should find the active link on water-balance page
++        assert 'href="water-balance.html" class="active"' in water_page
++
++
++def test_report_external_assets(report_run):
++    """Test that pages link to external CSS/JS assets."""
++    rpt = Report(report_run)
++    with tempfile.TemporaryDirectory() as outdir:
++        html_path = rpt.build(outdir)
++        content = html_path.read_text()
++
++        # Check for external asset links (not inline)
++        assert 'href="assets/style.css"' in content
++        assert 'src="assets/lightbox.js"' in content
++        # Should NOT have inline CSS/JS
++        assert "<style>" not in content
++
++
++def test_report_subsection_anchors(report_run):
++    """Test that subsections render as anchors within parent page."""
++    rpt = Report(report_run)
++    with tempfile.TemporaryDirectory() as outdir:
++        rpt.build(outdir)
++
++        # Look for variable group pages with subsections
++        pages = list(Path(outdir).glob("*.html"))
++        found_subsection = False
++
++        for page in pages:
++            if page.name in ["index.html", "diagnostics.html", "water-balance.html"]:
++                continue
++            content = page.read_text()
++            # Look for subsection ID anchors (plot types with section prefix)
++            # IDs are formatted as "section-plottype-plots" (e.g., "hydrology-timeseries-plots")
++            if "-timeseries-plots" in content or "-seasonal-plots" in content:
++                # Found a subsection anchor
++                found_subsection = True
++                break
++
++        # Should find at least one subsection
++        assert found_subsection, "No subsections found in variable group pages"
++
++
++def test_report_landing_page_summary(report_run):
++    """Test that landing page (index.html) contains summary bar."""
++    rpt = Report(report_run)
++    with tempfile.TemporaryDirectory() as outdir:
++        html_path = rpt.build(outdir)
++        content = html_path.read_text()
++
++        # Summary bar should be on landing page
++        assert "summary-bar" in content
++        assert "Sections" in content
++        assert "Figures" in content

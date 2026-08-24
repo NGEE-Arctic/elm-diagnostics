@@ -1,0 +1,45 @@
+spec_id: pr-21
+spec_type: synthetic-pr-review
+spec_version: 1
+title: "feat: Show individual year lines in seasonal plots when ≤5 years"
+author: rfiorella
+source_url: https://github.com/NGEE-Arctic/elm-diagnostics/pull/21
+
+inputs:
+  source_files:
+    - .github/workflows/test.yml
+    - elm_diagnostics/config/schema.py
+    - elm_diagnostics/plots/climatology.py
+    - elm_diagnostics/plots/seasonal.py
+    - tests/fixtures/synthetic_elm.py
+    - tests/test_analysis_window_regression.py
+    - tests/test_cli.py
+    - tests/test_plots.py
+    - tests/test_report.py
+  data: []
+  baseline: null
+
+deliverables:
+  - Added show_individual_years_threshold config option to ClimatologyConfig (default: 5 years)
+  - Created compute_individual_year_seasonal_cycles() helper function in climatology.py
+  - Modified _plot_seasonal_single() for both single Run and Comparison cases
+  - Modified _plot_seasonal_faceted() for sub-gridcell faceted plots
+  - Conditional rendering based on number of years (individual lines when ≤5 years, envelope when >5)
+  - Visual design with thin semi-transparent year lines and thick mean line
+  - Added test_seasonal_individual_years_few() test (3 years shows individual lines)
+  - Added test_seasonal_individual_years_many() test (6 years shows envelope only)
+  - Added test_seasonal_individual_years_comparison() test (Comparison plots work correctly)
+
+success_criteria: []
+
+out_of_scope: []
+
+resolved_decisions: []
+
+model_specific:
+  synthetic: true
+  base_ref: main
+  head_ref: feat/seasonal-individual-years
+  pr_state: OPEN
+  skills:
+    - python-analysis-conventions
