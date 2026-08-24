@@ -15,6 +15,7 @@ from elm_diagnostics.plots.diurnal import plot_diurnal
 from elm_diagnostics.plots.histogram import plot_histogram
 from elm_diagnostics.plots.hovmuller import plot_hovmuller
 from elm_diagnostics.plots.seasonal import plot_seasonal
+from elm_diagnostics.plots.spatial import plot_map, plot_map_comparison
 from elm_diagnostics.plots.timeseries import plot_timeseries
 
 __all__ = [
@@ -22,6 +23,8 @@ __all__ = [
     "plot_diurnal",
     "plot_histogram",
     "plot_hovmuller",
+    "plot_map",
+    "plot_map_comparison",
     "plot_seasonal",
     "plot_timeseries",
 ]

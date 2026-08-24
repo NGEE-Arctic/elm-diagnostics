@@ -51,6 +51,22 @@ plots:
     color_limit_quantile_low: 2.0
     color_limit_quantile_high: 98.0
     color_limit_sigma: 2.0
+  spatial:
+    enabled: true  # Enable spatial plots for multi-gridcell data
+    time_aggregation: "mean"  # mean | median | sum | std | min | max
+    projection: "PlateCarree"  # Cartopy projection name
+    watershed_boundary: null  # Path to GeoJSON/shapefile boundary
+    domain_file: null  # Path to ELM domain file (auto-detected if null)
+    variables:  # Variables to include in spatial plot section
+      - GPP
+      - QFLX_EVAP_TOT
+      - QOVER
+      - TWS
+      - TLAI
+      - FSH
+      - FCEV
+      - FCTR
+      - FGEV
 
 io:
   strict_combine: false

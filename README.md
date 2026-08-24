@@ -6,6 +6,7 @@ Diagnostics and budget-closure tools for E3SM's ELM land model.
 
 - **Water, Carbon, and Energy Balance Diagnostics** with automatic closure checking
 - **Automatic variable derivation**: Computes missing variables like `QFLX_EVAP_TOT` from components
+- **Spatial mapping for watersheds**: Georeferenced maps with cartopy for multi-gridcell output
 - **Handles multiple file formats**: Single-point (`lndgrid`) and gridded (`lat`×`lon`) output
 - **Vertical aggregation**: Automatically sums 3D soil variables (SOILLIQ, SOILICE) over depth
 - **Unit-aware integration**: Uses `pint` for proper unit handling in flux-to-cumulative conversions
@@ -49,6 +50,12 @@ elm-diagnostics balance water /path/to/elm/output --out ./water_analysis/
 
 ```bash
 elm-diagnostics plot GPP /path/to/elm/output --kind seasonal --out gpp_seasonal.png
+```
+
+### Create Spatial Maps (for Watershed-Scale Data)
+
+```bash
+elm-diagnostics map GPP /path/to/watershed/output --out gpp_map.png
 ```
 
 ## Command-Line Interface
@@ -114,6 +121,47 @@ elm-diagnostics plot SOILLIQ /path/to/elm/output --kind hovmuller --out soilliq_
 ```
 
 **Available plot types:** `timeseries`, `hovmuller`, `seasonal`, `anomaly`, `histogram`, `diurnal`
+
+### Spatial Mapping (Watershed-Scale Visualization)
+
+**For multi-gridcell data** (watersheds, regions), generate spatial maps:
+
+```bash
+# Mean GPP across watershed
+elm-diagnostics map GPP /path/to/watershed/output --out gpp_map.png
+
+# Median precipitation with custom time aggregation
+elm-diagnostics map RAIN /path/to/watershed/output --time-agg median --out rain_map.png
+
+# Specific timestep (e.g., peak event)
+elm-diagnostics map QOVER /path/to/watershed/output --time-agg 0 --out qover_t0.png
+
+# With watershed boundary overlay
+elm-diagnostics map TWS /path/to/watershed/output --boundary watershed.geojson --out tws_map.png
+
+# Custom projection
+elm-diagnostics map GPP /path/to/watershed/output --projection Orthographic --out gpp_ortho.png
+```
+
+**Time aggregation options:** `mean`, `median`, `sum`, `std`, `min`, `max`, or integer timestep index
+
+**Requirements:** Install with maps support: `pip install 'elm-diagnostics[maps]'`
+
+Spatial maps automatically appear in reports when multi-gridcell data is detected. Configure via `config.yaml`:
+
+```yaml
+plots:
+  spatial:
+    enabled: true
+    time_aggregation: mean  # or median, sum, etc.
+    projection: PlateCarree  # Cartopy projection name
+    watershed_boundary: /path/to/boundary.geojson  # optional
+    variables:  # Variables to map in reports
+      - GPP
+      - QFLX_EVAP_TOT
+      - QOVER
+      - TWS
+```
 
 ### Verbosity Control
 

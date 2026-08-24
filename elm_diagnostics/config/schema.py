@@ -57,10 +57,34 @@ class HovmullerConfig(BaseModel):
     color_limit_sigma: float = Field(default=2.0, gt=0.0)
 
 
+class SpatialPlotConfig(BaseModel):
+    """Configuration for spatial map plotting of multi-gridcell data."""
+
+    enabled: bool = True
+    time_aggregation: Literal["mean", "median", "sum", "std", "min", "max"] = "mean"
+    projection: str = "PlateCarree"
+    watershed_boundary: Path | None = None
+    domain_file: Path | None = None
+    variables: list[str] = Field(
+        default_factory=lambda: [
+            "GPP",
+            "QFLX_EVAP_TOT",
+            "QOVER",
+            "TWS",
+            "TLAI",
+            "FSH",
+            "FCEV",
+            "FCTR",
+            "FGEV",
+        ]
+    )
+
+
 class PlotsConfig(BaseModel):
     style: PlotStyleConfig = PlotStyleConfig()
     climatology: ClimatologyConfig = ClimatologyConfig()
     hovmuller: HovmullerConfig = HovmullerConfig()
+    spatial: SpatialPlotConfig = SpatialPlotConfig()
 
 
 class ThumbnailConfig(BaseModel):

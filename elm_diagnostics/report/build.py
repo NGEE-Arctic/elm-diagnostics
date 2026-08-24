@@ -467,6 +467,8 @@ class Report:
                 for group_name, group in self.config.variable_groups.items()
                 if group.enabled
             )
+        if self.config.plots.spatial.enabled:
+            planned.append("Spatial Patterns")
         if sections.diagnostics:
             planned.append("Diagnostics")
         return planned
@@ -597,6 +599,12 @@ class Report:
             # --- Variable group sections ---
             if section_flags.variable_groups:
                 sections.extend(self._build_variable_sections(figdir))
+
+            # --- Spatial patterns section ---
+            if self.config.plots.spatial.enabled:
+                spatial_section = self._build_spatial_section(figdir)
+                if spatial_section is not None:
+                    sections.append(spatial_section)
 
             # --- Diagnostics section ---
             if section_flags.diagnostics:
@@ -1459,8 +1467,141 @@ class Report:
                 0.0,
                 time.perf_counter() - plot_start,
             )
+        elif plot_type == "spatial":
+            # Check if data has multiple spatial cells
+            from elm_diagnostics.plots.dimension_helpers import (
+                has_multiple_spatial_cells,
+            )
+            from elm_diagnostics.plots import plot_map, plot_map_comparison
+
+            compute_start = time.perf_counter()
+            if not has_multiple_spatial_cells(var):
+                return None, time.perf_counter() - compute_start, 0.0
+            compute_seconds = time.perf_counter() - compute_start
+
+            plot_start = time.perf_counter()
+            spatial_config = self.config.plots.spatial
+            if isinstance(self.source, Comparison):
+                fig = plot_map_comparison(
+                    self.source,
+                    varname,
+                    time_agg=spatial_config.time_aggregation,
+                    projection=spatial_config.projection,
+                    watershed_boundary=spatial_config.watershed_boundary,
+                    domain_file=spatial_config.domain_file,
+                    config=self.config,
+                )
+            else:
+                fig = plot_map(
+                    self.source,
+                    varname,
+                    time_agg=spatial_config.time_aggregation,
+                    projection=spatial_config.projection,
+                    watershed_boundary=spatial_config.watershed_boundary,
+                    domain_file=spatial_config.domain_file,
+                    config=self.config,
+                )
+            return (
+                fig,
+                compute_seconds,
+                time.perf_counter() - plot_start,
+            )
         else:
             return None, 0.0, 0.0
+
+    def _build_spatial_section(self, figdir: Path) -> _Section | None:
+        """Build spatial patterns section for multi-gridcell data.
+
+        Returns None if data is single-point (no spatial variation).
+        """
+        from elm_diagnostics.plots.dimension_helpers import has_multiple_spatial_cells
+
+        spatial_config = self.config.plots.spatial
+        if not spatial_config.enabled:
+            return None
+
+        # Check if any variable has spatial variation
+        run = self._run
+        has_spatial_data = False
+        for varname in spatial_config.variables:
+            if run.has(varname):
+                var = run.get(varname)
+                if has_multiple_spatial_cells(var):
+                    has_spatial_data = True
+                    break
+
+        if not has_spatial_data:
+            return None
+
+        section_title = "Spatial Patterns"
+        section_start = time.perf_counter()
+        self._announce_section_progress(section_title)
+
+        sec = _Section(
+            section_title,
+            f"Spatial maps of key variables (time aggregation: {spatial_config.time_aggregation})",
+        )
+
+        io_seconds = 0.0
+        compute_seconds = 0.0
+        plot_seconds = 0.0
+
+        for varname in spatial_config.variables:
+            if not run.has(varname):
+                continue
+
+            compute_start = time.perf_counter()
+            var = run.get(varname)
+            base_var = None
+            if isinstance(self.source, Comparison):
+                base_var = self.source.base.get(varname)
+
+            # Check if this variable has spatial variation
+            if not has_multiple_spatial_cells(var):
+                continue
+
+            compute_seconds += time.perf_counter() - compute_start
+
+            # Create spatial plot
+            fig: plt.Figure | None = None
+            try:
+                fig, plot_compute_seconds, plot_render_seconds = self._create_plot(
+                    "spatial",
+                    varname,
+                    var,
+                    base_var,
+                    None,
+                )
+                compute_seconds += plot_compute_seconds
+                plot_seconds += plot_render_seconds
+
+                if fig is not None:
+                    basename = f"spatial_{varname}"
+                    io_start = time.perf_counter()
+                    full_path, thumb_path = self._save_figure(fig, figdir, basename)
+                    io_seconds += time.perf_counter() - io_start
+
+                    caption = f"{varname} spatial distribution"
+                    sec.add_figure(full_path, thumb_path, caption)
+            except Exception as e:
+                logger.warning(f"Failed to create spatial plot for {varname}: {e}")
+                self._add_warning(f"Spatial plot failed for {varname}: {str(e)}")
+            finally:
+                if fig is not None:
+                    plt.close(fig)
+
+        # Record timing
+        self._section_timings.append(
+            {
+                "title": section_title,
+                "total_seconds": time.perf_counter() - section_start,
+                "io_seconds": io_seconds,
+                "compute_seconds": compute_seconds,
+                "plot_seconds": plot_seconds,
+            }
+        )
+
+        return sec if sec.figures or sec.tables or sec.subsections else None
 
     def _build_diagnostics_section(self) -> _Section:
         """Build diagnostics section showing errors and warnings."""

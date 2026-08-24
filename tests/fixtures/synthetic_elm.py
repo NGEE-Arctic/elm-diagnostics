@@ -613,12 +613,16 @@ def make_met_forcing_dataset(
     # FSDS: 50–400 W/m² — more radiation in summer
     fsds_base = 200.0
     fsds_amp = 150.0
-    fsds = np.clip(fsds_base + fsds_amp * (-seasonal) + rng.normal(0, 10, size=n), 5.0, 450.0)
+    fsds = np.clip(
+        fsds_base + fsds_amp * (-seasonal) + rng.normal(0, 10, size=n), 5.0, 450.0
+    )
 
     # FLDS: 200–350 W/m² — weakly seasonal (higher in warm months)
     flds_base = 280.0
     flds_amp = 40.0
-    flds = np.clip(flds_base - flds_amp * seasonal + rng.normal(0, 5, size=n), 150.0, 380.0)
+    flds = np.clip(
+        flds_base - flds_amp * seasonal + rng.normal(0, 5, size=n), 150.0, 380.0
+    )
 
     # WIND: 1–10 m/s with some noise
     wind = np.clip(4.0 + rng.normal(0, 1.5, size=n), 0.5, 15.0)
@@ -629,7 +633,9 @@ def make_met_forcing_dataset(
     # QBOT: 0.001–0.015 kg/kg — higher in warm months
     qbot_base = 0.005
     qbot_amp = 0.004
-    qbot = np.clip(qbot_base - qbot_amp * seasonal + rng.normal(0, 0.0003, size=n), 5e-4, 0.025)
+    qbot = np.clip(
+        qbot_base - qbot_amp * seasonal + rng.normal(0, 0.0003, size=n), 5e-4, 0.025
+    )
 
     # RAIN/SNOW: split total precip by temperature
     total_precip = np.clip(rng.uniform(1e-6, 5e-5, size=n), 0, None)
@@ -694,6 +700,343 @@ def make_met_forcing_dataset(
         calendar=calendar,
         variables=variables,
     )
+
+
+def make_gridded_dataset(
+    nlat: int = 3,
+    nlon: int = 3,
+    start_year: int = 2000,
+    n_months: int = 12,
+    calendar: str = "noleap",
+    add_spatial_gradient: bool = True,
+) -> xr.Dataset:
+    """Build a multi-gridcell lat/lon dataset for spatial plotting tests.
+
+    Parameters
+    ----------
+    nlat : int, default 3
+        Number of latitude points
+    nlon : int, default 3
+        Number of longitude points
+    start_year : int, default 2000
+    n_months : int, default 12
+    calendar : str, default "noleap"
+    add_spatial_gradient : bool, default True
+        If True, add spatial gradients to variables (e.g., GPP higher at lower latitudes)
+
+    Returns
+    -------
+    xr.Dataset
+        Dataset with (time, lat, lon) dimensions and water/carbon variables
+    """
+    n = n_months
+    times, time_bounds_data = make_time_axis(start_year, n_months, calendar)
+
+    # Create lat/lon coordinates (small region for testing)
+    lat = np.linspace(40.0, 45.0, nlat)
+    lon = np.linspace(-120.0, -115.0, nlon)
+
+    # Compute time deltas for flux integration
+    dts = np.array(
+        [
+            (time_bounds_data[i, 1] - time_bounds_data[i, 0]).days * 86400.0
+            for i in range(n)
+        ]
+    )
+
+    # Initialize arrays with (time, lat, lon) shape
+    rng = np.random.RandomState(42)
+
+    # Base values (spatially uniform)
+    rain_base = rng.uniform(1e-6, 5e-5, size=n).astype(np.float64)
+    snow_base = rng.uniform(0, 1e-5, size=n).astype(np.float64)
+    gpp_base = rng.uniform(5e-6, 15e-6, size=n).astype(np.float64)
+
+    # Add seasonal pattern
+    month_of_year = np.arange(n) % 12
+    seasonal_factor = 1 + 0.5 * np.sin(2 * np.pi * month_of_year / 12)
+    gpp_base = gpp_base * seasonal_factor
+
+    if add_spatial_gradient:
+        # Create spatial gradients (broadcasts to correct shape)
+        # Latitude gradient: higher GPP at lower latitudes (warmer)
+        lat_factor = 1.0 + 0.3 * ((45.0 - lat) / 5.0)  # (nlat,)
+        # Longitude gradient: higher precip at western edge (windward)
+        lon_factor = 1.0 + 0.2 * ((-115.0 - lon) / 5.0)  # (nlon,)
+
+        # Create 2D spatial factors
+        spatial_rain_factor = np.ones((nlat, nlon)) * lon_factor[None, :]
+        spatial_gpp_factor = lat_factor[:, None] * np.ones((nlat, nlon))
+
+        # Apply gradients (broadcasting)
+        rain_3d = rain_base[:, None, None] * spatial_rain_factor[None, :, :]
+        snow_3d = snow_base[:, None, None] * spatial_rain_factor[None, :, :]
+        gpp_3d = gpp_base[:, None, None] * spatial_gpp_factor[None, :, :]
+    else:
+        # No spatial variation
+        rain_3d = np.broadcast_to(rain_base[:, None, None], (n, nlat, nlon))
+        snow_3d = np.broadcast_to(snow_base[:, None, None], (n, nlat, nlon))
+        gpp_3d = np.broadcast_to(gpp_base[:, None, None], (n, nlat, nlon))
+
+    # Outputs (construct for water balance closure at each grid cell)
+    total_input = rain_3d + snow_3d
+
+    # Spatially-varying evaporation fractions
+    evap_frac = rng.uniform(0.3, 0.5, size=(n, nlat, nlon))
+    runoff_frac = rng.uniform(0.1, 0.2, size=(n, nlat, nlon))
+    drain_frac = rng.uniform(0.05, 0.1, size=(n, nlat, nlon))
+
+    # Normalize to leave room for storage change
+    output_frac = evap_frac + runoff_frac + drain_frac
+    output_frac = np.clip(output_frac, 0, 0.9)
+    scale = output_frac / (evap_frac + runoff_frac + drain_frac)
+    evap_frac *= scale
+    runoff_frac *= scale
+    drain_frac *= scale
+
+    evap_tot = total_input * evap_frac
+    qover = total_input * runoff_frac
+    qdrai = total_input * drain_frac
+
+    # Storage change per grid cell
+    ds_dt_rate = total_input - evap_tot - qover - qdrai
+
+    # Cumulative storage per grid cell
+    ds_cumulative = np.cumsum(ds_dt_rate * dts[:, None, None], axis=0)
+    initial_storage = 500.0 + rng.uniform(
+        -50, 50, size=(nlat, nlon)
+    )  # Spatial variation
+    storage_3d = initial_storage[None, :, :] + ds_cumulative
+
+    # Partition storage
+    soilliq = storage_3d * 0.6
+    soilice = storage_3d * 0.2
+    h2osno = storage_3d * 0.1
+    h2ocan = storage_3d * 0.05
+    h2osfc = storage_3d * 0.05
+
+    # Build dataset following same pattern as make_single_point_dataset
+    coords = {
+        "time": times,
+        "lat": lat,
+        "lon": lon,
+    }
+
+    ds = xr.Dataset(coords=coords)
+
+    # Add time_bounds
+    ds["time_bounds"] = xr.DataArray(
+        time_bounds_data,
+        dims=["time", "ntb"],
+    )
+
+    # Add grid cell area (for area-weighted statistics testing)
+    dlat = np.abs(lat[1] - lat[0]) if nlat > 1 else 1.0
+    dlon = np.abs(lon[1] - lon[0]) if nlon > 1 else 1.0
+    lat_2d, lon_2d = np.meshgrid(lat, lon, indexing="ij")
+    area_2d = np.cos(np.deg2rad(lat_2d)) * dlat * dlon * 111000.0**2
+    ds["AREA"] = xr.DataArray(
+        area_2d,
+        dims=["lat", "lon"],
+        attrs={"units": "m^2", "long_name": "grid cell area"},
+    )
+
+    # Add variables
+    variables = {
+        "RAIN": (rain_3d, "mm/s", "time: mean"),
+        "SNOW": (snow_3d, "mm/s", "time: mean"),
+        "QFLX_EVAP_TOT": (evap_tot, "mm/s", "time: mean"),
+        "QOVER": (qover, "mm/s", "time: mean"),
+        "QDRAI": (qdrai, "mm/s", "time: mean"),
+        "QDRAI_PERCH": (np.zeros((n, nlat, nlon)), "mm/s", "time: mean"),
+        "QSNOMELT": (np.zeros((n, nlat, nlon)), "mm/s", "time: mean"),
+        "SOILLIQ": (soilliq, "kg/m2", "time: point"),
+        "SOILICE": (soilice, "kg/m2", "time: point"),
+        "H2OSNO": (h2osno, "mm", "time: point"),
+        "H2OCAN": (h2ocan, "mm", "time: point"),
+        "H2OSFC": (h2osfc, "mm", "time: point"),
+        "GPP": (gpp_3d, "gC/m^2/s", "time: mean"),
+        # ET components for derived variable testing
+        "QSOIL": (evap_tot * 0.4, "mm/s", "time: mean"),
+        "QVEGE": (evap_tot * 0.3, "mm/s", "time: mean"),
+        "QVEGT": (evap_tot * 0.3, "mm/s", "time: mean"),
+    }
+
+    for name, (data, units, cell_methods) in variables.items():
+        ds[name] = xr.DataArray(
+            data,
+            dims=["time", "lat", "lon"],
+            attrs={"units": units, "cell_methods": cell_methods},
+        )
+
+    return ds
+
+
+def make_lndgrid_dataset(
+    ncells: int = 9,
+    start_year: int = 2000,
+    n_months: int = 12,
+    calendar: str = "noleap",
+    add_spatial_gradient: bool = True,
+) -> tuple[xr.Dataset, xr.Dataset]:
+    """Build an unstructured lndgrid dataset plus domain file for spatial testing.
+
+    Parameters
+    ----------
+    ncells : int, default 9
+        Number of unstructured grid cells
+    start_year : int, default 2000
+    n_months : int, default 12
+    calendar : str, default "noleap"
+    add_spatial_gradient : bool, default True
+        If True, add spatial gradients to variables
+
+    Returns
+    -------
+    ds : xr.Dataset
+        ELM history dataset with lndgrid dimension
+    domain_ds : xr.Dataset
+        Domain file with xc/yc coordinates for lndgrid
+    """
+    n = n_months
+    times, time_bounds_data = make_time_axis(start_year, n_months, calendar)
+
+    # Create scattered lat/lon points (unstructured)
+    rng = np.random.RandomState(123)
+    lat_pts = 40.0 + rng.uniform(0, 5.0, size=ncells)
+    lon_pts = -120.0 + rng.uniform(0, 5.0, size=ncells)
+
+    # Compute time deltas
+    dts = np.array(
+        [
+            (time_bounds_data[i, 1] - time_bounds_data[i, 0]).days * 86400.0
+            for i in range(n)
+        ]
+    )
+
+    # Base values
+    rain_base = rng.uniform(1e-6, 5e-5, size=n).astype(np.float64)
+    snow_base = rng.uniform(0, 1e-5, size=n).astype(np.float64)
+    gpp_base = rng.uniform(5e-6, 15e-6, size=n).astype(np.float64)
+
+    # Seasonal pattern
+    month_of_year = np.arange(n) % 12
+    seasonal_factor = 1 + 0.5 * np.sin(2 * np.pi * month_of_year / 12)
+    gpp_base = gpp_base * seasonal_factor
+
+    if add_spatial_gradient:
+        # Spatial factors per cell
+        lat_factor = 1.0 + 0.3 * ((45.0 - lat_pts) / 5.0)
+        lon_factor = 1.0 + 0.2 * ((-115.0 - lon_pts) / 5.0)
+
+        rain_2d = rain_base[:, None] * lon_factor[None, :]
+        snow_2d = snow_base[:, None] * lon_factor[None, :]
+        gpp_2d = gpp_base[:, None] * lat_factor[None, :]
+    else:
+        rain_2d = np.broadcast_to(rain_base[:, None], (n, ncells))
+        snow_2d = np.broadcast_to(snow_base[:, None], (n, ncells))
+        gpp_2d = np.broadcast_to(gpp_base[:, None], (n, ncells))
+
+    # Construct water balance closure per cell
+    total_input = rain_2d + snow_2d
+
+    evap_frac = rng.uniform(0.3, 0.5, size=(n, ncells))
+    runoff_frac = rng.uniform(0.1, 0.2, size=(n, ncells))
+    drain_frac = rng.uniform(0.05, 0.1, size=(n, ncells))
+
+    output_frac = evap_frac + runoff_frac + drain_frac
+    output_frac = np.clip(output_frac, 0, 0.9)
+    scale = output_frac / (evap_frac + runoff_frac + drain_frac)
+    evap_frac *= scale
+    runoff_frac *= scale
+    drain_frac *= scale
+
+    evap_tot = total_input * evap_frac
+    qover = total_input * runoff_frac
+    qdrai = total_input * drain_frac
+
+    ds_dt_rate = total_input - evap_tot - qover - qdrai
+    ds_cumulative = np.cumsum(ds_dt_rate * dts[:, None], axis=0)
+    initial_storage = 500.0 + rng.uniform(-50, 50, size=ncells)
+    storage_2d = initial_storage[None, :] + ds_cumulative
+
+    soilliq = storage_2d * 0.6
+    soilice = storage_2d * 0.2
+    h2osno = storage_2d * 0.1
+    h2ocan = storage_2d * 0.05
+    h2osfc = storage_2d * 0.05
+
+    # Build history dataset
+    coords = {
+        "time": times,
+        "lndgrid": np.arange(1, ncells + 1),  # 1-indexed
+    }
+
+    ds = xr.Dataset(coords=coords)
+    ds["time_bounds"] = xr.DataArray(time_bounds_data, dims=["time", "ntb"])
+
+    variables = {
+        "RAIN": (rain_2d, "mm/s", "time: mean"),
+        "SNOW": (snow_2d, "mm/s", "time: mean"),
+        "QFLX_EVAP_TOT": (evap_tot, "mm/s", "time: mean"),
+        "QOVER": (qover, "mm/s", "time: mean"),
+        "QDRAI": (qdrai, "mm/s", "time: mean"),
+        "QDRAI_PERCH": (np.zeros((n, ncells)), "mm/s", "time: mean"),
+        "QSNOMELT": (np.zeros((n, ncells)), "mm/s", "time: mean"),
+        "SOILLIQ": (soilliq, "kg/m2", "time: point"),
+        "SOILICE": (soilice, "kg/m2", "time: point"),
+        "H2OSNO": (h2osno, "mm", "time: point"),
+        "H2OCAN": (h2ocan, "mm", "time: point"),
+        "H2OSFC": (h2osfc, "mm", "time: point"),
+        "GPP": (gpp_2d, "gC/m^2/s", "time: mean"),
+        "QSOIL": (evap_tot * 0.4, "mm/s", "time: mean"),
+        "QVEGE": (evap_tot * 0.3, "mm/s", "time: mean"),
+        "QVEGT": (evap_tot * 0.3, "mm/s", "time: mean"),
+    }
+
+    for name, (data, units, cell_methods) in variables.items():
+        da = xr.DataArray(
+            data,
+            dims=["time", "lndgrid"],
+            attrs={"units": units, "cell_methods": cell_methods},
+            name=name,
+        )
+        ds[name] = da
+
+    # Build domain file (matches ELM domain file structure)
+    domain_coords = {"ni": np.arange(1, ncells + 1)}  # Same as lndgrid
+    domain_ds = xr.Dataset(coords=domain_coords)
+
+    # Cell area (rough approximation)
+    area = np.cos(np.deg2rad(lat_pts)) * 0.25 * 111000.0**2  # m^2
+
+    domain_ds["xc"] = xr.DataArray(
+        lon_pts,
+        dims=["ni"],
+        attrs={"units": "degrees_east", "long_name": "longitude of grid cell center"},
+    )
+    domain_ds["yc"] = xr.DataArray(
+        lat_pts,
+        dims=["ni"],
+        attrs={"units": "degrees_north", "long_name": "latitude of grid cell center"},
+    )
+    domain_ds["area"] = xr.DataArray(
+        area,
+        dims=["ni"],
+        attrs={"units": "m^2", "long_name": "area of grid cell"},
+    )
+    domain_ds["mask"] = xr.DataArray(
+        np.ones(ncells, dtype=np.int32),
+        dims=["ni"],
+        attrs={"long_name": "land mask: 1 = land, 0 = ocean"},
+    )
+    domain_ds["frac"] = xr.DataArray(
+        np.ones(ncells),
+        dims=["ni"],
+        attrs={"long_name": "fraction of grid cell that is active"},
+    )
+
+    return ds, domain_ds
 
 
 def save_as_elm_files(

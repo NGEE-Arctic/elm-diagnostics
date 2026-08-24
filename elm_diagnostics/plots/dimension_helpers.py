@@ -161,3 +161,27 @@ def format_level_label(level_value: object, level_name: str, units: str = "") ->
     except (TypeError, ValueError):
         pass
     return f"{level_name}={level_value}{suffix}"
+
+
+def has_multiple_spatial_cells(da: xr.DataArray) -> bool:
+    """Check if data has multiple spatial grid cells.
+
+    Parameters
+    ----------
+    da : xr.DataArray
+        Data array to check
+
+    Returns
+    -------
+    bool
+        True if data has lat/lon or lndgrid dimension with size > 1
+    """
+    if "lat" in da.dims and da.sizes["lat"] > 1:
+        return True
+    if "lon" in da.dims and da.sizes["lon"] > 1:
+        return True
+    if "lndgrid" in da.dims and da.sizes["lndgrid"] > 1:
+        return True
+    if "gridcell" in da.dims and da.sizes["gridcell"] > 1:
+        return True
+    return False
