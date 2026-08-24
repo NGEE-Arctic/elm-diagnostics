@@ -47,7 +47,14 @@ class ClimatologyConfig(BaseModel):
     climo_start_year: int = -1
     climo_end_year: int = -1
     envelope: Literal["minmax", "p10_p90", "std"] = "minmax"
-    show_individual_years_threshold: int = 5
+    show_individual_years_threshold: int = Field(
+        default=5,
+        description=(
+            "Maximum number of years for individual year line rendering. "
+            "When data span ≤ this many years, individual year lines are shown. "
+            "When data span > this many years, an envelope is shown instead."
+        ),
+    )
 
 
 class HovmullerConfig(BaseModel):

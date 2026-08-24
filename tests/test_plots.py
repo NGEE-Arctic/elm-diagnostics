@@ -764,6 +764,31 @@ def test_seasonal_individual_years_many():
     plt.close("all")
 
 
+def test_seasonal_individual_years_boundary():
+    """Seasonal plot shows individual year lines when exactly at threshold (5 years)."""
+    ds = make_water_balance_dataset(start_year=2000, n_months=60)  # Exactly 5 years
+    with tempfile.TemporaryDirectory() as tmpdir:
+        save_as_elm_files(ds, Path(tmpdir), casename="boundary_years", tape="h0")
+        run = Run(tmpdir)
+        fig = plot_seasonal(run, "RAIN")
+        ax = fig.axes[0]
+
+        # Should have 5 thin individual year lines + 1 thick mean line = 6 total
+        assert len(ax.lines) == 6
+        # Thick mean line should be last
+        assert ax.lines[-1].get_linewidth() > ax.lines[0].get_linewidth()
+        # Check that mean line is thicker (3.0)
+        assert ax.lines[-1].get_linewidth() == 3.0
+        # Check that individual year lines are thin (1.0)
+        assert ax.lines[0].get_linewidth() == 1.0
+
+        run.close()
+
+    import matplotlib.pyplot as plt
+
+    plt.close("all")
+
+
 def test_seasonal_individual_years_comparison():
     """Comparison seasonal plot shows individual years for both runs."""
     ds_base = make_water_balance_dataset(start_year=2000, n_months=24)

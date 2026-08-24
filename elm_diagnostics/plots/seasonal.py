@@ -23,6 +23,8 @@ from elm_diagnostics.io.subgrid import SubgridLevel
 from elm_diagnostics.plots.climatology import (
     compute_climo_stats,
     compute_individual_year_seasonal_cycles,
+    compute_individual_year_seasonal_cycles_faceted,
+    count_years_in_window,
 )
 from elm_diagnostics.plots.dimension_helpers import (
     detect_additional_dimension,
@@ -251,25 +253,34 @@ def _plot_seasonal_single(
             ]
             ax.legend(handles=run_handles, loc="upper left", fontsize="x-small")
         else:
-            # Compute number of years for individual year plotting
-            years_b, year_cycles_b = compute_individual_year_seasonal_cycles(
+            # Fast-path: count years without computing full seasonal cycles
+            n_years_b = count_years_in_window(
                 da_base,
                 config.plots.climatology.climo_start_year,
                 config.plots.climatology.climo_end_year,
             )
-            years_e, year_cycles_e = compute_individual_year_seasonal_cycles(
+            n_years_e = count_years_in_window(
                 da_exp,
                 config.plots.climatology.climo_start_year,
                 config.plots.climatology.climo_end_year,
             )
-            n_years_b = len(years_b)
-            n_years_e = len(years_e)
 
             # Use threshold: show individual years if EITHER run has ≤ threshold years
             if (
                 n_years_b <= config.plots.climatology.show_individual_years_threshold
                 or n_years_e <= config.plots.climatology.show_individual_years_threshold
             ):
+                # Compute full seasonal cycles only if needed
+                years_b, year_cycles_b = compute_individual_year_seasonal_cycles(
+                    da_base,
+                    config.plots.climatology.climo_start_year,
+                    config.plots.climatology.climo_end_year,
+                )
+                years_e, year_cycles_e = compute_individual_year_seasonal_cycles(
+                    da_exp,
+                    config.plots.climatology.climo_start_year,
+                    config.plots.climatology.climo_end_year,
+                )
                 # Plot individual year lines for base (thin, semi-transparent)
                 for year, year_mean in zip(years_b, year_cycles_b):
                     ax.plot(
@@ -278,7 +289,6 @@ def _plot_seasonal_single(
                         color="gray",
                         alpha=0.3,
                         linewidth=1,
-                        label=f"{source.base.name} {year}",
                     )
 
                 # Plot base mean as thick line
@@ -298,7 +308,6 @@ def _plot_seasonal_single(
                         color="tab:blue",
                         alpha=0.3,
                         linewidth=1,
-                        label=f"{source.experiment.name} {year}",
                     )
 
                 # Plot experiment mean as thick line
@@ -366,15 +375,20 @@ def _plot_seasonal_single(
         if level_dim is not None:
             ax.legend(loc="best", fontsize="x-small", title=f"{level_dim} levels")
         else:
-            # Compute number of years for individual year plotting
-            years, year_cycles = compute_individual_year_seasonal_cycles(
+            # Fast-path: count years without computing full seasonal cycles
+            n_years = count_years_in_window(
                 da,
                 config.plots.climatology.climo_start_year,
                 config.plots.climatology.climo_end_year,
             )
-            n_years = len(years)
 
             if n_years <= config.plots.climatology.show_individual_years_threshold:
+                # Compute full seasonal cycles only if needed
+                years, year_cycles = compute_individual_year_seasonal_cycles(
+                    da,
+                    config.plots.climatology.climo_start_year,
+                    config.plots.climatology.climo_end_year,
+                )
                 # Plot individual year lines (thin, semi-transparent)
                 for year, year_mean in zip(years, year_cycles):
                     ax.plot(
@@ -457,6 +471,65 @@ def _plot_seasonal_faceted(
 
     months = np.arange(1, 13)
 
+    # Pre-check if we need individual years and compute once if so (optimization)
+    years_b_faceted = None
+    year_cycles_b_faceted = None
+    years_e_faceted = None
+    year_cycles_e_faceted = None
+    years_faceted = None
+    year_cycles_faceted = None
+
+    if isinstance(source, Comparison):
+        # Count years on the full faceted data (cheaper than per-facet)
+        n_years_b = count_years_in_window(
+            da_base,
+            config.plots.climatology.climo_start_year,
+            config.plots.climatology.climo_end_year,
+        )
+        n_years_e = count_years_in_window(
+            da_exp,
+            config.plots.climatology.climo_start_year,
+            config.plots.climatology.climo_end_year,
+        )
+
+        # Pre-compute individual year cycles if needed
+        if (
+            n_years_b <= config.plots.climatology.show_individual_years_threshold
+            or n_years_e <= config.plots.climatology.show_individual_years_threshold
+        ):
+            years_b_faceted, year_cycles_b_faceted = (
+                compute_individual_year_seasonal_cycles_faceted(
+                    da_base,
+                    by,
+                    config.plots.climatology.climo_start_year,
+                    config.plots.climatology.climo_end_year,
+                )
+            )
+            years_e_faceted, year_cycles_e_faceted = (
+                compute_individual_year_seasonal_cycles_faceted(
+                    da_exp,
+                    by,
+                    config.plots.climatology.climo_start_year,
+                    config.plots.climatology.climo_end_year,
+                )
+            )
+    else:
+        # Single Run: pre-check and compute if needed
+        n_years = count_years_in_window(
+            da,
+            config.plots.climatology.climo_start_year,
+            config.plots.climatology.climo_end_year,
+        )
+        if n_years <= config.plots.climatology.show_individual_years_threshold:
+            years_faceted, year_cycles_faceted = (
+                compute_individual_year_seasonal_cycles_faceted(
+                    da,
+                    by,
+                    config.plots.climatology.climo_start_year,
+                    config.plots.climatology.climo_end_year,
+                )
+            )
+
     # Plot each subgrid unit
     for unit_id, ax_i in zip(units, axes.flat):
         if isinstance(source, Comparison):
@@ -523,29 +596,18 @@ def _plot_seasonal_faceted(
                             handles=run_handles, loc="upper left", fontsize="xx-small"
                         )
                 else:
-                    # Compute number of years for individual year plotting
-                    years_b, year_cycles_b = compute_individual_year_seasonal_cycles(
-                        da_base_unit,
-                        config.plots.climatology.climo_start_year,
-                        config.plots.climatology.climo_end_year,
-                    )
-                    years_e, year_cycles_e = compute_individual_year_seasonal_cycles(
-                        da_exp_unit,
-                        config.plots.climatology.climo_start_year,
-                        config.plots.climatology.climo_end_year,
-                    )
-                    n_years_b = len(years_b)
-                    n_years_e = len(years_e)
+                    # Check if we pre-computed individual year cycles
+                    if year_cycles_b_faceted is not None and year_cycles_e_faceted is not None:
+                        # Use pre-computed faceted arrays, slicing by unit_id
+                        year_cycles_b_unit = [
+                            yc.sel({by: unit_id}) for yc in year_cycles_b_faceted
+                        ]
+                        year_cycles_e_unit = [
+                            yc.sel({by: unit_id}) for yc in year_cycles_e_faceted
+                        ]
 
-                    # Use threshold: show individual years if EITHER run has ≤ threshold years
-                    if (
-                        n_years_b
-                        <= config.plots.climatology.show_individual_years_threshold
-                        or n_years_e
-                        <= config.plots.climatology.show_individual_years_threshold
-                    ):
                         # Plot individual year lines for base (thin, semi-transparent)
-                        for year_mean in year_cycles_b:
+                        for year_mean in year_cycles_b_unit:
                             ax_i.plot(
                                 months,
                                 year_mean.values,
@@ -564,7 +626,7 @@ def _plot_seasonal_faceted(
                         )
 
                         # Plot individual year lines for experiment (thin, semi-transparent)
-                        for year_mean in year_cycles_e:
+                        for year_mean in year_cycles_e_unit:
                             ax_i.plot(
                                 months,
                                 year_mean.values,
@@ -641,20 +703,15 @@ def _plot_seasonal_faceted(
                             loc="best", fontsize="xx-small", title=f"{level_dim} levels"
                         )
                 else:
-                    # Compute number of years for individual year plotting
-                    years, year_cycles = compute_individual_year_seasonal_cycles(
-                        da_unit,
-                        config.plots.climatology.climo_start_year,
-                        config.plots.climatology.climo_end_year,
-                    )
-                    n_years = len(years)
+                    # Check if we pre-computed individual year cycles
+                    if year_cycles_faceted is not None:
+                        # Use pre-computed faceted arrays, slicing by unit_id
+                        year_cycles_unit = [
+                            yc.sel({by: unit_id}) for yc in year_cycles_faceted
+                        ]
 
-                    if (
-                        n_years
-                        <= config.plots.climatology.show_individual_years_threshold
-                    ):
                         # Plot individual year lines (thin, semi-transparent)
-                        for year_mean in year_cycles:
+                        for year_mean in year_cycles_unit:
                             ax_i.plot(
                                 months,
                                 year_mean.values,
