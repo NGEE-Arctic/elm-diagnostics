@@ -414,13 +414,21 @@ def _add_climatology_envelope(
     if lo is None or hi is None:
         return
 
-    # Plot envelope as fill between month indices
-    month_vals = np.arange(1, 13)
+    # Map climatology values to actual dates from the timeseries
+    plot_times = _plot_time(da)
+    # Array of month numbers (1-12) for each time point
+    months = da.time.dt.month.values
+
+    # Map climatology values: for each time point, get the climo value for that month
+    lo_mapped = lo.sel(month=xr.DataArray(months, dims="time")).values
+    hi_mapped = hi.sel(month=xr.DataArray(months, dims="time")).values
+
+    # Plot using actual dates (not month indices 1-12)
     ax_twin = ax.twinx()
     ax_twin.fill_between(
-        month_vals,
-        lo.values,
-        hi.values,
+        plot_times,
+        lo_mapped,
+        hi_mapped,
         alpha=0.15,
         color="tab:blue",
         label=f"Climatology ({method})",
