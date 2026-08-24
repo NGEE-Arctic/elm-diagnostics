@@ -472,11 +472,8 @@ def _plot_seasonal_faceted(
     months = np.arange(1, 13)
 
     # Pre-check if we need individual years and compute once if so (optimization)
-    years_b_faceted = None
     year_cycles_b_faceted = None
-    years_e_faceted = None
     year_cycles_e_faceted = None
-    years_faceted = None
     year_cycles_faceted = None
 
     if isinstance(source, Comparison):
@@ -497,7 +494,7 @@ def _plot_seasonal_faceted(
             n_years_b <= config.plots.climatology.show_individual_years_threshold
             or n_years_e <= config.plots.climatology.show_individual_years_threshold
         ):
-            years_b_faceted, year_cycles_b_faceted = (
+            _years_b_faceted, year_cycles_b_faceted = (
                 compute_individual_year_seasonal_cycles_faceted(
                     da_base,
                     by,
@@ -505,7 +502,7 @@ def _plot_seasonal_faceted(
                     config.plots.climatology.climo_end_year,
                 )
             )
-            years_e_faceted, year_cycles_e_faceted = (
+            _years_e_faceted, year_cycles_e_faceted = (
                 compute_individual_year_seasonal_cycles_faceted(
                     da_exp,
                     by,
@@ -521,7 +518,7 @@ def _plot_seasonal_faceted(
             config.plots.climatology.climo_end_year,
         )
         if n_years <= config.plots.climatology.show_individual_years_threshold:
-            years_faceted, year_cycles_faceted = (
+            _years_faceted, year_cycles_faceted = (
                 compute_individual_year_seasonal_cycles_faceted(
                     da,
                     by,
@@ -597,7 +594,10 @@ def _plot_seasonal_faceted(
                         )
                 else:
                     # Check if we pre-computed individual year cycles
-                    if year_cycles_b_faceted is not None and year_cycles_e_faceted is not None:
+                    if (
+                        year_cycles_b_faceted is not None
+                        and year_cycles_e_faceted is not None
+                    ):
                         # Use pre-computed faceted arrays, slicing by unit_id
                         year_cycles_b_unit = [
                             yc.sel({by: unit_id}) for yc in year_cycles_b_faceted

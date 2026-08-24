@@ -147,7 +147,7 @@ def compute_individual_year_seasonal_cycles(
     valid_years = []
     for year in years:
         # Select data for this year
-        year_mask = (year_array == year)  # Use pre-computed array
+        year_mask = year_array == year  # Use pre-computed array
         da_year = da.isel(time=year_mask)
 
         if len(da_year.time) == 0:
@@ -163,7 +163,7 @@ def compute_individual_year_seasonal_cycles(
     # and fusion across years. For in-memory arrays, this has negligible overhead.
     if seasonal_arrays:
         # Stack all years, compute once, then unstack
-        stacked = xr.concat(seasonal_arrays, dim='temp_year')
+        stacked = xr.concat(seasonal_arrays, dim="temp_year")
         computed = stacked.compute()
         seasonal_arrays = [computed.isel(temp_year=i) for i in range(len(valid_years))]
 
@@ -217,7 +217,7 @@ def compute_individual_year_seasonal_cycles_faceted(
     valid_years = []
 
     for year in years:
-        year_mask = (year_array == year)
+        year_mask = year_array == year
         da_year = da.isel(time=year_mask)
         if len(da_year.time) == 0:
             continue
@@ -227,7 +227,7 @@ def compute_individual_year_seasonal_cycles_faceted(
 
     # Batch compute all years at once for efficiency
     if seasonal_arrays:
-        stacked = xr.concat(seasonal_arrays, dim='temp_year')
+        stacked = xr.concat(seasonal_arrays, dim="temp_year")
         computed = stacked.compute()
         seasonal_arrays = [computed.isel(temp_year=i) for i in range(len(valid_years))]
 
