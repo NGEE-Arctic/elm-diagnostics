@@ -1679,8 +1679,7 @@ class Report:
         except OSError as e:
             logger.error(f"Failed to copy assets to {assetsdir}: {e}")
             raise RuntimeError(
-                f"Cannot write to output directory {assetsdir}. "
-                "Check permissions."
+                f"Cannot write to output directory {assetsdir}. Check permissions."
             ) from e
 
     def _compute_summary_stats(self, sections: list[_Section]) -> dict:
