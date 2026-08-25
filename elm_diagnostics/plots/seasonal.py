@@ -20,7 +20,12 @@ from matplotlib.lines import Line2D
 from elm_diagnostics.config.schema import Config, load_config
 from elm_diagnostics.io.run import Comparison, Run
 from elm_diagnostics.io.subgrid import SubgridLevel
-from elm_diagnostics.plots.climatology import compute_climo_stats
+from elm_diagnostics.plots.climatology import (
+    compute_climo_stats,
+    compute_individual_year_seasonal_cycles,
+    compute_individual_year_seasonal_cycles_faceted,
+    count_years_in_window,
+)
 from elm_diagnostics.plots.dimension_helpers import (
     detect_additional_dimension,
     format_level_label,
@@ -248,27 +253,100 @@ def _plot_seasonal_single(
             ]
             ax.legend(handles=run_handles, loc="upper left", fontsize="x-small")
         else:
-            if include_climos:
-                ax.fill_between(
-                    months, lo_b.values, hi_b.values, alpha=0.2, color="gray"
-                )
-            ax.plot(
-                months, mean_b.values, color="gray", label=source.base.name, linewidth=2
+            # Fast-path: count years without computing full seasonal cycles
+            n_years_b = count_years_in_window(
+                da_base,
+                config.plots.climatology.climo_start_year,
+                config.plots.climatology.climo_end_year,
+            )
+            n_years_e = count_years_in_window(
+                da_exp,
+                config.plots.climatology.climo_start_year,
+                config.plots.climatology.climo_end_year,
             )
 
-            if include_climos:
-                ax.fill_between(
-                    months, lo_e.values, hi_e.values, alpha=0.2, color="tab:blue"
+            # Use threshold: show individual years if EITHER run has ≤ threshold years
+            if (
+                n_years_b <= config.plots.climatology.show_individual_years_threshold
+                or n_years_e <= config.plots.climatology.show_individual_years_threshold
+            ):
+                # Compute full seasonal cycles only if needed
+                years_b, year_cycles_b = compute_individual_year_seasonal_cycles(
+                    da_base,
+                    config.plots.climatology.climo_start_year,
+                    config.plots.climatology.climo_end_year,
                 )
-            ax.plot(
-                months,
-                mean_e.values,
-                color="tab:blue",
-                label=source.experiment.name,
-                linewidth=2,
-            )
+                years_e, year_cycles_e = compute_individual_year_seasonal_cycles(
+                    da_exp,
+                    config.plots.climatology.climo_start_year,
+                    config.plots.climatology.climo_end_year,
+                )
+                # Plot individual year lines for base (thin, semi-transparent)
+                for year, year_mean in zip(years_b, year_cycles_b):
+                    ax.plot(
+                        months,
+                        year_mean.values,
+                        color="gray",
+                        alpha=0.3,
+                        linewidth=1,
+                    )
 
-            ax.legend(loc="best", fontsize="small")
+                # Plot base mean as thick line
+                ax.plot(
+                    months,
+                    mean_b.values,
+                    color="gray",
+                    linewidth=3,
+                    label=f"{source.base.name} mean ({n_years_b} years)",
+                )
+
+                # Plot individual year lines for experiment (thin, semi-transparent)
+                for year, year_mean in zip(years_e, year_cycles_e):
+                    ax.plot(
+                        months,
+                        year_mean.values,
+                        color="tab:blue",
+                        alpha=0.3,
+                        linewidth=1,
+                    )
+
+                # Plot experiment mean as thick line
+                ax.plot(
+                    months,
+                    mean_e.values,
+                    color="tab:blue",
+                    linewidth=3,
+                    label=f"{source.experiment.name} mean ({n_years_e} years)",
+                )
+
+                ax.legend(loc="best", fontsize="small")
+            else:
+                # Original behavior: envelope + mean line
+                if include_climos:
+                    ax.fill_between(
+                        months, lo_b.values, hi_b.values, alpha=0.2, color="gray"
+                    )
+                ax.plot(
+                    months,
+                    mean_b.values,
+                    color="gray",
+                    label=source.base.name,
+                    linewidth=2,
+                )
+
+                if include_climos:
+                    ax.fill_between(
+                        months, lo_e.values, hi_e.values, alpha=0.2, color="tab:blue"
+                    )
+                ax.plot(
+                    months,
+                    mean_e.values,
+                    color="tab:blue",
+                    label=source.experiment.name,
+                    linewidth=2,
+                )
+
+                ax.legend(loc="best", fontsize="small")
         units = da_base.attrs.get("units", "")
     else:
         da = squeeze_spatial_dims(source.get(varname))
@@ -297,11 +375,47 @@ def _plot_seasonal_single(
         if level_dim is not None:
             ax.legend(loc="best", fontsize="x-small", title=f"{level_dim} levels")
         else:
-            if include_climos:
-                ax.fill_between(
-                    months, lo.values, hi.values, alpha=0.2, color="tab:blue"
+            # Fast-path: count years without computing full seasonal cycles
+            n_years = count_years_in_window(
+                da,
+                config.plots.climatology.climo_start_year,
+                config.plots.climatology.climo_end_year,
+            )
+
+            if n_years <= config.plots.climatology.show_individual_years_threshold:
+                # Compute full seasonal cycles only if needed
+                years, year_cycles = compute_individual_year_seasonal_cycles(
+                    da,
+                    config.plots.climatology.climo_start_year,
+                    config.plots.climatology.climo_end_year,
                 )
-            ax.plot(months, mean.values, color="tab:blue", linewidth=2)
+                # Plot individual year lines (thin, semi-transparent)
+                for year, year_mean in zip(years, year_cycles):
+                    ax.plot(
+                        months,
+                        year_mean.values,
+                        color="tab:blue",
+                        alpha=0.3,
+                        linewidth=1,
+                        label=str(year),
+                    )
+
+                # Plot multi-year mean as thick line
+                ax.plot(
+                    months,
+                    mean.values,
+                    color="tab:blue",
+                    linewidth=3,
+                    label=f"Mean ({n_years} years)",
+                )
+                ax.legend(loc="best", fontsize="small")
+            else:
+                # Original behavior: envelope + mean line
+                if include_climos:
+                    ax.fill_between(
+                        months, lo.values, hi.values, alpha=0.2, color="tab:blue"
+                    )
+                ax.plot(months, mean.values, color="tab:blue", linewidth=2)
         units = da.attrs.get("units", "")
 
     ax.set_xticks(months)
@@ -356,6 +470,62 @@ def _plot_seasonal_faceted(
     fig, axes = create_facet_figure(len(units), style)
 
     months = np.arange(1, 13)
+
+    # Pre-check if we need individual years and compute once if so (optimization)
+    year_cycles_b_faceted = None
+    year_cycles_e_faceted = None
+    year_cycles_faceted = None
+
+    if isinstance(source, Comparison):
+        # Count years on the full faceted data (cheaper than per-facet)
+        n_years_b = count_years_in_window(
+            da_base,
+            config.plots.climatology.climo_start_year,
+            config.plots.climatology.climo_end_year,
+        )
+        n_years_e = count_years_in_window(
+            da_exp,
+            config.plots.climatology.climo_start_year,
+            config.plots.climatology.climo_end_year,
+        )
+
+        # Pre-compute individual year cycles if needed
+        if (
+            n_years_b <= config.plots.climatology.show_individual_years_threshold
+            or n_years_e <= config.plots.climatology.show_individual_years_threshold
+        ):
+            _years_b_faceted, year_cycles_b_faceted = (
+                compute_individual_year_seasonal_cycles_faceted(
+                    da_base,
+                    by,
+                    config.plots.climatology.climo_start_year,
+                    config.plots.climatology.climo_end_year,
+                )
+            )
+            _years_e_faceted, year_cycles_e_faceted = (
+                compute_individual_year_seasonal_cycles_faceted(
+                    da_exp,
+                    by,
+                    config.plots.climatology.climo_start_year,
+                    config.plots.climatology.climo_end_year,
+                )
+            )
+    else:
+        # Single Run: pre-check and compute if needed
+        n_years = count_years_in_window(
+            da,
+            config.plots.climatology.climo_start_year,
+            config.plots.climatology.climo_end_year,
+        )
+        if n_years <= config.plots.climatology.show_individual_years_threshold:
+            _years_faceted, year_cycles_faceted = (
+                compute_individual_year_seasonal_cycles_faceted(
+                    da,
+                    by,
+                    config.plots.climatology.climo_start_year,
+                    config.plots.climatology.climo_end_year,
+                )
+            )
 
     # Plot each subgrid unit
     for unit_id, ax_i in zip(units, axes.flat):
@@ -423,33 +593,91 @@ def _plot_seasonal_faceted(
                             handles=run_handles, loc="upper left", fontsize="xx-small"
                         )
                 else:
-                    if include_climos:
-                        ax_i.fill_between(
-                            months, lo_b.values, hi_b.values, alpha=0.2, color="gray"
-                        )
-                    ax_i.plot(
-                        months,
-                        mean_b.values,
-                        color="gray",
-                        label=source.base.name,
-                        linewidth=2,
-                    )
-                    if include_climos:
-                        ax_i.fill_between(
+                    # Check if we pre-computed individual year cycles
+                    if (
+                        year_cycles_b_faceted is not None
+                        and year_cycles_e_faceted is not None
+                    ):
+                        # Use pre-computed faceted arrays, slicing by unit_id
+                        year_cycles_b_unit = [
+                            yc.sel({by: unit_id}) for yc in year_cycles_b_faceted
+                        ]
+                        year_cycles_e_unit = [
+                            yc.sel({by: unit_id}) for yc in year_cycles_e_faceted
+                        ]
+
+                        # Plot individual year lines for base (thin, semi-transparent)
+                        for year_mean in year_cycles_b_unit:
+                            ax_i.plot(
+                                months,
+                                year_mean.values,
+                                color="gray",
+                                alpha=0.3,
+                                linewidth=1,
+                            )
+
+                        # Plot base mean as thick line
+                        ax_i.plot(
                             months,
-                            lo_e.values,
-                            hi_e.values,
-                            alpha=0.2,
-                            color="tab:blue",
+                            mean_b.values,
+                            color="gray",
+                            linewidth=3,
+                            label=source.base.name,
                         )
-                    ax_i.plot(
-                        months,
-                        mean_e.values,
-                        color="tab:blue",
-                        label=source.experiment.name,
-                        linewidth=2,
-                    )
-                    ax_i.legend(loc="best", fontsize="x-small")
+
+                        # Plot individual year lines for experiment (thin, semi-transparent)
+                        for year_mean in year_cycles_e_unit:
+                            ax_i.plot(
+                                months,
+                                year_mean.values,
+                                color="tab:blue",
+                                alpha=0.3,
+                                linewidth=1,
+                            )
+
+                        # Plot experiment mean as thick line
+                        ax_i.plot(
+                            months,
+                            mean_e.values,
+                            color="tab:blue",
+                            linewidth=3,
+                            label=source.experiment.name,
+                        )
+
+                        ax_i.legend(loc="best", fontsize="x-small")
+                    else:
+                        # Original behavior: envelope + mean line
+                        if include_climos:
+                            ax_i.fill_between(
+                                months,
+                                lo_b.values,
+                                hi_b.values,
+                                alpha=0.2,
+                                color="gray",
+                            )
+                        ax_i.plot(
+                            months,
+                            mean_b.values,
+                            color="gray",
+                            label=source.base.name,
+                            linewidth=2,
+                        )
+                        if include_climos:
+                            ax_i.fill_between(
+                                months,
+                                lo_e.values,
+                                hi_e.values,
+                                alpha=0.2,
+                                color="tab:blue",
+                            )
+                        ax_i.plot(
+                            months,
+                            mean_e.values,
+                            color="tab:blue",
+                            label=source.experiment.name,
+                            linewidth=2,
+                        )
+                        ax_i.legend(loc="best", fontsize="x-small")
 
             units_str = da_base.attrs.get("units", "")
         else:
@@ -475,11 +703,41 @@ def _plot_seasonal_faceted(
                             loc="best", fontsize="xx-small", title=f"{level_dim} levels"
                         )
                 else:
-                    if include_climos:
-                        ax_i.fill_between(
-                            months, lo.values, hi.values, alpha=0.2, color="tab:blue"
+                    # Check if we pre-computed individual year cycles
+                    if year_cycles_faceted is not None:
+                        # Use pre-computed faceted arrays, slicing by unit_id
+                        year_cycles_unit = [
+                            yc.sel({by: unit_id}) for yc in year_cycles_faceted
+                        ]
+
+                        # Plot individual year lines (thin, semi-transparent)
+                        for year_mean in year_cycles_unit:
+                            ax_i.plot(
+                                months,
+                                year_mean.values,
+                                color="tab:blue",
+                                alpha=0.3,
+                                linewidth=1,
+                            )
+
+                        # Plot multi-year mean as thick line
+                        ax_i.plot(
+                            months,
+                            mean.values,
+                            color="tab:blue",
+                            linewidth=3,
                         )
-                    ax_i.plot(months, mean.values, color="tab:blue", linewidth=2)
+                    else:
+                        # Original behavior: envelope + mean line
+                        if include_climos:
+                            ax_i.fill_between(
+                                months,
+                                lo.values,
+                                hi.values,
+                                alpha=0.2,
+                                color="tab:blue",
+                            )
+                        ax_i.plot(months, mean.values, color="tab:blue", linewidth=2)
 
             units_str = da.attrs.get("units", "")
 

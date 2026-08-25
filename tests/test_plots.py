@@ -153,7 +153,9 @@ def test_seasonal_vertical_depth_coloring_and_legend():
     ds["levgrnd"].attrs["units"] = "m"
 
     with tempfile.TemporaryDirectory() as tmpdir:
-        save_as_elm_files(ds, Path(tmpdir), casename="vertical_seasonal_test", tape="h0")
+        save_as_elm_files(
+            ds, Path(tmpdir), casename="vertical_seasonal_test", tape="h0"
+        )
         run = Run(tmpdir)
         fig = plot_seasonal(run, "SOILLIQ")
         ax = fig.axes[0]
@@ -350,7 +352,9 @@ def test_hovmuller_max_depth_m_warns_and_ignored_for_index_axis():
     )
 
     with tempfile.TemporaryDirectory() as tmpdir:
-        save_as_elm_files(ds, Path(tmpdir), casename="hov_index_max_depth_test", tape="h0")
+        save_as_elm_files(
+            ds, Path(tmpdir), casename="hov_index_max_depth_test", tape="h0"
+        )
         run = Run(tmpdir)
 
         cfg_default = load_config()
@@ -556,7 +560,9 @@ def test_hovmuller_color_limit_quantile_reduces_outlier_influence():
     ds["levgrnd"].attrs["units"] = "m"
 
     with tempfile.TemporaryDirectory() as tmpdir:
-        save_as_elm_files(ds, Path(tmpdir), casename="hov_quantile_color_test", tape="h0")
+        save_as_elm_files(
+            ds, Path(tmpdir), casename="hov_quantile_color_test", tape="h0"
+        )
         run = Run(tmpdir)
 
         fig_full = plot_hovmuller(run, "SOILLIQ", config=_config_without_hydrology_max_levels())
@@ -585,7 +591,11 @@ def test_hovmuller_color_limit_quantile_reduces_outlier_influence():
         vmax_quantile = fig_quantile.axes[0].collections[0].get_clim()[1]
 
         assert vmax_quantile < vmax_full
-        assert fig_quantile.axes[0].collections[0].colorbar.extend in {"min", "max", "both"}
+        assert fig_quantile.axes[0].collections[0].colorbar.extend in {
+            "min",
+            "max",
+            "both",
+        }
 
         run.close()
 
@@ -727,6 +737,120 @@ def test_hovmuller_comparison_uses_shared_color_limits_with_robust_method():
         assert clim_base == pytest.approx(clim_exp)
         assert fig.axes[0].collections[0].colorbar.extend in {"min", "max", "both"}
         assert fig.axes[1].collections[0].colorbar.extend in {"min", "max", "both"}
+
+        base_run.close()
+        exp_run.close()
+
+    import matplotlib.pyplot as plt
+
+    plt.close("all")
+
+
+def test_seasonal_individual_years_few():
+    """Seasonal plot shows individual year lines when ≤5 years."""
+    ds = make_water_balance_dataset(start_year=2000, n_months=36)  # 3 years
+    with tempfile.TemporaryDirectory() as tmpdir:
+        save_as_elm_files(ds, Path(tmpdir), casename="few_years", tape="h0")
+        run = Run(tmpdir)
+        fig = plot_seasonal(run, "RAIN")
+        ax = fig.axes[0]
+
+        # Should have 3 thin individual year lines + 1 thick mean line = 4 total
+        assert len(ax.lines) == 4
+        # Thick mean line should be last
+        assert ax.lines[-1].get_linewidth() > ax.lines[0].get_linewidth()
+        # Check that mean line is thicker (3.0)
+        assert ax.lines[-1].get_linewidth() == 3.0
+        # Check that individual year lines are thin (1.0)
+        assert ax.lines[0].get_linewidth() == 1.0
+
+        run.close()
+
+    import matplotlib.pyplot as plt
+
+    plt.close("all")
+
+
+def test_seasonal_individual_years_many():
+    """Seasonal plot uses envelope when >5 years."""
+    ds = make_water_balance_dataset(start_year=2000, n_months=72)  # 6 years
+    with tempfile.TemporaryDirectory() as tmpdir:
+        save_as_elm_files(ds, Path(tmpdir), casename="many_years", tape="h0")
+        run = Run(tmpdir)
+        fig = plot_seasonal(run, "RAIN")
+        ax = fig.axes[0]
+
+        # Should have 1 mean line + 1 fill_between (envelope)
+        assert len(ax.lines) == 1
+        assert len(ax.collections) == 1  # fill_between creates a PolyCollection
+        # Mean line should be standard thickness (2.0)
+        assert ax.lines[0].get_linewidth() == 2.0
+
+        run.close()
+
+    import matplotlib.pyplot as plt
+
+    plt.close("all")
+
+
+def test_seasonal_individual_years_boundary():
+    """Seasonal plot shows individual year lines when exactly at threshold (5 years)."""
+    ds = make_water_balance_dataset(start_year=2000, n_months=60)  # Exactly 5 years
+    with tempfile.TemporaryDirectory() as tmpdir:
+        save_as_elm_files(ds, Path(tmpdir), casename="boundary_years", tape="h0")
+        run = Run(tmpdir)
+        fig = plot_seasonal(run, "RAIN")
+        ax = fig.axes[0]
+
+        # Should have 5 thin individual year lines + 1 thick mean line = 6 total
+        assert len(ax.lines) == 6
+        # Thick mean line should be last
+        assert ax.lines[-1].get_linewidth() > ax.lines[0].get_linewidth()
+        # Check that mean line is thicker (3.0)
+        assert ax.lines[-1].get_linewidth() == 3.0
+        # Check that individual year lines are thin (1.0)
+        assert ax.lines[0].get_linewidth() == 1.0
+
+        run.close()
+
+    import matplotlib.pyplot as plt
+
+    plt.close("all")
+
+
+def test_seasonal_individual_years_comparison():
+    """Comparison seasonal plot shows individual years for both runs."""
+    ds_base = make_water_balance_dataset(start_year=2000, n_months=24)
+    ds_exp = make_water_balance_dataset(start_year=2000, n_months=24)
+    # Add small perturbation to exp
+    ds_exp["RAIN"] = ds_exp["RAIN"] * 1.1
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        base_dir = Path(tmpdir) / "base"
+        exp_dir = Path(tmpdir) / "exp"
+        base_dir.mkdir()
+        exp_dir.mkdir()
+
+        save_as_elm_files(ds_base, base_dir, casename="base", tape="h0")
+        save_as_elm_files(ds_exp, exp_dir, casename="exp", tape="h0")
+
+        base_run = Run(str(base_dir))
+        exp_run = Run(str(exp_dir))
+        comparison = Comparison(base_run, exp_run)
+
+        fig = plot_seasonal(comparison, "RAIN")
+        ax = fig.axes[0]
+
+        # 2 years × 2 runs = 4 individual lines + 2 thick mean lines = 6 total
+        assert len(ax.lines) == 6
+
+        # Check that we have 2 thick mean lines (linewidth=3.0)
+        thick_lines = [line for line in ax.lines if line.get_linewidth() == 3.0]
+        assert len(thick_lines) == 2
+
+        # Check that we have 4 thin individual year lines (linewidth=1.0)
+        thin_lines = [line for line in ax.lines if line.get_linewidth() == 1.0]
+        assert len(thin_lines) == 4
 
         base_run.close()
         exp_run.close()

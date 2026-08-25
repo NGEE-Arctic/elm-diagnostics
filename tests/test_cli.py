@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import os
+import signal
 import subprocess
 
 import pytest
@@ -16,6 +18,50 @@ from tests.fixtures.synthetic_elm import (
 )
 
 runner = CliRunner()
+
+# Subprocess timeouts. CI runners are much slower and far more variable than a dev
+# laptop, so allow generous budgets and let them be tuned via the environment.
+CLI_HELP_TIMEOUT = int(os.environ.get("ELM_DIAGNOSTICS_TEST_HELP_TIMEOUT", "60"))
+CLI_REPORT_TIMEOUT = int(os.environ.get("ELM_DIAGNOSTICS_TEST_REPORT_TIMEOUT", "600"))
+
+
+def run_cli(args: list[str], timeout: int) -> subprocess.CompletedProcess:
+    """Run the installed ``elm-diagnostics`` console script, dumping stacks on hang.
+
+    ``report`` has hung on CI a handful of times: the run never finishes, while
+    every other test on the same runner keeps normal pace, so it is a deadlock
+    rather than a slow machine. Plot rendering pulls data through dask's threaded
+    scheduler onto netCDF4/HDF5, which serializes on a global lock, and that
+    combination is a known intermittent-deadlock surface.
+
+    A bare ``TimeoutExpired`` says nothing about where the process was stuck, so
+    run the child with faulthandler enabled and SIGABRT it on timeout. That makes
+    it print a traceback for every thread, turning the next occurrence into a
+    diagnosis instead of another blind timeout bump.
+    """
+    env = dict(os.environ, PYTHONFAULTHANDLER="1")
+    proc = subprocess.Popen(
+        args,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        env=env,
+    )
+    try:
+        stdout, stderr = proc.communicate(timeout=timeout)
+    except subprocess.TimeoutExpired:
+        proc.send_signal(signal.SIGABRT)
+        try:
+            _, stacks = proc.communicate(timeout=60)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+            _, stacks = proc.communicate()
+            stacks = f"(child ignored SIGABRT; killed)\n{stacks}"
+        pytest.fail(
+            f"{' '.join(args)} did not finish within {timeout}s.\n"
+            f"Thread stacks at the time of the hang:\n{stacks}"
+        )
+    return subprocess.CompletedProcess(args, proc.returncode, stdout, stderr)
 
 
 @pytest.fixture
@@ -69,7 +115,8 @@ def test_report_command_help():
     assert "Generate a full diagnostics report" in result.output
     # Strip ANSI codes to handle CI terminal width differences
     import re
-    output_clean = re.sub(r'\x1b\[[0-9;]*m', '', result.output)
+
+    output_clean = re.sub(r"\x1b\[[0-9;]*m", "", result.output)
     assert "--compare" in output_clean
     assert "--config" in output_clean
     assert "--year" not in output_clean
@@ -104,7 +151,9 @@ def test_report_command_basic(synthetic_data_dir, temp_output_dir):
     assert (temp_output_dir / "index.html").exists()
 
 
-def test_report_with_analysis_window_config(synthetic_data_dir, temp_output_dir, tmp_path):
+def test_report_with_analysis_window_config(
+    synthetic_data_dir, temp_output_dir, tmp_path
+):
     """Test report generation using year window in config."""
     config_file = tmp_path / "analysis_window.yaml"
     config_file.write_text(
@@ -531,24 +580,14 @@ def test_help_exit_code():
 
 def test_cli_installed():
     """Integration test: verify CLI command is in PATH."""
-    result = subprocess.run(
-        ["elm-diagnostics", "--help"],
-        capture_output=True,
-        text=True,
-        timeout=10,
-    )
+    result = run_cli(["elm-diagnostics", "--help"], timeout=CLI_HELP_TIMEOUT)
     assert result.returncode == 0
     assert "Diagnostics and budget-closure" in result.stdout
 
 
 def test_cli_entry_point_version():
     """Integration test: verify CLI entry point works."""
-    result = subprocess.run(
-        ["elm-diagnostics", "--help"],
-        capture_output=True,
-        text=True,
-        timeout=10,
-    )
+    result = run_cli(["elm-diagnostics", "--help"], timeout=CLI_HELP_TIMEOUT)
     assert result.returncode == 0
     assert "report" in result.stdout
     assert "balance" in result.stdout
@@ -556,20 +595,39 @@ def test_cli_entry_point_version():
 
 
 @pytest.mark.slow
-def test_cli_end_to_end_subprocess(synthetic_data_dir, temp_output_dir):
-    """Integration test: full report generation via subprocess."""
-    result = subprocess.run(
+def test_cli_end_to_end_subprocess(synthetic_data_dir, temp_output_dir, tmp_path):
+    """Integration test: report generation via the installed console script.
+
+    This test exists to verify the packaging path — that ``elm-diagnostics`` is
+    on PATH, imports cleanly in a fresh interpreter, and writes a report — not
+    to re-check plot content. The variable-group sections render ~250 figures
+    and account for the large majority of report runtime, so they are disabled
+    here; ``test_report_command_basic`` still exercises the full default report
+    in-process. Balance sections are kept so the run remains a real report.
+    """
+    config_file = tmp_path / "end_to_end_config.yaml"
+    config_file.write_text(
+        """
+report:
+  sections:
+    variable_groups: false
+  thumbnails:
+    enabled: false
+"""
+    )
+
+    result = run_cli(
         [
             "elm-diagnostics",
             "report",
             str(synthetic_data_dir),
             "--out",
             str(temp_output_dir),
+            "--config",
+            str(config_file),
             "--quiet",
         ],
-        capture_output=True,
-        text=True,
-        timeout=300,
+        timeout=CLI_REPORT_TIMEOUT,
     )
     assert result.returncode == 0
     assert "Report generated" in result.stdout
@@ -611,7 +669,9 @@ plots:
     assert (temp_output_dir / "index.html").exists()
 
 
-def test_balance_with_analysis_window_config(synthetic_data_dir, temp_output_dir, tmp_path):
+def test_balance_with_analysis_window_config(
+    synthetic_data_dir, temp_output_dir, tmp_path
+):
     """Test balance command uses year window in config."""
     config_file = tmp_path / "analysis_window.yaml"
     config_file.write_text(

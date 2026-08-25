@@ -74,6 +74,35 @@ def compute_climo_stats(
     return mean, lo, hi
 
 
+def count_years_in_window(
+    da: xr.DataArray, climo_start_year: int = -1, climo_end_year: int = -1
+) -> int:
+    """Fast year count without computing seasonal cycles.
+
+    Returns the number of unique years in the data window without
+    performing expensive groupby operations.
+
+    Parameters
+    ----------
+    da : xr.DataArray
+        Input data with a time dimension.
+    climo_start_year : int, optional
+        Start year for filtering (-1 = earliest available).
+    climo_end_year : int, optional
+        End year for filtering (-1 = latest available).
+
+    Returns
+    -------
+    int
+        Number of unique years in the filtered data.
+    """
+    da = subset_climo_years(da, climo_start_year, climo_end_year)
+    if len(da.time) == 0:
+        return 0
+    times = da.time.values
+    return len({_get_year(t) for t in times})
+
+
 def compute_individual_year_seasonal_cycles(
     da: xr.DataArray,
     climo_start_year: int = -1,
@@ -110,21 +139,96 @@ def compute_individual_year_seasonal_cycles(
 
     # Extract unique years
     times = da.time.values
-    years = sorted({_get_year(t) for t in times})
+    year_array = np.array([_get_year(t) for t in times])  # Extract once
+    years = sorted(set(year_array))
 
-    # Compute seasonal cycle for each year
+    # Compute seasonal cycle for each year (keep lazy for better task fusion)
     seasonal_arrays = []
+    valid_years = []
     for year in years:
         # Select data for this year
-        year_mask = np.array([_get_year(t) == year for t in times])
+        year_mask = year_array == year  # Use pre-computed array
         da_year = da.isel(time=year_mask)
 
         if len(da_year.time) == 0:
             continue
 
-        # Compute monthly means for this year
+        # Compute monthly means for this year (keep lazy)
         monthly_mean = da_year.groupby("time.month").mean()
 
         seasonal_arrays.append(monthly_mean)
+        valid_years.append(year)
 
-    return years, seasonal_arrays
+    # Batch computation: for dask-backed arrays, this allows task graph optimization
+    # and fusion across years. For in-memory arrays, this has negligible overhead.
+    if seasonal_arrays:
+        # Stack all years, compute once, then unstack
+        stacked = xr.concat(seasonal_arrays, dim="temp_year")
+        computed = stacked.compute()
+        seasonal_arrays = [computed.isel(temp_year=i) for i in range(len(valid_years))]
+
+    return valid_years, seasonal_arrays
+
+
+def compute_individual_year_seasonal_cycles_faceted(
+    da: xr.DataArray,
+    facet_dim: str,
+    climo_start_year: int = -1,
+    climo_end_year: int = -1,
+) -> tuple[list[int], list[xr.DataArray]]:
+    """Compute seasonal cycles by year, preserving facet dimension.
+
+    Similar to compute_individual_year_seasonal_cycles but preserves
+    the facet dimension (column/pft/landunit) through computation, allowing
+    efficient batch processing for faceted plots.
+
+    Parameters
+    ----------
+    da : xr.DataArray
+        Input data with a time dimension and a facet dimension.
+    facet_dim : str
+        Name of the facet dimension to preserve (e.g., 'column', 'pft', 'landunit').
+    climo_start_year : int, optional
+        Start year for filtering (-1 = earliest available).
+    climo_end_year : int, optional
+        End year for filtering (-1 = latest available).
+
+    Returns
+    -------
+    years : list[int]
+        Years in the data window.
+    seasonal_arrays : list[xr.DataArray]
+        Monthly means for each year, with facet_dim preserved.
+        Each array has dimensions (month, facet_dim, ...).
+    """
+    # Filter to requested year range
+    da = subset_climo_years(da, climo_start_year, climo_end_year)
+
+    if len(da.time) == 0:
+        return [], []
+
+    # Extract unique years
+    times = da.time.values
+    year_array = np.array([_get_year(t) for t in times])
+    years = sorted(set(year_array))
+
+    # Compute seasonal cycle for each year, preserving facet dimension
+    seasonal_arrays = []
+    valid_years = []
+
+    for year in years:
+        year_mask = year_array == year
+        da_year = da.isel(time=year_mask)
+        if len(da_year.time) == 0:
+            continue
+        monthly_mean = da_year.groupby("time.month").mean()
+        seasonal_arrays.append(monthly_mean)
+        valid_years.append(year)
+
+    # Batch compute all years at once for efficiency
+    if seasonal_arrays:
+        stacked = xr.concat(seasonal_arrays, dim="temp_year")
+        computed = stacked.compute()
+        seasonal_arrays = [computed.isel(temp_year=i) for i in range(len(valid_years))]
+
+    return valid_years, seasonal_arrays
