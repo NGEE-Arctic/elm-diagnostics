@@ -18,7 +18,6 @@ import xarray as xr
 from elm_diagnostics import Run, WaterBalance
 from elm_diagnostics.io.derived import compute_total_et
 
-
 # Path to the real h0 file (any file from the set will work - Run auto-discovers all)
 REAL_H0_FILE = (
     Path(__file__).parent

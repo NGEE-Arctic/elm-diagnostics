@@ -15,11 +15,6 @@ from elm_diagnostics.config.schema import (
 )
 from elm_diagnostics.io.run import Comparison, Run
 from elm_diagnostics.report.build import Report
-from elm_diagnostics.config.schema import (
-    Config,
-    GroupPlotTypesConfig,
-    VariableGroupConfig,
-)
 from tests.fixtures.synthetic_elm import (
     make_multicolumn_dataset,
     make_vertical_profile_dataset,

@@ -102,7 +102,7 @@ class TestCreateFacetFigure:
         style = PlotStyleConfig(figsize=[8, 5], dpi=100, palette="tab10")
         with warnings.catch_warnings(record=True) as w:
             warnings.simplefilter("always")
-            fig, axes = create_facet_figure(20, style)
+            fig, _axes = create_facet_figure(20, style)
             assert len(w) == 1
             assert "20 faceted subplots" in str(w[0].message)
             plt.close(fig)
@@ -112,7 +112,7 @@ class TestCreateFacetFigure:
         style = PlotStyleConfig(figsize=[8, 5], dpi=100, palette="tab10")
         with warnings.catch_warnings(record=True) as w:
             warnings.simplefilter("always")
-            fig, axes = create_facet_figure(16, style)
+            fig, _axes = create_facet_figure(16, style)
             assert len(w) == 0
             plt.close(fig)
 

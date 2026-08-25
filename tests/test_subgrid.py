@@ -259,4 +259,4 @@ class TestFacetLayoutEdgeCases:
         # Should warn about many facets
         with pytest.warns(UserWarning, match="20 faceted subplots"):
             fig = plot_timeseries(run, "GPP", by="column")
-            plt.close(fig)
+        plt.close(fig)
