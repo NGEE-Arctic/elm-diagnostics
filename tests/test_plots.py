@@ -21,11 +21,24 @@ from elm_diagnostics.plots import (
     plot_timeseries,
 )
 from tests.fixtures.synthetic_elm import (
-    make_vertical_profile_dataset,
     make_single_point_dataset,
+    make_vertical_profile_dataset,
     make_water_balance_dataset,
     save_as_elm_files,
 )
+
+
+def _config_without_hydrology_max_levels():
+    """Helper to get config with hydrology group max_levels disabled.
+
+    Useful for tests that use SOILLIQ but want to test other features
+    without the default max_levels=10 affecting the results.
+    """
+    cfg = load_config()
+    if "hydrology" in cfg.variable_groups:
+        cfg.variable_groups["hydrology"].hovmuller.max_levels = None
+    return cfg
+
 
 
 @pytest.fixture
@@ -91,7 +104,10 @@ def test_timeseries_vertical_depth_coloring_and_legend():
     with tempfile.TemporaryDirectory() as tmpdir:
         save_as_elm_files(ds, Path(tmpdir), casename="vertical_plot_test", tape="h0")
         run = Run(tmpdir)
-        fig = plot_timeseries(run, "SOILLIQ")
+        # Set max_levels to null to show all 12 levels (override hydrology group default)
+        cfg = load_config()
+        cfg.variable_groups["hydrology"].hovmuller.max_levels = None
+        fig = plot_timeseries(run, "SOILLIQ", config=cfg)
         ax = fig.axes[0]
 
         assert len(ax.lines) == n_levels
@@ -292,13 +308,15 @@ def test_hovmuller_max_depth_m_clips_when_coordinate_available():
         run = Run(tmpdir)
 
         cfg_default = load_config()
+        # Disable group-specific max_levels to test max_depth_m properly
+        cfg_default.variable_groups["hydrology"].hovmuller.max_levels = None
         fig_full = plot_hovmuller(run, "SOILLIQ", config=cfg_default)
         deep_full = max(fig_full.axes[0].get_ylim())
 
         cfg_path = Path(tmpdir) / "cfg.yaml"
-        cfg_path.write_text(
-            yaml.safe_dump({"plots": {"hovmuller": {"max_depth_m": 0.6}}})
-        )
+        cfg_path.write_text(yaml.safe_dump({
+            "variable_groups": {"hydrology": {"hovmuller": {"max_levels": None, "max_depth_m": 0.6}}}
+        }))
         cfg_limited = load_config(path=cfg_path)
         fig_limited = plot_hovmuller(run, "SOILLIQ", config=cfg_limited)
         deep_limited = max(fig_limited.axes[0].get_ylim())
@@ -340,13 +358,15 @@ def test_hovmuller_max_depth_m_warns_and_ignored_for_index_axis():
         run = Run(tmpdir)
 
         cfg_default = load_config()
+        # Disable group-specific max_levels to test max_depth_m properly
+        cfg_default.variable_groups["hydrology"].hovmuller.max_levels = None
         fig_full = plot_hovmuller(run, "SOILLIQ", config=cfg_default)
         deep_full = max(fig_full.axes[0].get_ylim())
 
         cfg_path = Path(tmpdir) / "cfg.yaml"
-        cfg_path.write_text(
-            yaml.safe_dump({"plots": {"hovmuller": {"max_depth_m": 0.3}}})
-        )
+        cfg_path.write_text(yaml.safe_dump({
+            "variable_groups": {"hydrology": {"hovmuller": {"max_levels": None, "max_depth_m": 0.3}}}
+        }))
         cfg_limited = load_config(path=cfg_path)
 
         with pytest.warns(UserWarning, match="max_depth_m=.*ignored"):
@@ -545,7 +565,7 @@ def test_hovmuller_color_limit_quantile_reduces_outlier_influence():
         )
         run = Run(tmpdir)
 
-        fig_full = plot_hovmuller(run, "SOILLIQ", config=load_config())
+        fig_full = plot_hovmuller(run, "SOILLIQ", config=_config_without_hydrology_max_levels())
         vmax_full = fig_full.axes[0].collections[0].get_clim()[1]
         assert fig_full.axes[0].collections[0].colorbar.extend == "neither"
 
@@ -553,11 +573,14 @@ def test_hovmuller_color_limit_quantile_reduces_outlier_influence():
         cfg_path.write_text(
             yaml.safe_dump(
                 {
-                    "plots": {
-                        "hovmuller": {
-                            "color_limit_method": "quantile",
-                            "color_limit_quantile_low": 2.0,
-                            "color_limit_quantile_high": 98.0,
+                    "variable_groups": {
+                        "hydrology": {
+                            "hovmuller": {
+                                "max_levels": None,
+                                "color_limit_method": "quantile",
+                                "color_limit_quantile_low": 2.0,
+                                "color_limit_quantile_high": 98.0,
+                            }
                         }
                     }
                 }
@@ -608,17 +631,20 @@ def test_hovmuller_color_limit_sigma_clip_reduces_outlier_influence():
         save_as_elm_files(ds, Path(tmpdir), casename="hov_sigma_color_test", tape="h0")
         run = Run(tmpdir)
 
-        fig_full = plot_hovmuller(run, "SOILLIQ", config=load_config())
+        fig_full = plot_hovmuller(run, "SOILLIQ", config=_config_without_hydrology_max_levels())
         vmax_full = fig_full.axes[0].collections[0].get_clim()[1]
 
         cfg_path = Path(tmpdir) / "cfg_sigma.yaml"
         cfg_path.write_text(
             yaml.safe_dump(
                 {
-                    "plots": {
-                        "hovmuller": {
-                            "color_limit_method": "sigma_clip",
-                            "color_limit_sigma": 2.0,
+                    "variable_groups": {
+                        "hydrology": {
+                            "hovmuller": {
+                                "max_levels": None,
+                                "color_limit_method": "sigma_clip",
+                                "color_limit_sigma": 2.0,
+                            }
                         }
                     }
                 }
@@ -689,11 +715,14 @@ def test_hovmuller_comparison_uses_shared_color_limits_with_robust_method():
         cfg_path.write_text(
             yaml.safe_dump(
                 {
-                    "plots": {
-                        "hovmuller": {
-                            "color_limit_method": "quantile",
-                            "color_limit_quantile_low": 2.0,
-                            "color_limit_quantile_high": 98.0,
+                    "variable_groups": {
+                        "hydrology": {
+                            "hovmuller": {
+                                "max_levels": None,
+                                "color_limit_method": "quantile",
+                                "color_limit_quantile_low": 2.0,
+                                "color_limit_quantile_high": 98.0,
+                            }
                         }
                     }
                 }

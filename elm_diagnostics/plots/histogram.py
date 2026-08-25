@@ -22,10 +22,11 @@ from elm_diagnostics.io.subgrid import SubgridLevel
 
 
 def _squeeze_spatial(da: xr.DataArray) -> xr.DataArray:
-    """Squeeze singleton spatial dims (lat/lon/lndgrid/gridcell)."""
-    # Compute dask arrays before drop=True to avoid KeyError
-    if hasattr(da, "chunks") and da.chunks is not None:
-        da = da.compute()
+    """Squeeze singleton spatial dims (lat/lon/lndgrid/gridcell).
+
+    Preserves dask chunks for lazy evaluation. Xarray's squeeze operation
+    works efficiently on chunked arrays without triggering computation.
+    """
     for dim in ("lat", "lon", "lndgrid", "gridcell"):
         if dim in da.dims and da.sizes[dim] == 1:
             da = da.squeeze(dim, drop=True)
@@ -35,14 +36,14 @@ def _squeeze_spatial(da: xr.DataArray) -> xr.DataArray:
 def _flatten_finite_values(da: xr.DataArray) -> np.ndarray:
     """Return finite values as a 1D NumPy array.
 
-    This keeps flattening and NaN filtering in xarray until the final
-    materialization step, which is friendlier to chunked arrays than
-    immediately calling ``.values.ravel()``.
+    Stack and filter operations are done lazily when possible. Boolean indexing
+    with drop=True requires computation for dask arrays due to xarray limitations.
     """
-    # Compute dask arrays before boolean indexing to avoid KeyError
-    if hasattr(da, "chunks") and da.chunks is not None:
-        da = da.compute()
     stacked = da.stack(sample=da.dims)
+    # Boolean indexing with drop=True doesn't work on dask arrays in xarray
+    # Compute here right before the indexing operation to minimize eager evaluation
+    if hasattr(stacked, "chunks") and stacked.chunks is not None:
+        stacked = stacked.compute()
     finite = stacked.where(np.isfinite(stacked), drop=True)
     return finite.values
 
