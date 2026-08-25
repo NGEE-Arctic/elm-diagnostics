@@ -47,6 +47,7 @@ plots:
     envelope: "minmax"  # or "p10_p90", "std"
   hovmuller:
     max_depth_m: null  # null means full vertical extent from the source variable
+    max_levels: null  # null means all levels; set to 10 for hydrologically active zone
     color_limit_method: "full_range"  # full_range | quantile | sigma_clip
     color_limit_quantile_low: 2.0
     color_limit_quantile_high: 98.0
@@ -75,6 +76,8 @@ variable_groups:
       anomaly: true
       histogram: true
       diurnal: true
+    hovmuller:
+      max_levels: 10  # Hydrologically active zone
   carbon_pools:
     enabled: true
     variables: [LEAFC, LIVESTEMC, DEADSTEMC, FROOTC, LIVECROOTC,

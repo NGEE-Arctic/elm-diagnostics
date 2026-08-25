@@ -30,6 +30,9 @@ jobs:
         pip install -e ".[dev]"
 
     - name: Run tests
+      env:
+        DASK_SCHEDULER: synchronous
+        HDF5_USE_FILE_LOCKING: FALSE
       run: |
         pytest tests/ -v --tb=short
 
@@ -50,5 +53,8 @@ jobs:
         pip install -e ".[all,dev]"
 
     - name: Run tests with all features
+      env:
+        DASK_SCHEDULER: synchronous
+        HDF5_USE_FILE_LOCKING: FALSE
       run: |
         pytest tests/ -v --tb=short

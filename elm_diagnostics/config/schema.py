@@ -51,10 +51,18 @@ class ClimatologyConfig(BaseModel):
 
 class HovmullerConfig(BaseModel):
     max_depth_m: float | None = None
+    max_levels: int | None = None
     color_limit_method: Literal["full_range", "quantile", "sigma_clip"] = "full_range"
     color_limit_quantile_low: float = Field(default=2.0, ge=0.0, le=100.0)
     color_limit_quantile_high: float = Field(default=98.0, ge=0.0, le=100.0)
     color_limit_sigma: float = Field(default=2.0, gt=0.0)
+
+    @model_validator(mode="after")
+    def validate_depth_limits(self):
+        """Ensure max_levels and max_depth_m are mutually exclusive."""
+        if self.max_levels is not None and self.max_depth_m is not None:
+            raise ValueError("Cannot set both max_levels and max_depth_m")
+        return self
 
 
 class PlotsConfig(BaseModel):
@@ -95,6 +103,7 @@ class VariableGroupConfig(BaseModel):
     enabled: bool = True
     variables: list[str] = Field(default_factory=list)
     plot_types: GroupPlotTypesConfig = GroupPlotTypesConfig()
+    hovmuller: HovmullerConfig | None = None
 
 
 class VariableSectionsConfig(BaseModel):
@@ -290,6 +299,53 @@ class Config(BaseModel):
     time: TimeConfig = TimeConfig()
     balances: BalancesConfig = BalancesConfig()
     variable_groups: dict[str, VariableGroupConfig] = Field(default_factory=dict)
+
+    def get_variable_group_hovmuller_config(self, varname: str) -> HovmullerConfig:
+        """Get hovmuller config for a variable, merging group and global settings.
+
+        Parameters
+        ----------
+        varname : str
+            Variable name to look up
+
+        Returns
+        -------
+        HovmullerConfig
+            Merged hovmuller config with group-specific overrides applied to global settings.
+
+        Notes
+        -----
+        Group-specific settings override global settings only for fields that are explicitly
+        set in the group config. If a variable appears in multiple groups, the first group
+        with hovmuller settings takes precedence.
+        """
+        # Start with global config as base
+        base_config = self.plots.hovmuller.model_dump()
+
+        # Check variable groups for one that contains this variable and has hovmuller config
+        for group_config in self.variable_groups.values():
+            if (
+                group_config.enabled
+                and varname in group_config.variables
+                and group_config.hovmuller is not None
+            ):
+                # Merge group-specific overrides into base config
+                # For most fields, only override non-None values from group config
+                # For max_levels/max_depth_m, always use group value (even if None)
+                # since None is a valid "unset" value for these mutually-exclusive options
+                group_overrides = group_config.hovmuller.model_dump()
+                merged = base_config.copy()
+                for key, value in group_overrides.items():
+                    if key in ["max_levels", "max_depth_m"]:
+                        # Always override these, even if None
+                        merged[key] = value
+                    elif value is not None:
+                        # For other fields, only override if not None
+                        merged[key] = value
+                return HovmullerConfig(**merged)
+
+        # No group-specific config found, return global config
+        return self.plots.hovmuller
 
 
 # ---------------------------------------------------------------------------

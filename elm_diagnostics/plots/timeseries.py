@@ -23,6 +23,7 @@ from elm_diagnostics.io.run import Comparison, Run
 from elm_diagnostics.io.subgrid import SubgridLevel
 from elm_diagnostics.plots.climatology import compute_climo_stats
 from elm_diagnostics.plots.dimension_helpers import (
+    apply_max_levels,
     detect_additional_dimension,
     format_level_label,
     resolve_dimension_axis,
@@ -53,7 +54,9 @@ def _append_long_name_line(title: str, da: xr.DataArray | None) -> str:
 def _plot_multilevel_lines(
     ax: plt.Axes,
     da: xr.DataArray,
+    varname: str,
     *,
+    config: Config,
     linestyle: str = "-",
     alpha: float = 1.0,
     legend_max_entries: int = 8,
@@ -69,6 +72,11 @@ def _plot_multilevel_lines(
     dim = detect_additional_dimension(da)
     if dim is None:
         return None
+
+    # Apply max_levels filter if configured
+    # Note: hovmuller config controls vertical dimension behavior for all plot types
+    hov_config = config.get_variable_group_hovmuller_config(varname)
+    da = apply_max_levels(da, dim, hov_config.max_levels)
 
     n_levels = da.sizes[dim]
     level_values, _, level_name, level_units, _ = resolve_dimension_axis(da, dim)
@@ -176,12 +184,16 @@ def _plot_timeseries_single(
         da_base = squeeze_spatial_dims(source.base.get(varname))
         da_exp = squeeze_spatial_dims(source.experiment.get(varname))
         title_da = da_exp
-        level_dim = _plot_multilevel_lines(ax, da_exp, linestyle="-", alpha=1.0)
+        level_dim = _plot_multilevel_lines(
+            ax, da_exp, varname, config=config, linestyle="-", alpha=1.0
+        )
         if level_dim is not None:
             # Overlay base as dashed lines with same depth colormap.
             _plot_multilevel_lines(
                 ax,
                 da_base,
+                varname,
+                config=config,
                 linestyle="--",
                 alpha=0.7,
                 legend_max_entries=0,
@@ -218,7 +230,7 @@ def _plot_timeseries_single(
     else:
         da = squeeze_spatial_dims(source.get(varname))
         title_da = da
-        level_dim = _plot_multilevel_lines(ax, da)
+        level_dim = _plot_multilevel_lines(ax, da, varname, config=config)
         if level_dim is not None:
             ax.legend(loc="best", fontsize="x-small", title=f"{level_dim} levels")
         else:
@@ -290,6 +302,8 @@ def _plot_timeseries_faceted(
             level_dim = _plot_multilevel_lines(
                 ax_i,
                 da_exp_unit,
+                varname,
+                config=config,
                 linestyle="-",
                 alpha=1.0,
             )
@@ -297,6 +311,8 @@ def _plot_timeseries_faceted(
                 _plot_multilevel_lines(
                     ax_i,
                     da_base_unit,
+                    varname,
+                    config=config,
                     linestyle="--",
                     alpha=0.7,
                     legend_max_entries=0,
@@ -346,7 +362,7 @@ def _plot_timeseries_faceted(
             units_str = da_base.attrs.get("units", "")
         else:
             da_unit = squeeze_spatial_dims(da.sel({by: unit_id}))
-            level_dim = _plot_multilevel_lines(ax_i, da_unit)
+            level_dim = _plot_multilevel_lines(ax_i, da_unit, varname, config=config)
             if level_dim is not None and unit_id == units[0]:
                 ax_i.legend(
                     loc="best", fontsize="xx-small", title=f"{level_dim} levels"
