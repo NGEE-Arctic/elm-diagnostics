@@ -22,6 +22,7 @@ from elm_diagnostics.balances.base import _plot_time
 from elm_diagnostics.config.schema import Config, load_config
 from elm_diagnostics.io.run import Comparison, Run
 from elm_diagnostics.plots.dimension_helpers import (
+    apply_max_levels,
     detect_additional_dimension,
     resolve_dimension_axis,
     squeeze_spatial_dims,
@@ -248,6 +249,9 @@ def _plot_hovmuller_run(
         )
 
     da2 = da.transpose("time", dim)
+    # Apply max_levels filter if configured (check group-specific config first)
+    hov_config = config.get_variable_group_hovmuller_config(varname)
+    da2 = apply_max_levels(da2, dim, hov_config.max_levels)
     yvals_raw, axis_label_raw, _, level_units, is_depth_like = resolve_dimension_axis(
         da2, dim
     )
@@ -275,7 +279,7 @@ def _plot_hovmuller_run(
     field = da2.transpose(dim, "time").values
     mask = _max_depth_mask(
         yvals,
-        max_depth_m=config.plots.hovmuller.max_depth_m,
+        max_depth_m=hov_config.max_depth_m,
         dim=dim,
         is_index_based_axis=is_index_based_axis,
     )
@@ -287,10 +291,10 @@ def _plot_hovmuller_run(
 
     clim = _compute_color_limits(
         field,
-        method=config.plots.hovmuller.color_limit_method,
-        q_low=config.plots.hovmuller.color_limit_quantile_low,
-        q_high=config.plots.hovmuller.color_limit_quantile_high,
-        sigma_count=config.plots.hovmuller.color_limit_sigma,
+        method=hov_config.color_limit_method,
+        q_low=hov_config.color_limit_quantile_low,
+        q_high=hov_config.color_limit_quantile_high,
+        sigma_count=hov_config.color_limit_sigma,
     )
     mesh_kwargs = {"shading": "auto", "cmap": "viridis"}
     cbar_extend = "neither"
@@ -339,6 +343,10 @@ def _plot_hovmuller_comparison(
 
     base2 = da_base.transpose("time", dim)
     exp2 = da_exp.transpose("time", dim)
+    # Apply max_levels filter if configured (check group-specific config first)
+    hov_config = config.get_variable_group_hovmuller_config(varname)
+    base2 = apply_max_levels(base2, dim, hov_config.max_levels)
+    exp2 = apply_max_levels(exp2, dim, hov_config.max_levels)
     yvals_raw, axis_label_raw, _, level_units, is_depth_like = resolve_dimension_axis(
         exp2, dim
     )
@@ -368,7 +376,7 @@ def _plot_hovmuller_comparison(
     exp_field = exp2.transpose(dim, "time").values
     mask = _max_depth_mask(
         yvals,
-        max_depth_m=config.plots.hovmuller.max_depth_m,
+        max_depth_m=hov_config.max_depth_m,
         dim=dim,
         is_index_based_axis=is_index_based_axis,
     )
@@ -385,10 +393,10 @@ def _plot_hovmuller_comparison(
     )
     clim = _compute_color_limits(
         np.concatenate([base_field.ravel(), exp_field.ravel()]),
-        method=config.plots.hovmuller.color_limit_method,
-        q_low=config.plots.hovmuller.color_limit_quantile_low,
-        q_high=config.plots.hovmuller.color_limit_quantile_high,
-        sigma_count=config.plots.hovmuller.color_limit_sigma,
+        method=hov_config.color_limit_method,
+        q_low=hov_config.color_limit_quantile_low,
+        q_high=hov_config.color_limit_quantile_high,
+        sigma_count=hov_config.color_limit_sigma,
     )
     mesh_kwargs = {"shading": "auto", "cmap": "viridis"}
     cbar_extend = "neither"

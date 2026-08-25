@@ -161,3 +161,54 @@ def format_level_label(level_value: object, level_name: str, units: str = "") ->
     except (TypeError, ValueError):
         pass
     return f"{level_name}={level_value}{suffix}"
+
+
+def apply_max_levels(
+    da: xr.DataArray,
+    dim: str,
+    max_levels: int | None,
+) -> xr.DataArray:
+    """Apply max_levels filter to vertical dimension.
+
+    Parameters
+    ----------
+    da : xr.DataArray
+        Data with vertical dimension
+    dim : str
+        Name of vertical dimension (e.g., 'levgrnd')
+    max_levels : int | None
+        Maximum number of levels to keep from top (index 0).
+        If None, returns data unchanged.
+
+    Returns
+    -------
+    xr.DataArray
+        Data masked to first max_levels along dim, or unchanged if
+        max_levels is None or dimension not present.
+
+    Notes
+    -----
+    Assumes level 0 is at top (surface). Works with both indexed
+    dimensions and physical coordinate dimensions.
+
+    When data is truncated, a warning is issued to inform the user
+    that only partial depth profiles are shown for visualization clarity.
+    """
+    if max_levels is None or dim not in da.dims:
+        return da
+
+    n_levels = da.sizes[dim]
+    if n_levels <= max_levels:
+        return da  # Already within limit
+
+    # Warn user about truncation
+    import warnings
+
+    warnings.warn(
+        f"Limiting {dim} to {max_levels} of {n_levels} levels for clearer visualization.",
+        UserWarning,
+        stacklevel=3,
+    )
+
+    # Select first max_levels (0:max_levels)
+    return da.isel({dim: slice(0, max_levels)})

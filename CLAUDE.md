@@ -75,6 +75,16 @@ All variable names verified against E3SM IM1 ELM source (`/code/E3SM/IM1/compone
 **Vertical Aggregation:**
 `SOILLIQ` and `SOILICE` have `levgrnd` dimension (15 levels). Must sum over depth before balance computations.
 
+**Vertical Dimension Handling (Plotting):**
+- Soil variables with `levgrnd` dimension (15 levels) can be limited via config for clearer visualization
+- `max_depth_m`: physical depth limit in meters (e.g., 3.5) - limits by actual depth coordinate
+- `max_levels`: layer count limit (e.g., 10 for hydrologically active zone) - limits by index
+- **Group-specific config**: `hydrology` variable group has `max_levels: 10` by default (hydrologically active zone)
+- Other groups (e.g., `soil_state` with TSOI) use global config (null = all levels)
+- Can override per-group via `variable_groups.<group>.hovmuller.max_levels` in user config
+- `max_levels` and `max_depth_m` are mutually exclusive - only one can be set at a time
+- Applies to hovmuller and timeseries multilevel plots
+
 **Time Handling:**
 - Monthly h0 files use `noleap` calendar
 - Integration uses `time_bounds` (shape `(time, hist_interval)`) for accurate flux-to-cumulative

@@ -475,6 +475,56 @@ class Report:
             flush=True,
         )
 
+    def _announce_variable_progress(
+        self,
+        section: str,
+        varname: str,
+        var_index: int,
+        total_vars: int,
+    ) -> None:
+        """Write variable-level progress within a section."""
+        print(
+            f"  [{section}] Variable {var_index}/{total_vars}: {varname}",
+            flush=True,
+        )
+
+    def _announce_plot_progress(
+        self,
+        varname: str,
+        plot_type: str,
+        plot_index: int,
+        total_plots: int,
+    ) -> None:
+        """Write plot-level progress within a variable."""
+        print(
+            f"    [{varname}] Plot {plot_index}/{total_plots}: {plot_type}",
+            flush=True,
+        )
+
+    def _check_slow_operation(
+        self,
+        operation: str,
+        duration: float,
+        threshold: float = 30.0,
+    ) -> None:
+        """Warn if an operation is taking longer than expected.
+
+        Helps users understand when processing is still happening vs. truly hung.
+        """
+        if duration > threshold:
+            print(
+                f"  ⚠ {operation} took {duration:.1f}s (threshold: {threshold:.0f}s)",
+                flush=True,
+            )
+            if duration > 60:
+                print(
+                    "     For large datasets, this is normal. Consider:\n"
+                    "     - Reducing analysis_year_min/max window\n"
+                    "     - Using analysis_year to process one year at a time\n"
+                    "     - Reducing max_variables_per_group in config",
+                    flush=True,
+                )
+
     def _planned_progress_sections(self) -> list[str]:
         """Return configured section titles announced during report generation."""
         sections = self.config.report.sections
@@ -1305,7 +1355,12 @@ class Report:
                     f"Group '{group_name}': showing {max_vars}/{len(varnames)} variables"
                 )
 
-            for varname in varnames_to_plot:
+            for var_index, varname in enumerate(varnames_to_plot, start=1):
+                # Announce variable progress
+                self._announce_variable_progress(
+                    section_title, varname, var_index, len(varnames_to_plot)
+                )
+
                 compute_start = time.perf_counter()
                 var = None
                 base_var = None
@@ -1317,13 +1372,25 @@ class Report:
                     if isinstance(self.source, Comparison):
                         base_var = self.source.base.get(varname)
                     var_context = self._build_var_plot_context(var)
-                compute_seconds += time.perf_counter() - compute_start
+                var_load_time = time.perf_counter() - compute_start
+                compute_seconds += var_load_time
+
+                # Warn if variable loading was slow
+                if var_load_time > 30:
+                    self._check_slow_operation(
+                        f"Loading {varname}", var_load_time, threshold=30.0
+                    )
+
                 if var is None:
                     continue
 
                 # Try each plot type
                 with self._plot_source_cache_context(varname, var, base_var):
-                    for plot_type in plot_types:
+                    for plot_index, plot_type in enumerate(plot_types, start=1):
+                        # Announce plot progress
+                        self._announce_plot_progress(
+                            varname, plot_type, plot_index, len(plot_types)
+                        )
                         fig: plt.Figure | None = None
                         existing_fignums = set(plt.get_fignums())
                         try:
@@ -1338,6 +1405,16 @@ class Report:
                             )
                             compute_seconds += plot_compute_seconds
                             plot_seconds += plot_render_seconds
+
+                            # Warn if plot was slow
+                            total_plot_time = plot_compute_seconds + plot_render_seconds
+                            if total_plot_time > 30:
+                                self._check_slow_operation(
+                                    f"{plot_type} plot for {varname}",
+                                    total_plot_time,
+                                    threshold=30.0,
+                                )
+
                             io_elapsed = 0.0
                             if fig is not None:
                                 basename = f"{group_name}_{varname}_{plot_type}"
