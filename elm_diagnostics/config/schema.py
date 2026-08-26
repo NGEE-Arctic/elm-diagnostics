@@ -167,6 +167,15 @@ class PerformanceConfig(BaseModel):
         description="Warn when an operation takes longer than this threshold.",
     )
 
+    parallel_plot_workers: int = Field(
+        default=2,
+        ge=1,
+        le=16,
+        description="Number of worker threads for parallel plot generation. "
+        "Default 2 balances speed and memory. Higher values (4-8) can speed up "
+        "report generation on multi-core systems but increase memory usage.",
+    )
+
 
 class ReportConfig(BaseModel):
     title_template: str = "ELM diagnostics — {casename}"
