@@ -1217,12 +1217,12 @@ class Report:
     @staticmethod
     def _final_scalar(da: xr.DataArray) -> float:
         """Return the final time-step value as a Python float."""
-        return float(da.isel(time=-1).values)
+        return float(da.isel(time=-1).compute().item())
 
     @staticmethod
     def _mean_scalar(da: xr.DataArray) -> float:
         """Return the time mean as a Python float."""
-        return float(da.mean().values)
+        return float(da.mean().compute().item())
 
     @staticmethod
     def _long_name_from_da(da: xr.DataArray | None) -> str:

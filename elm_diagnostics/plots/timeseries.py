@@ -83,7 +83,7 @@ def _plot_multilevel_lines(
     legend_idx = _legend_level_indices(n_levels, max_entries=legend_max_entries)
     cmap = plt.get_cmap("viridis")
     time_values = _plot_time(da)
-    line_values = np.asarray(da.transpose(dim, "time").values)
+    line_values = np.asarray(da.transpose(dim, "time").compute())
 
     for i in range(n_levels):
         fraction = i / max(n_levels - 1, 1)
@@ -214,14 +214,14 @@ def _plot_timeseries_single(
         else:
             ax.plot(
                 _plot_time(da_base),
-                da_base.values,
+                da_base.compute(),
                 color="gray",
                 label=source.base.name,
                 alpha=0.8,
             )
             ax.plot(
                 _plot_time(da_exp),
-                da_exp.values,
+                da_exp.compute(),
                 color="tab:blue",
                 label=source.experiment.name,
             )
@@ -234,7 +234,7 @@ def _plot_timeseries_single(
         if level_dim is not None:
             ax.legend(loc="best", fontsize="x-small", title=f"{level_dim} levels")
         else:
-            ax.plot(_plot_time(da), da.values, color="tab:blue")
+            ax.plot(_plot_time(da), da.compute(), color="tab:blue")
 
             # Climatology envelope if multi-year
             _add_climatology_envelope(
@@ -346,14 +346,14 @@ def _plot_timeseries_faceted(
             else:
                 ax_i.plot(
                     _plot_time(da_base_unit),
-                    da_base_unit.values,
+                    da_base_unit.compute(),
                     color="gray",
                     label=source.base.name,
                     alpha=0.8,
                 )
                 ax_i.plot(
                     _plot_time(da_exp_unit),
-                    da_exp_unit.values,
+                    da_exp_unit.compute(),
                     color="tab:blue",
                     label=source.experiment.name,
                 )
@@ -368,7 +368,7 @@ def _plot_timeseries_faceted(
                     loc="best", fontsize="xx-small", title=f"{level_dim} levels"
                 )
             if level_dim is None:
-                ax_i.plot(_plot_time(da_unit), da_unit.values, color="tab:blue")
+                ax_i.plot(_plot_time(da_unit), da_unit.compute(), color="tab:blue")
 
                 # Climatology envelope
                 _add_climatology_envelope(
@@ -433,11 +433,11 @@ def _add_climatology_envelope(
     # Map climatology values to actual dates from the timeseries
     plot_times = _plot_time(da)
     # Array of month numbers (1-12) for each time point
-    months = da.time.dt.month.values
+    months = da.time.dt.month.compute()
 
     # Map climatology values: for each time point, get the climo value for that month
-    lo_mapped = lo.sel(month=xr.DataArray(months, dims="time")).values
-    hi_mapped = hi.sel(month=xr.DataArray(months, dims="time")).values
+    lo_mapped = lo.sel(month=xr.DataArray(months, dims="time")).compute()
+    hi_mapped = hi.sel(month=xr.DataArray(months, dims="time")).compute()
 
     # Plot using actual dates (not month indices 1-12)
     ax_twin = ax.twinx()

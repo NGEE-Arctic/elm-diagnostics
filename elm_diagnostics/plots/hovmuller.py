@@ -276,7 +276,7 @@ def _plot_hovmuller_run(
             UserWarning,
             stacklevel=3,
         )
-    field = da2.transpose(dim, "time").values
+    field = da2.transpose(dim, "time").compute()
     mask = _max_depth_mask(
         yvals,
         max_depth_m=hov_config.max_depth_m,
@@ -372,8 +372,8 @@ def _plot_hovmuller_comparison(
             stacklevel=3,
         )
 
-    base_field = base2.transpose(dim, "time").values
-    exp_field = exp2.transpose(dim, "time").values
+    base_field = base2.transpose(dim, "time").compute()
+    exp_field = exp2.transpose(dim, "time").compute()
     mask = _max_depth_mask(
         yvals,
         max_depth_m=hov_config.max_depth_m,
