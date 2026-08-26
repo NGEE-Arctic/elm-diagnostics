@@ -1423,9 +1423,7 @@ class Report:
 
         # Warn if plot was slow
         total_time = (
-            result["compute_seconds"]
-            + result["plot_seconds"]
-            + result["io_seconds"]
+            result["compute_seconds"] + result["plot_seconds"] + result["io_seconds"]
         )
         if total_time > 30:
             self._check_slow_operation(
