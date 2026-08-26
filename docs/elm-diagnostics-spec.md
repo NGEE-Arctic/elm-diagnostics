@@ -280,7 +280,7 @@ No CI in v1 (user request). Structure tests so `pytest` runs clean locally; add 
 ## 10. v2 spec (captured now, deferred)
 
 - **Observations overlays:** NEON tower fluxes (AmeriFlux AMF BASE files, ONEFlux processing), GRACE/GRACE-FO TWS anomalies, ERA5 reanalysis for forcing comparison, FLUXNET2015 subset. Add an `observations:` YAML block and an `ObsOverlay` mixin on plots.
-- **CI:** GitHub Actions matrix (Python 3.10/3.11/3.12, ubuntu/macos), `pytest-mpl` image baselines committed, conda-forge feedstock.
+- **CI:** GitHub Actions matrix (Python 3.10/3.11/3.12/3.13/3.14, ubuntu/macos), `pytest-mpl` image baselines committed, conda-forge feedstock.
 - **Interactive report:** optional Plotly/Panel variant of the single-page report for pan/zoom on time series.
 - **Ensemble/multi-site:** `Run` → `RunGroup` with faceted plots and ensemble envelopes.
 - **ILAMB-style benchmarking:** comparison against reference datasets with scoring metrics. CLM diagnostics package and ILAMB are the references.
