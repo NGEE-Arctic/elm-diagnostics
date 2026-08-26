@@ -274,9 +274,11 @@ class Run:
         self._datasets: dict[str, xr.Dataset] = {}
         self._cadence: dict[str, str | pd.Timedelta] = {}
         self._streams_cache: dict[str, xr.Dataset] | None = None
-        # LRU cache with max 50 variables to prevent OOM on large datasets
+        # LRU cache with max 15 variables to prevent OOM on large datasets
+        # Each variable can be ~1GB metadata for 167-year datasets (167 files)
+        # Balance components (~10 vars) + recent plot vars (~5) = 15 total (~15GB peak)
         self._variable_cache: OrderedDict[str, xr.DataArray] = OrderedDict()
-        self._variable_cache_maxsize = 50
+        self._variable_cache_maxsize = 15
 
         if streams is not None:
             self._stream_files: dict[str, list[Path]] = {}
