@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import re
 import warnings
+from collections import OrderedDict
 from pathlib import Path
 from typing import Literal
 
@@ -273,7 +274,9 @@ class Run:
         self._datasets: dict[str, xr.Dataset] = {}
         self._cadence: dict[str, str | pd.Timedelta] = {}
         self._streams_cache: dict[str, xr.Dataset] | None = None
-        self._variable_cache: dict[str, xr.DataArray] = {}
+        # LRU cache with max 50 variables to prevent OOM on large datasets
+        self._variable_cache: OrderedDict[str, xr.DataArray] = OrderedDict()
+        self._variable_cache_maxsize = 50
 
         if streams is not None:
             self._stream_files: dict[str, list[Path]] = {}
@@ -426,11 +429,26 @@ class Run:
 
         return sorted(self._tape_order, key=_cadence_key)
 
+    def _cache_variable(self, varname: str, data: xr.DataArray) -> None:
+        """Add variable to LRU cache, evicting oldest if at capacity."""
+        # Move to end (most recently used) if already in cache
+        if varname in self._variable_cache:
+            self._variable_cache.move_to_end(varname)
+        else:
+            # Add new entry
+            self._variable_cache[varname] = data
+            # Evict oldest if over capacity
+            if len(self._variable_cache) > self._variable_cache_maxsize:
+                self._variable_cache.popitem(last=False)
+
     def get(self, varname: str, tape: str | None = None) -> xr.DataArray:
         """Retrieve a variable, searching tapes in priority order.
 
         If the variable is not found, attempts to derive it from available
         components (e.g., compute QFLX_EVAP_TOT from QSOIL + QVEGE + QVEGT).
+
+        Variables are cached with an LRU policy (max 50 variables) to balance
+        performance and memory usage on large datasets.
 
         Parameters
         ----------
@@ -451,15 +469,16 @@ class Run:
         """
         # Check cache first (only for non-tape-specific requests)
         if tape is None and varname in self._variable_cache:
+            # Move to end (mark as recently used)
+            self._variable_cache.move_to_end(varname)
             return self._variable_cache[varname]
 
         if tape is not None:
             ds = self._open_stream(tape)
             if varname in ds:
                 result = ds[varname]
-                # Cache tape-specific request as well
-                if varname not in self._variable_cache:
-                    self._variable_cache[varname] = result
+                # Cache tape-specific request
+                self._cache_variable(varname, result)
                 return result
             raise KeyError(f"{varname!r} not found in stream {tape}")
 
@@ -468,7 +487,7 @@ class Run:
             if varname in ds:
                 result = ds[varname]
                 # Cache for future access
-                self._variable_cache[varname] = result
+                self._cache_variable(varname, result)
                 return result
 
         # Try to derive the variable if it's not directly available
@@ -478,7 +497,7 @@ class Run:
             try:
                 result = derive_variable(self, varname)
                 # Cache derived variables
-                self._variable_cache[varname] = result
+                self._cache_variable(varname, result)
                 return result
             except (ValueError, KeyError) as e:
                 # Derivation failed - fall through to original error
