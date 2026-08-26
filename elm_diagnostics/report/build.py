@@ -828,6 +828,11 @@ class Report:
                     compute_seconds=compute_seconds,
                     plot_seconds=plot_seconds,
                 )
+                # Clear cache after balance section
+                import gc
+                if hasattr(self._run, '_variable_cache'):
+                    self._run._variable_cache.clear()
+                gc.collect()
 
         if self.config.report.sections.energy_balance:
             section_title = "Energy Balance"
@@ -908,6 +913,11 @@ class Report:
                     compute_seconds=compute_seconds,
                     plot_seconds=plot_seconds,
                 )
+                # Clear cache after balance section
+                import gc
+                if hasattr(self._run, '_variable_cache'):
+                    self._run._variable_cache.clear()
+                gc.collect()
 
         if self.config.report.sections.carbon_balance:
             section_title = "Carbon Balance"
@@ -988,6 +998,11 @@ class Report:
                     compute_seconds=compute_seconds,
                     plot_seconds=plot_seconds,
                 )
+                # Clear cache after balance section
+                import gc
+                if hasattr(self._run, '_variable_cache'):
+                    self._run._variable_cache.clear()
+                gc.collect()
 
         return sections
 
@@ -1470,6 +1485,13 @@ class Report:
                 compute_seconds=compute_seconds,
                 plot_seconds=plot_seconds,
             )
+
+            # Clear variable cache and force garbage collection after each group
+            # to prevent memory accumulation across 912 variables
+            import gc
+            if hasattr(run, '_variable_cache'):
+                run._variable_cache.clear()
+            gc.collect()
 
         return sections
 
