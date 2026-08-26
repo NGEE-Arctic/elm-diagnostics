@@ -77,7 +77,7 @@ def _plot_multilevel_seasonal_lines(
     level_values, _, level_name, level_units, _ = resolve_dimension_axis(mean_da, dim)
     legend_idx = _legend_level_indices(n_levels, max_entries=legend_max_entries)
     cmap = plt.get_cmap("viridis")
-    line_values = np.asarray(mean_da.transpose(dim, "month").values)
+    line_values = np.asarray(mean_da.transpose(dim, "month").compute())
 
     for i in range(n_levels):
         fraction = i / max(n_levels - 1, 1)
@@ -285,7 +285,7 @@ def _plot_seasonal_single(
                 for year, year_mean in zip(years_b, year_cycles_b):
                     ax.plot(
                         months,
-                        year_mean.values,
+                        year_mean.compute(),
                         color="gray",
                         alpha=0.3,
                         linewidth=1,
@@ -294,7 +294,7 @@ def _plot_seasonal_single(
                 # Plot base mean as thick line
                 ax.plot(
                     months,
-                    mean_b.values,
+                    mean_b.compute(),
                     color="gray",
                     linewidth=3,
                     label=f"{source.base.name} mean ({n_years_b} years)",
@@ -304,7 +304,7 @@ def _plot_seasonal_single(
                 for year, year_mean in zip(years_e, year_cycles_e):
                     ax.plot(
                         months,
-                        year_mean.values,
+                        year_mean.compute(),
                         color="tab:blue",
                         alpha=0.3,
                         linewidth=1,
@@ -313,7 +313,7 @@ def _plot_seasonal_single(
                 # Plot experiment mean as thick line
                 ax.plot(
                     months,
-                    mean_e.values,
+                    mean_e.compute(),
                     color="tab:blue",
                     linewidth=3,
                     label=f"{source.experiment.name} mean ({n_years_e} years)",
@@ -324,11 +324,11 @@ def _plot_seasonal_single(
                 # Original behavior: envelope + mean line
                 if include_climos:
                     ax.fill_between(
-                        months, lo_b.values, hi_b.values, alpha=0.2, color="gray"
+                        months, lo_b.compute(), hi_b.compute(), alpha=0.2, color="gray"
                     )
                 ax.plot(
                     months,
-                    mean_b.values,
+                    mean_b.compute(),
                     color="gray",
                     label=source.base.name,
                     linewidth=2,
@@ -336,11 +336,11 @@ def _plot_seasonal_single(
 
                 if include_climos:
                     ax.fill_between(
-                        months, lo_e.values, hi_e.values, alpha=0.2, color="tab:blue"
+                        months, lo_e.compute(), hi_e.compute(), alpha=0.2, color="tab:blue"
                     )
                 ax.plot(
                     months,
-                    mean_e.values,
+                    mean_e.compute(),
                     color="tab:blue",
                     label=source.experiment.name,
                     linewidth=2,
@@ -393,7 +393,7 @@ def _plot_seasonal_single(
                 for year, year_mean in zip(years, year_cycles):
                     ax.plot(
                         months,
-                        year_mean.values,
+                        year_mean.compute(),
                         color="tab:blue",
                         alpha=0.3,
                         linewidth=1,
@@ -403,7 +403,7 @@ def _plot_seasonal_single(
                 # Plot multi-year mean as thick line
                 ax.plot(
                     months,
-                    mean.values,
+                    mean.compute(),
                     color="tab:blue",
                     linewidth=3,
                     label=f"Mean ({n_years} years)",
@@ -413,9 +413,9 @@ def _plot_seasonal_single(
                 # Original behavior: envelope + mean line
                 if include_climos:
                     ax.fill_between(
-                        months, lo.values, hi.values, alpha=0.2, color="tab:blue"
+                        months, lo.compute(), hi.compute(), alpha=0.2, color="tab:blue"
                     )
-                ax.plot(months, mean.values, color="tab:blue", linewidth=2)
+                ax.plot(months, mean.compute(), color="tab:blue", linewidth=2)
         units = da.attrs.get("units", "")
 
     ax.set_xticks(months)
@@ -610,7 +610,7 @@ def _plot_seasonal_faceted(
                         for year_mean in year_cycles_b_unit:
                             ax_i.plot(
                                 months,
-                                year_mean.values,
+                                year_mean.compute(),
                                 color="gray",
                                 alpha=0.3,
                                 linewidth=1,
@@ -619,7 +619,7 @@ def _plot_seasonal_faceted(
                         # Plot base mean as thick line
                         ax_i.plot(
                             months,
-                            mean_b.values,
+                            mean_b.compute(),
                             color="gray",
                             linewidth=3,
                             label=source.base.name,
@@ -629,7 +629,7 @@ def _plot_seasonal_faceted(
                         for year_mean in year_cycles_e_unit:
                             ax_i.plot(
                                 months,
-                                year_mean.values,
+                                year_mean.compute(),
                                 color="tab:blue",
                                 alpha=0.3,
                                 linewidth=1,
@@ -638,7 +638,7 @@ def _plot_seasonal_faceted(
                         # Plot experiment mean as thick line
                         ax_i.plot(
                             months,
-                            mean_e.values,
+                            mean_e.compute(),
                             color="tab:blue",
                             linewidth=3,
                             label=source.experiment.name,
@@ -650,14 +650,14 @@ def _plot_seasonal_faceted(
                         if include_climos:
                             ax_i.fill_between(
                                 months,
-                                lo_b.values,
-                                hi_b.values,
+                                lo_b.compute(),
+                                hi_b.compute(),
                                 alpha=0.2,
                                 color="gray",
                             )
                         ax_i.plot(
                             months,
-                            mean_b.values,
+                            mean_b.compute(),
                             color="gray",
                             label=source.base.name,
                             linewidth=2,
@@ -665,14 +665,14 @@ def _plot_seasonal_faceted(
                         if include_climos:
                             ax_i.fill_between(
                                 months,
-                                lo_e.values,
-                                hi_e.values,
+                                lo_e.compute(),
+                                hi_e.compute(),
                                 alpha=0.2,
                                 color="tab:blue",
                             )
                         ax_i.plot(
                             months,
-                            mean_e.values,
+                            mean_e.compute(),
                             color="tab:blue",
                             label=source.experiment.name,
                             linewidth=2,
@@ -714,7 +714,7 @@ def _plot_seasonal_faceted(
                         for year_mean in year_cycles_unit:
                             ax_i.plot(
                                 months,
-                                year_mean.values,
+                                year_mean.compute(),
                                 color="tab:blue",
                                 alpha=0.3,
                                 linewidth=1,
@@ -723,7 +723,7 @@ def _plot_seasonal_faceted(
                         # Plot multi-year mean as thick line
                         ax_i.plot(
                             months,
-                            mean.values,
+                            mean.compute(),
                             color="tab:blue",
                             linewidth=3,
                         )
@@ -732,12 +732,12 @@ def _plot_seasonal_faceted(
                         if include_climos:
                             ax_i.fill_between(
                                 months,
-                                lo.values,
-                                hi.values,
+                                lo.compute(),
+                                hi.compute(),
                                 alpha=0.2,
                                 color="tab:blue",
                             )
-                        ax_i.plot(months, mean.values, color="tab:blue", linewidth=2)
+                        ax_i.plot(months, mean.compute(), color="tab:blue", linewidth=2)
 
             units_str = da.attrs.get("units", "")
 

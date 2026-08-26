@@ -392,7 +392,7 @@ def _plot_hovmuller_comparison(
         mask=mask,
     )
     clim = _compute_color_limits(
-        np.concatenate([base_field.ravel(), exp_field.ravel()]),
+        np.concatenate([np.asarray(base_field).ravel(), np.asarray(exp_field).ravel()]),
         method=hov_config.color_limit_method,
         q_low=hov_config.color_limit_quantile_low,
         q_high=hov_config.color_limit_quantile_high,

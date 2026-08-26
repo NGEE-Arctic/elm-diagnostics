@@ -212,11 +212,11 @@ def _plot_diurnal_single(
 
         if include_climos:
             ax.fill_between(
-                mean_b.hour.values, lo_b.values, hi_b.values, alpha=0.2, color="gray"
+                mean_b.hour.compute(), lo_b.compute(), hi_b.compute(), alpha=0.2, color="gray"
             )
         ax.plot(
-            mean_b.hour.values,
-            mean_b.values,
+            mean_b.hour.compute(),
+            mean_b.compute(),
             color="gray",
             label=source.base.name,
             linewidth=2,
@@ -224,15 +224,15 @@ def _plot_diurnal_single(
 
         if include_climos:
             ax.fill_between(
-                mean_e.hour.values,
-                lo_e.values,
-                hi_e.values,
+                mean_e.hour.compute(),
+                lo_e.compute(),
+                hi_e.compute(),
                 alpha=0.2,
                 color="tab:blue",
             )
         ax.plot(
-            mean_e.hour.values,
-            mean_e.values,
+            mean_e.hour.compute(),
+            mean_e.compute(),
             color="tab:blue",
             label=source.experiment.name,
             linewidth=2,
@@ -277,9 +277,9 @@ def _plot_diurnal_single(
 
         if include_climos:
             ax.fill_between(
-                mean.hour.values, lo.values, hi.values, alpha=0.2, color="tab:blue"
+                mean.hour.compute(), lo.compute(), hi.compute(), alpha=0.2, color="tab:blue"
             )
-        ax.plot(mean.hour.values, mean.values, color="tab:blue", linewidth=2)
+        ax.plot(mean.hour.compute(), mean.compute(), color="tab:blue", linewidth=2)
         units = da.attrs.get("units", "")
 
     ax.set_xticks(np.arange(0, 24, 3))
@@ -368,30 +368,30 @@ def _plot_diurnal_faceted(
 
                 if include_climos:
                     ax_i.fill_between(
-                        mean_b.hour.values,
-                        lo_b.values,
-                        hi_b.values,
+                        mean_b.hour.compute(),
+                        lo_b.compute(),
+                        hi_b.compute(),
                         alpha=0.2,
                         color="gray",
                     )
                 ax_i.plot(
-                    mean_b.hour.values,
-                    mean_b.values,
+                    mean_b.hour.compute(),
+                    mean_b.compute(),
                     color="gray",
                     label=source.base.name,
                     linewidth=2,
                 )
                 if include_climos:
                     ax_i.fill_between(
-                        mean_e.hour.values,
-                        lo_e.values,
-                        hi_e.values,
+                        mean_e.hour.compute(),
+                        lo_e.compute(),
+                        hi_e.compute(),
                         alpha=0.2,
                         color="tab:blue",
                     )
                 ax_i.plot(
-                    mean_e.hour.values,
-                    mean_e.values,
+                    mean_e.hour.compute(),
+                    mean_e.compute(),
                     color="tab:blue",
                     label=source.experiment.name,
                     linewidth=2,
@@ -416,13 +416,13 @@ def _plot_diurnal_faceted(
 
                 if include_climos:
                     ax_i.fill_between(
-                        mean.hour.values,
-                        lo.values,
-                        hi.values,
+                        mean.hour.compute(),
+                        lo.compute(),
+                        hi.compute(),
                         alpha=0.2,
                         color="tab:blue",
                     )
-                ax_i.plot(mean.hour.values, mean.values, color="tab:blue", linewidth=2)
+                ax_i.plot(mean.hour.compute(), mean.compute(), color="tab:blue", linewidth=2)
 
             units_str = da.attrs.get("units", "")
 
