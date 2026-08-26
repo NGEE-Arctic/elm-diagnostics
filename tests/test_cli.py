@@ -678,6 +678,120 @@ def test_balance_with_analysis_window_config(
 
 
 # =============================================================================
+# Last N Years Tests
+# =============================================================================
+
+
+def test_compute_max_year_from_files():
+    """Test _compute_max_year_from_files helper function."""
+    from pathlib import Path
+
+    from elm_diagnostics.cli import _compute_max_year_from_files
+
+    # Use real test data
+    test_data_path = Path(__file__).parent / "fixtures" / "data"
+    max_year = _compute_max_year_from_files(test_data_path)
+    assert max_year == 2001
+
+
+def test_last_n_years_report(tmp_path):
+    """Test report command with --last-n-years option."""
+    from pathlib import Path
+
+    # Use real test data that spans multiple years
+    test_data_path = Path(__file__).parent / "fixtures" / "data"
+    out_dir = tmp_path / "report_output"
+
+    result = runner.invoke(
+        app,
+        [
+            "report",
+            str(test_data_path),
+            "--out",
+            str(out_dir),
+            "--last-n-years",
+            "1",
+            "--quiet",
+        ],
+    )
+    assert result.exit_code == 0
+    assert (out_dir / "index.html").exists()
+
+
+def test_last_n_years_balance(tmp_path):
+    """Test balance command with --last-n-years option."""
+    from pathlib import Path
+
+    test_data_path = Path(__file__).parent / "fixtures" / "data"
+    out_dir = tmp_path / "balance_output"
+
+    result = runner.invoke(
+        app,
+        [
+            "balance",
+            "water",
+            str(test_data_path),
+            "--out",
+            str(out_dir),
+            "--last-n-years",
+            "1",
+            "--quiet",
+        ],
+    )
+    assert result.exit_code == 0
+    assert (out_dir / "water_panel1.png").exists()
+
+
+def test_last_n_years_plot(tmp_path):
+    """Test plot command with --last-n-years option."""
+    from pathlib import Path
+
+    test_data_path = Path(__file__).parent / "fixtures" / "data"
+    out_file = tmp_path / "gpp_last_n_years.png"
+
+    result = runner.invoke(
+        app,
+        [
+            "plot",
+            "GPP",
+            str(test_data_path),
+            "--out",
+            str(out_file),
+            "--last-n-years",
+            "1",
+            "--quiet",
+        ],
+    )
+    assert result.exit_code == 0
+    assert out_file.exists()
+
+
+def test_last_n_years_filters_files_correctly(tmp_path):
+    """Test that --last-n-years actually filters files before loading."""
+    from pathlib import Path
+
+    from elm_diagnostics.io.run import Run
+
+    test_data_path = Path(__file__).parent / "fixtures" / "data"
+
+    # Load with all years
+    run_all = Run(str(test_data_path))
+    all_files = run_all._stream_files["h0"]
+    run_all.close()
+
+    # Load with last 1 year only
+    run_last1 = Run(str(test_data_path), analysis_year_min=2001, analysis_year_max=2001)
+    last1_files = run_last1._stream_files["h0"]
+    run_last1.close()
+
+    # Should have fewer files when filtered
+    assert len(last1_files) < len(all_files)
+    # Should only have files from 2001
+    for f in last1_files:
+        assert "2001" in f.name
+
+
+# =============================================================================
 # Keyboard Interrupt Test
 # =============================================================================
 
