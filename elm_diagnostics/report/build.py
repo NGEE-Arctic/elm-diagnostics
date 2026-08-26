@@ -12,6 +12,7 @@
 
 from __future__ import annotations
 
+import functools
 import getpass
 import logging
 import os
@@ -27,6 +28,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+import jinja2
 import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
@@ -60,17 +62,82 @@ _PNG_PIL_KWARGS = {"compress_level": 1, "optimize": False}
 
 
 class _Section:
-    """Container for a report section."""
+    """Container for a report section.
 
-    def __init__(self, title: str, description: str = ""):
+    Attributes
+    ----------
+    title : str
+        Section display title.
+    id : str
+        URL-friendly identifier derived from title.
+    filename : str
+        HTML filename for this section. Computed at construction time based on
+        whether this is the landing page (index.html) or a regular section
+        ({id}.html).
+    description : str
+        Section description text.
+    figures : list[dict]
+        List of figure dictionaries with path, thumb_path, caption, plot_type.
+    subsections : list[_Subsection]
+        List of subsections for grouped figures.
+    statistics : Any
+        Statistics data to render as a table.
+    extra_tables : list[dict]
+        Additional tables to render beneath primary statistics.
+    extra_text_blocks : list[dict]
+        Additional text content blocks.
+    """
+
+    def __init__(self, title: str, description: str = "", is_landing: bool = False):
+        """Initialize section.
+
+        Parameters
+        ----------
+        title : str
+            Section display title.
+        description : str, optional
+            Section description text.
+        is_landing : bool, optional
+            Whether this is the landing page. If True, filename is set to
+            "index.html"; otherwise computed from title as "{id}.html".
+        """
         self.title = title
         self.id = re.sub(r"[^a-z0-9]+", "-", title.lower()).strip("-")
+        self.filename = "index.html" if is_landing else f"{self.id}.html"
         self.description = description
         self.figures: list[dict[str, str]] = []
         self.subsections: list[_Subsection] = []
         self.statistics: Any = {}
         self.extra_tables: list[dict[str, Any]] = []
         self.extra_text_blocks: list[dict[str, str]] = []
+
+    def to_dict(self) -> dict:
+        """Convert section to dictionary for template rendering.
+
+        Returns
+        -------
+        dict
+            Dictionary with keys: id, title, filename, description, figures,
+            subsections (list of dicts), statistics, extra_tables, extra_text_blocks.
+        """
+        return {
+            "id": self.id,
+            "title": self.title,
+            "filename": self.filename,
+            "description": self.description,
+            "figures": self.figures,
+            "subsections": [
+                {
+                    "id": sub.id,
+                    "title": sub.title,
+                    "figures": sub.figures,
+                }
+                for sub in self.subsections
+            ],
+            "statistics": self.statistics,
+            "extra_tables": self.extra_tables,
+            "extra_text_blocks": self.extra_text_blocks,
+        }
 
     def add_subsection(self, title: str) -> _Subsection:
         """Create a named subsection for grouped figures."""
@@ -268,6 +335,14 @@ class Report:
     def _is_comparison(self) -> bool:
         """Check if this is a comparison report."""
         return isinstance(self.source, Comparison)
+
+    @functools.cached_property
+    def _template_env(self) -> Environment:
+        """Cached Jinja2 environment for template rendering."""
+        return Environment(
+            loader=FileSystemLoader(str(_TEMPLATE_DIR)),
+            autoescape=True,
+        )
 
     def _apply_analysis_window(self, ds: xr.Dataset) -> xr.Dataset:
         """Apply analysis_year_min/max window to a dataset.
@@ -551,8 +626,10 @@ class Report:
         outdir = Path(outdir)
         figdir = outdir / "figures"
         datadir = outdir / "data"
+        assetsdir = outdir / "assets"
         figdir.mkdir(parents=True, exist_ok=True)
         datadir.mkdir(parents=True, exist_ok=True)
+        assetsdir.mkdir(parents=True, exist_ok=True)
         self._section_timings = []
         self._rendered_section_titles = []
         self._build_total_seconds = None
@@ -606,16 +683,21 @@ class Report:
             plt.close("all")
             threading.excepthook = _orig_excepthook
 
-        # Render HTML
+        # Copy assets to output
+        self._copy_assets(assetsdir)
+
+        # Render multi-page HTML
         self._rendered_section_titles = [section.title for section in sections]
-        html_path = self._render_html(outdir, sections)
+        html_paths = self._render_multi_page_html(outdir, sections)
         self._build_total_seconds = time.perf_counter() - build_start
-        return html_path
+        return html_paths[0]  # Return landing page (index.html)
 
     def _build_metadata_section(self) -> _Section:
         """Build metadata section with run information."""
         start_time = time.perf_counter()
-        sec = _Section("Run Information", "Metadata about the ELM simulation(s).")
+        sec = _Section(
+            "Run Information", "Metadata about the ELM simulation(s).", is_landing=True
+        )
 
         run = self._run
         streams = run.streams
@@ -1581,27 +1663,39 @@ class Report:
         self._record_section_timing(section_title, start_time)
         return sec
 
-    def _render_html(self, outdir: Path, sections: list[_Section]) -> Path:
-        env = Environment(
-            loader=FileSystemLoader(str(_TEMPLATE_DIR)),
-            autoescape=True,
-        )
-        template = env.get_template("single_page.html.j2")
+    def _copy_assets(self, assetsdir: Path) -> None:
+        """Copy CSS and JS assets to output assets/ directory."""
+        import shutil
 
-        # Load CSS
-        css_path = _ASSETS_DIR / "style.css"
-        css = css_path.read_text()
+        try:
+            shutil.copyfile(_ASSETS_DIR / "style.css", assetsdir / "style.css")
+            shutil.copyfile(_ASSETS_DIR / "lightbox.js", assetsdir / "lightbox.js")
+        except FileNotFoundError as e:
+            logger.error(f"Asset file not found: {e}")
+            raise RuntimeError(
+                f"Required asset file missing from {_ASSETS_DIR}. "
+                "Report generation cannot continue."
+            ) from e
+        except OSError as e:
+            logger.error(f"Failed to copy assets to {assetsdir}: {e}")
+            raise RuntimeError(
+                f"Cannot write to output directory {assetsdir}. Check permissions."
+            ) from e
 
-        # Load JavaScript for lightbox
-        js_path = _ASSETS_DIR / "lightbox.js"
-        if js_path.exists():
-            js = js_path.read_text()
-        else:
-            js = ""  # Will be created next
+    def _compute_summary_stats(self, sections: list[_Section]) -> dict:
+        """Compute summary statistics for report landing page.
 
-        title = self.config.report.title_template.format(casename=self._casename)
+        Parameters
+        ----------
+        sections : list[_Section]
+            Report sections to compute statistics from.
 
-        # Generate summary statistics
+        Returns
+        -------
+        dict
+            Summary statistics with keys: total_sections, total_figures,
+            total_errors, total_warnings, status, status_message.
+        """
         total_figures = sum(
             len(s.figures) + sum(len(sub.figures) for sub in s.subsections)
             for s in sections
@@ -1609,7 +1703,6 @@ class Report:
         total_errors = len(self._errors)
         total_warnings = len(self._warnings)
 
-        # Determine status
         if total_errors > 5:
             status = "error"
             status_message = f"{total_errors} errors encountered"
@@ -1623,42 +1716,69 @@ class Report:
             status = "success"
             status_message = "All sections generated successfully"
 
-        html = template.render(
-            title=title,
-            casename=self._casename,
-            css=css,
-            js=js,
-            thumbnails_enabled=self.config.report.thumbnails.enabled,
-            summary={
-                "total_sections": len(sections),
-                "total_figures": total_figures,
-                "total_errors": total_errors,
-                "total_warnings": total_warnings,
-                "status": status,
-                "status_message": status_message,
-            },
-            sections=[
-                {
-                    "id": s.id,
-                    "title": s.title,
-                    "description": s.description,
-                    "figures": s.figures,
-                    "subsections": [
-                        {
-                            "id": sub.id,
-                            "title": sub.title,
-                            "figures": sub.figures,
-                        }
-                        for sub in s.subsections
-                    ],
-                    "statistics": s.statistics,
-                    "extra_tables": s.extra_tables,
-                    "extra_text_blocks": s.extra_text_blocks,
-                }
-                for s in sections
-            ],
-        )
+        return {
+            "total_sections": len(sections),
+            "total_figures": total_figures,
+            "total_errors": total_errors,
+            "total_warnings": total_warnings,
+            "status": status,
+            "status_message": status_message,
+        }
 
-        html_path = outdir / "index.html"
-        html_path.write_text(html)
-        return html_path
+    def _render_multi_page_html(
+        self, outdir: Path, sections: list[_Section]
+    ) -> list[Path]:
+        """Render each section as separate HTML file with shared navigation."""
+        env = self._template_env
+
+        # Prepare navigation data (same for all pages)
+        all_sections_for_nav = [
+            {
+                "id": s.id,
+                "title": s.title,
+                "filename": s.filename,
+                "subsections": [
+                    {"id": sub.id, "title": sub.title} for sub in s.subsections
+                ],
+            }
+            for s in sections
+        ]
+
+        # Generate summary statistics (for landing page)
+        summary = self._compute_summary_stats(sections)
+
+        html_paths = []
+        try:
+            section_template = env.get_template("section.html.j2")
+        except jinja2.TemplateNotFound as e:
+            logger.error(f"Template not found: {e}")
+            raise RuntimeError(
+                f"Report template 'section.html.j2' not found in {_TEMPLATE_DIR}. "
+                "Package installation may be corrupted."
+            ) from e
+
+        # Render each section to its own file
+        for section in sections:
+            html_path = outdir / section.filename
+
+            # Convert section to dict for template
+            section_dict = section.to_dict()
+
+            # Only include summary on landing page (Run Information)
+            template_vars = {
+                "casename": self._casename,
+                "all_sections": all_sections_for_nav,
+                "current_section_id": section.id,
+                "section_title": section.title,
+                "section": section_dict,
+                "thumbnails_enabled": self.config.report.thumbnails.enabled,
+            }
+
+            if section.filename == "index.html":
+                template_vars["summary"] = summary
+
+            html = section_template.render(**template_vars)
+            html_path.write_text(html)
+            html_paths.append(html_path)
+
+        return html_paths

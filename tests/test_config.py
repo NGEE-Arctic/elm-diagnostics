@@ -4,6 +4,7 @@ import tempfile
 
 import pytest
 import yaml
+from pydantic import ValidationError
 
 from elm_diagnostics.config.schema import Config, load_config, load_defaults
 
@@ -158,7 +159,7 @@ def test_invalid_envelope_rejected():
     with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
         yaml.dump(bad, f)
         f.flush()
-        with pytest.raises(Exception):
+        with pytest.raises((ValueError, ValidationError)):
             load_config(path=f.name)
 
 

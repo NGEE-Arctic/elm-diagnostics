@@ -9,11 +9,11 @@ import subprocess
 import pytest
 from typer.testing import CliRunner
 
-from elm_diagnostics.cli import app, _resolve_analysis_year_filter
+from elm_diagnostics.cli import _resolve_analysis_year_filter, app
 from tests.fixtures.synthetic_elm import (
-    make_water_balance_dataset,
     make_carbon_balance_dataset,
     make_energy_balance_dataset,
+    make_water_balance_dataset,
     save_as_elm_files,
 )
 
@@ -157,18 +157,7 @@ def test_report_with_analysis_window_config(
     """Test report generation using year window in config."""
     config_file = tmp_path / "analysis_window.yaml"
     config_file.write_text(
-        "\n".join(
-            [
-                "time:",
-                "  analysis_start_year: 2000",
-                "  analysis_end_year: 2000",
-                "  water_year_start_month: 10",
-                "plots:",
-                "  climatology:",
-                "    include_climos: false",
-                "",
-            ]
-        )
+        "time:\n  analysis_start_year: 2000\n  analysis_end_year: 2000\n  water_year_start_month: 10\nplots:\n  climatology:\n    include_climos: false\n"
     )
 
     result = runner.invoke(
@@ -457,18 +446,7 @@ def test_analysis_year_filter_includes_previous_year_for_water_year(tmp_path):
     """Year narrowing should include prior year for water-year framing."""
     cfg = tmp_path / "config.yaml"
     cfg.write_text(
-        "\n".join(
-            [
-                "time:",
-                "  analysis_start_year: 2000",
-                "  analysis_end_year: 2000",
-                "  water_year_start_month: 10",
-                "plots:",
-                "  climatology:",
-                "    include_climos: false",
-                "",
-            ]
-        )
+        "time:\n  analysis_start_year: 2000\n  analysis_end_year: 2000\n  water_year_start_month: 10\nplots:\n  climatology:\n    include_climos: false\n"
     )
 
     lo, hi = _resolve_analysis_year_filter(str(cfg))
@@ -479,18 +457,7 @@ def test_analysis_year_filter_uses_config_window(tmp_path):
     """Year narrowing should honor config start/end year bounds."""
     cfg = tmp_path / "config.yaml"
     cfg.write_text(
-        "\n".join(
-            [
-                "time:",
-                "  analysis_start_year: 1990",
-                "  analysis_end_year: 1995",
-                "  water_year_start_month: 1",
-                "plots:",
-                "  climatology:",
-                "    include_climos: false",
-                "",
-            ]
-        )
+        "time:\n  analysis_start_year: 1990\n  analysis_end_year: 1995\n  water_year_start_month: 1\nplots:\n  climatology:\n    include_climos: false\n"
     )
 
     lo, hi = _resolve_analysis_year_filter(str(cfg))
@@ -509,8 +476,9 @@ def test_report_comparison(synthetic_data_dir, tmp_path, temp_output_dir):
     compare_dir.mkdir()
 
     # We need to import and create another dataset
-    from tests.fixtures.synthetic_elm import make_single_point_dataset
     import numpy as np
+
+    from tests.fixtures.synthetic_elm import make_single_point_dataset
 
     # Create a slightly different dataset
     variables = {
@@ -605,6 +573,16 @@ def test_cli_end_to_end_subprocess(synthetic_data_dir, temp_output_dir, tmp_path
     here; ``test_report_command_basic`` still exercises the full default report
     in-process. Balance sections are kept so the run remains a real report.
     """
+    env = os.environ.copy()
+    # Use synchronous scheduler to prevent dask threading issues
+    env["DASK_SCHEDULER"] = "synchronous"
+    # Ensure matplotlib uses non-interactive backend
+    env["MPLBACKEND"] = "Agg"
+    # Limit threads to prevent resource contention in CI
+    env["OMP_NUM_THREADS"] = "1"
+    env["MKL_NUM_THREADS"] = "1"
+    env["OPENBLAS_NUM_THREADS"] = "1"
+
     config_file = tmp_path / "end_to_end_config.yaml"
     config_file.write_text(
         """
@@ -616,7 +594,7 @@ report:
 """
     )
 
-    result = run_cli(
+    result = subprocess.run(
         [
             "elm-diagnostics",
             "report",
@@ -627,7 +605,11 @@ report:
             str(config_file),
             "--quiet",
         ],
+        capture_output=True,
+        text=True,
+        env=env,
         timeout=CLI_REPORT_TIMEOUT,
+        check=False,
     )
     assert result.returncode == 0
     assert "Report generated" in result.stdout
@@ -675,17 +657,7 @@ def test_balance_with_analysis_window_config(
     """Test balance command uses year window in config."""
     config_file = tmp_path / "analysis_window.yaml"
     config_file.write_text(
-        "\n".join(
-            [
-                "time:",
-                "  analysis_start_year: 2000",
-                "  analysis_end_year: 2000",
-                "plots:",
-                "  climatology:",
-                "    include_climos: false",
-                "",
-            ]
-        )
+        "time:\n  analysis_start_year: 2000\n  analysis_end_year: 2000\nplots:\n  climatology:\n    include_climos: false\n"
     )
 
     result = runner.invoke(

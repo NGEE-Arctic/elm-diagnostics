@@ -1,14 +1,16 @@
 """Test and demonstrate all plotting functions with real oakharbor data."""
 
 from pathlib import Path
+
 import matplotlib.pyplot as plt
+
 from elm_diagnostics import Run
 from elm_diagnostics.plots import (
-    plot_timeseries,
-    plot_seasonal,
     plot_anomaly,
-    plot_histogram,
     plot_diurnal,
+    plot_histogram,
+    plot_seasonal,
+    plot_timeseries,
 )
 
 # Load the real data

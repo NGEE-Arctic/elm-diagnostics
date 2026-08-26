@@ -1,0 +1,142 @@
+{# Section content fragment - renders a single section's body #}
+<section id="{{ section.id }}">
+  {% if section.description %}
+  <p>{{ section.description }}</p>
+  {% endif %}
+
+  {# Statistics table if present #}
+  {% if section.statistics %}
+  <table class="stats-table">
+    {% if section.statistics.table_kind and section.statistics.rows %}
+    <thead>
+      <tr>
+        <th>Metric</th>
+        <th>Long Name</th>
+        <th>Value</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in section.statistics.rows %}
+      <tr class="stats-row-{{ row.kind }}{% if row.indent %} stats-row-indented{% endif %}">
+        <td>
+          {% if row.kind == 'group' %}
+          <strong>{{ row.metric }}</strong>
+          {% else %}
+          <span class="stats-indent-{{ row.indent }}">{{ row.metric }}</span>
+          {% endif %}
+        </td>
+        <td>{{ row.long_name }}</td>
+        <td>{{ row.value }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+    {% else %}
+    <thead>
+      <tr>
+        <th>Metric</th>
+        <th>Value</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for key, value in section.statistics.items() %}
+      <tr>
+        <td><strong>{{ key }}</strong></td>
+        <td>
+          {% if value is string %}
+            {{ value }}
+          {% elif value is iterable and value is not string %}
+            <ul>
+            {% for item in value %}
+              <li>{{ item }}</li>
+            {% endfor %}
+            </ul>
+          {% else %}
+            {{ value }}
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+    {% endif %}
+  </table>
+  {% endif %}
+
+  {# Additional tables for section-specific structured data #}
+  {% if section.extra_tables %}
+  {% for table in section.extra_tables %}
+  <h3>{{ table.title }}</h3>
+  <table class="stats-table">
+    <thead>
+      <tr>
+        {% for column in table.columns %}
+        <th>{{ column }}</th>
+        {% endfor %}
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in table.rows %}
+      <tr>
+        {% for cell in row %}
+        <td>{{ cell }}</td>
+        {% endfor %}
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% endfor %}
+  {% endif %}
+
+  {% if section.extra_text_blocks %}
+  {% for block in section.extra_text_blocks %}
+  <h3>{{ block.title }}</h3>
+  <pre>{{ block.content }}</pre>
+  {% endfor %}
+  {% endif %}
+
+  {# Figures grouped by subsection #}
+  {% if section.subsections %}
+  {% for subsection in section.subsections %}
+  {% if subsection.figures %}
+  <h3 class="plot-subsection" id="{{ subsection.id }}">{{ subsection.title }}</h3>
+  <div class="figure-grid">
+    {% for fig in subsection.figures %}
+    <div class="figure-card">
+      {% if thumbnails_enabled %}
+      <img src="{{ fig.thumb_path }}" alt="{{ fig.caption }}" data-full-path="{{ fig.path }}">
+      {% else %}
+      <img src="{{ fig.path }}" alt="{{ fig.caption }}">
+      {% endif %}
+      <p class="caption">
+        {% if fig.plot_type %}
+        <span class="plot-type-badge">{{ fig.plot_type }}</span>
+        {% endif %}
+        {{ fig.caption }}
+      </p>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+  {% endfor %}
+  {% endif %}
+
+  {# Backward-compatible flat figure grid #}
+  {% if section.figures %}
+  <div class="figure-grid">
+    {% for fig in section.figures %}
+    <div class="figure-card">
+      {% if thumbnails_enabled %}
+      <img src="{{ fig.thumb_path }}" alt="{{ fig.caption }}" data-full-path="{{ fig.path }}">
+      {% else %}
+      <img src="{{ fig.path }}" alt="{{ fig.caption }}">
+      {% endif %}
+      <p class="caption">
+        {% if fig.plot_type %}
+        <span class="plot-type-badge">{{ fig.plot_type }}</span>
+        {% endif %}
+        {{ fig.caption }}
+      </p>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+</section>

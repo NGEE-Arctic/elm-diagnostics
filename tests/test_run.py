@@ -63,9 +63,8 @@ def test_run_cadence(elm_case_dir):
 
 
 def test_run_no_files_raises():
-    with tempfile.TemporaryDirectory() as tmpdir:
-        with pytest.raises(FileNotFoundError):
-            Run(tmpdir)
+    with tempfile.TemporaryDirectory() as tmpdir, pytest.raises(FileNotFoundError):
+        Run(tmpdir)
 
 
 def test_run_repr(elm_case_dir):

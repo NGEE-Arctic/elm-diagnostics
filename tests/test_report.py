@@ -15,11 +15,6 @@ from elm_diagnostics.config.schema import (
 )
 from elm_diagnostics.io.run import Comparison, Run
 from elm_diagnostics.report.build import Report
-from elm_diagnostics.config.schema import (
-    Config,
-    GroupPlotTypesConfig,
-    VariableGroupConfig,
-)
 from tests.fixtures.synthetic_elm import (
     make_multicolumn_dataset,
     make_vertical_profile_dataset,
@@ -361,8 +356,13 @@ def test_report_responsive_css(report_run):
         content = html_path.read_text()
         # Check for viewport meta tag
         assert "viewport" in content
-        # Check for CSS grid or flex
-        assert "grid" in content or "flex" in content
+        # Check for external CSS reference (CSS is now in external file)
+        assert 'href="assets/style.css"' in content
+        # Check that CSS file exists and contains grid/flex
+        css_path = Path(outdir) / "assets" / "style.css"
+        assert css_path.exists()
+        css_content = css_path.read_text()
+        assert "grid" in css_content or "flex" in css_content
 
 
 def test_report_generation_timestamp(report_run):
@@ -384,8 +384,11 @@ def test_report_diagnostics_include_provenance(report_run, monkeypatch):
     rpt = Report(report_run, invocation_command="elm-diagnostics report /tmp/run")
 
     with tempfile.TemporaryDirectory() as outdir:
-        html_path = rpt.build(outdir)
-        content = html_path.read_text()
+        rpt.build(outdir)
+        # Diagnostics content is now in diagnostics.html, not index.html
+        diagnostics_path = Path(outdir) / "diagnostics.html"
+        assert diagnostics_path.exists()
+        content = diagnostics_path.read_text()
         assert "Diagnostics" in content
         assert "Git version" in content
         assert "test-git-version" in content
@@ -427,8 +430,11 @@ def test_report_includes_lnd_in_when_present(report_run):
 
     rpt = Report(report_run)
     with tempfile.TemporaryDirectory() as outdir:
-        html_path = rpt.build(outdir)
-        content = html_path.read_text()
+        rpt.build(outdir)
+        # lnd_in content is now in diagnostics.html, not index.html
+        diagnostics_path = Path(outdir) / "diagnostics.html"
+        assert diagnostics_path.exists()
+        content = diagnostics_path.read_text()
         assert "lnd_in namelist file" in content
         # Content is HTML-escaped in the template
         assert "&amp;clm_inparm" in content
@@ -445,19 +451,16 @@ def test_report_handles_missing_lnd_in(report_run, caplog):
         lnd_in_path.unlink()
 
     rpt = Report(report_run)
-    with tempfile.TemporaryDirectory() as outdir:
-        with caplog.at_level(logging.WARNING):
-            html_path = rpt.build(outdir)
-            assert html_path.exists()
-            content = html_path.read_text()
-            # Report should still be generated
-            assert "report_test" in content
-            # lnd_in should not be in the content
-            assert "lnd_in namelist file" not in content
-            # Warning should be logged
-            assert any(
-                "lnd_in file not found" in record.message for record in caplog.records
-            )
+    with tempfile.TemporaryDirectory() as outdir, caplog.at_level(logging.WARNING):
+        html_path = rpt.build(outdir)
+        assert html_path.exists()
+        content = html_path.read_text()
+        # Report should still be generated
+        assert "report_test" in content
+        # lnd_in should not be in the content
+        assert "lnd_in namelist file" not in content
+        # Warning should be logged
+        assert any("lnd_in file not found" in record.message for record in caplog.records)
 
 
 def test_report_handles_unreadable_lnd_in(report_run, caplog, monkeypatch):
@@ -488,3 +491,108 @@ def test_report_handles_unreadable_lnd_in(report_run, caplog, monkeypatch):
         assert "report_test" in content
         # lnd_in should not be in the content
         assert "lnd_in namelist file" not in content
+
+
+def test_report_multipage_structure(report_run):
+    """Test that report generates multiple HTML pages."""
+    rpt = Report(report_run)
+    with tempfile.TemporaryDirectory() as outdir:
+        html_path = rpt.build(outdir)
+
+        # Landing page returned
+        assert html_path.name == "index.html"
+        assert html_path.exists()
+
+        # Section pages exist - check what files are actually there
+        html_files = {f.name for f in Path(outdir).glob("*.html")}
+        expected_files = {"index.html", "water-balance.html", "diagnostics.html"}
+        assert expected_files.issubset(html_files), \
+            f"Missing expected files. Found: {sorted(html_files)}"
+        assert len(html_files) >= 4, \
+            f"Expected at least 4 HTML files (index + sections), got {len(html_files)}"
+
+        # Figures directory unchanged
+        assert (Path(outdir) / "figures").exists()
+
+
+def test_report_navigation_links(report_run):
+    """Test that navigation menu appears on all pages with correct active state."""
+    rpt = Report(report_run)
+    with tempfile.TemporaryDirectory() as outdir:
+        rpt.build(outdir)
+
+        # Check water balance page
+        water_page = (Path(outdir) / "water-balance.html").read_text()
+        assert 'href="water-balance.html"' in water_page
+        assert 'class="active"' in water_page  # Active state present
+        assert 'href="index.html"' in water_page  # Link to landing
+        assert 'href="diagnostics.html"' in water_page  # Link to another section
+
+        # Check that navigation menu is present
+        assert '<nav id="sidebar">' in water_page
+
+        # Check that active class is on the correct link
+        # Should find the active link on water-balance page
+        assert 'href="water-balance.html" class="active"' in water_page
+
+
+def test_report_external_assets(report_run):
+    """Test that pages link to external CSS/JS assets."""
+    rpt = Report(report_run)
+    with tempfile.TemporaryDirectory() as outdir:
+        html_path = rpt.build(outdir)
+        content = html_path.read_text()
+
+        # Check for external asset links (not inline)
+        assert 'href="assets/style.css"' in content
+        assert 'src="assets/lightbox.js"' in content
+        # Should NOT have inline CSS/JS
+        assert "<style>" not in content
+
+
+def test_report_subsection_anchors(report_run):
+    """Test that subsections render as anchors within parent page."""
+    rpt = Report(report_run)
+    with tempfile.TemporaryDirectory() as outdir:
+        rpt.build(outdir)
+
+        # Look for variable group pages with subsections
+        pages = list(Path(outdir).glob("*.html"))
+        found_subsection = False
+
+        for page in pages:
+            if page.name in ["index.html", "diagnostics.html", "water-balance.html"]:
+                continue
+            content = page.read_text()
+            # Look for subsection ID anchors (plot types with section prefix)
+            # IDs are formatted as "section-plottype-plots" (e.g., "hydrology-timeseries-plots")
+            if "-timeseries-plots" in content or "-seasonal-plots" in content:
+                # Found a subsection anchor
+                found_subsection = True
+                break
+
+        # Should find at least one subsection
+        assert found_subsection, "No subsections found in variable group pages"
+
+
+def test_report_landing_page_summary(report_run):
+    """Test that landing page (index.html) contains summary bar."""
+    rpt = Report(report_run)
+    with tempfile.TemporaryDirectory() as outdir:
+        html_path = rpt.build(outdir)
+        content = html_path.read_text()
+
+        # Summary bar should be on landing page
+        assert "summary-bar" in content
+        assert "Sections" in content
+        assert "Figures" in content
+
+
+def test_report_handles_missing_assets(report_run, monkeypatch, tmp_path):
+    """Test that missing asset files produce helpful error."""
+    import elm_diagnostics.report.build as build_module
+    monkeypatch.setattr(build_module, "_ASSETS_DIR", tmp_path / "nonexistent")
+
+    rpt = Report(report_run)
+    with tempfile.TemporaryDirectory() as outdir, pytest.raises(RuntimeError, match="Required asset file missing"):
+        rpt.build(outdir)

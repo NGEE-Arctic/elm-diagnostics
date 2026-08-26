@@ -1,0 +1,14 @@
+# claude-workflows project configuration
+# Generated: 2026-05-12
+
+project_name: elm-diagnostics
+workflow_types:
+  - analysis
+spec_storage_mode: mutable        # mutable | immutable
+specs_dir: specs/
+
+analysis:
+  primary_language: python
+  environment_manager: mamba
+  environment_name: elm-diagnostics
+  test_strategy: test-along       # test-along | test-first | test-after

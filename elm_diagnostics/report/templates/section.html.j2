@@ -1,0 +1,39 @@
+{% extends "base.html.j2" %}
+
+{% block title %}{{ section_title }} — {{ casename }}{% endblock %}
+
+{% block content %}
+  <h1>{{ section_title }}</h1>
+  <p class="meta">Case: <code>{{ casename }}</code></p>
+
+  {# Summary bar - only shown on landing page (Run Information) #}
+  {% if summary %}
+  <div class="summary-bar {{ summary.status }}">
+    <strong>{{ summary.status_message }}</strong>
+    <div class="summary-stats">
+      <div class="summary-stat">
+        <div class="value">{{ summary.total_sections }}</div>
+        <div class="label">Sections</div>
+      </div>
+      <div class="summary-stat">
+        <div class="value">{{ summary.total_figures }}</div>
+        <div class="label">Figures</div>
+      </div>
+      {% if summary.total_errors > 0 %}
+      <div class="summary-stat">
+        <div class="value">{{ summary.total_errors }}</div>
+        <div class="label">Errors</div>
+      </div>
+      {% endif %}
+      {% if summary.total_warnings > 0 %}
+      <div class="summary-stat">
+        <div class="value">{{ summary.total_warnings }}</div>
+        <div class="label">Warnings</div>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+  {% endif %}
+
+  {% include "_section_content.html.j2" %}
+{% endblock %}

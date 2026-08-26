@@ -18,9 +18,9 @@ from typer.testing import CliRunner
 
 from elm_diagnostics.cli import app
 from tests.fixtures.synthetic_elm import (
-    make_water_balance_dataset,
     make_carbon_balance_dataset,
     make_energy_balance_dataset,
+    make_water_balance_dataset,
     save_as_elm_files,
 )
 
@@ -68,7 +68,8 @@ def _extract_time_range_from_html(html_path: Path) -> tuple[str, str] | None:
         if match:
             return (match.group(1), match.group(2))
     except Exception:
-        pass
+        # Ignore any parsing errors and return None
+        return None
     return None
 
 
@@ -81,18 +82,7 @@ class TestAnalysisWindowFiltering:
         """Report with analysis window 2001-2001 should not include 2000 or 2002 data."""
         config_file = tmp_path / "single_year.yaml"
         config_file.write_text(
-            "\n".join(
-                [
-                    "time:",
-                    "  analysis_start_year: 2001",
-                    "  analysis_end_year: 2001",
-                    "  water_year_start_month: 1",
-                    "plots:",
-                    "  climatology:",
-                    "    include_climos: false",
-                    "",
-                ]
-            )
+            "time:\n  analysis_start_year: 2001\n  analysis_end_year: 2001\n  water_year_start_month: 1\nplots:\n  climatology:\n    include_climos: false\n"
         )
 
         result = runner.invoke(
@@ -126,18 +116,7 @@ class TestAnalysisWindowFiltering:
         """Report with water year start month=10 and 2001-2001 should include Oct 2000-Sep 2001."""
         config_file = tmp_path / "water_year.yaml"
         config_file.write_text(
-            "\n".join(
-                [
-                    "time:",
-                    "  analysis_start_year: 2001",
-                    "  analysis_end_year: 2001",
-                    "  water_year_start_month: 10",
-                    "plots:",
-                    "  climatology:",
-                    "    include_climos: false",
-                    "",
-                ]
-            )
+            "time:\n  analysis_start_year: 2001\n  analysis_end_year: 2001\n  water_year_start_month: 10\nplots:\n  climatology:\n    include_climos: false\n"
         )
 
         result = runner.invoke(
@@ -176,18 +155,7 @@ class TestAnalysisWindowFiltering:
         """Report with analysis window 2000-2002 should include only those years."""
         config_file = tmp_path / "multi_year.yaml"
         config_file.write_text(
-            "\n".join(
-                [
-                    "time:",
-                    "  analysis_start_year: 2000",
-                    "  analysis_end_year: 2002",
-                    "  water_year_start_month: 1",
-                    "plots:",
-                    "  climatology:",
-                    "    include_climos: false",
-                    "",
-                ]
-            )
+            "time:\n  analysis_start_year: 2000\n  analysis_end_year: 2002\n  water_year_start_month: 1\nplots:\n  climatology:\n    include_climos: false\n"
         )
 
         result = runner.invoke(
@@ -219,18 +187,7 @@ class TestAnalysisWindowFiltering:
         """Balance command with analysis window should also respect the window."""
         config_file = tmp_path / "balance_window.yaml"
         config_file.write_text(
-            "\n".join(
-                [
-                    "time:",
-                    "  analysis_start_year: 2001",
-                    "  analysis_end_year: 2001",
-                    "  water_year_start_month: 1",
-                    "plots:",
-                    "  climatology:",
-                    "    include_climos: false",
-                    "",
-                ]
-            )
+            "time:\n  analysis_start_year: 2001\n  analysis_end_year: 2001\n  water_year_start_month: 1\nplots:\n  climatology:\n    include_climos: false\n"
         )
 
         result = runner.invoke(
@@ -261,20 +218,7 @@ class TestAnalysisWindowFiltering:
         """
         config_file = tmp_path / "climo_with_window.yaml"
         config_file.write_text(
-            "\n".join(
-                [
-                    "time:",
-                    "  analysis_start_year: 2001",
-                    "  analysis_end_year: 2001",
-                    "  water_year_start_month: 1",
-                    "plots:",
-                    "  climatology:",
-                    "    include_climos: true",
-                    "    climo_start_year: -1",
-                    "    climo_end_year: -1",
-                    "",
-                ]
-            )
+            "time:\n  analysis_start_year: 2001\n  analysis_end_year: 2001\n  water_year_start_month: 1\nplots:\n  climatology:\n    include_climos: true\n    climo_start_year: -1\n    climo_end_year: -1\n"
         )
 
         result = runner.invoke(
