@@ -105,7 +105,7 @@ class WaterBalance(Balance):
                     "Storage component '%s' included in storage decomposition.", varname
                 )
                 if total_storage is None:
-                    total_storage = da.copy()
+                    total_storage = da
                 else:
                     total_storage = total_storage + da
             except KeyError:

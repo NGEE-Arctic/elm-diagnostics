@@ -1355,17 +1355,26 @@ class Report:
                     f"Group '{group_name}': showing {max_vars}/{len(varnames)} variables"
                 )
 
-            for var_index, varname in enumerate(varnames_to_plot, start=1):
+            # Batch check variable existence to avoid repeated stream opens
+            available_vars = [v for v in varnames_to_plot if run.has(v)]
+            if len(available_vars) < len(varnames_to_plot):
+                missing = set(varnames_to_plot) - set(available_vars)
+                self._add_warning(
+                    f"Group '{group_name}': skipping {len(missing)} missing variables: {sorted(missing)}"
+                )
+
+            for var_index, varname in enumerate(available_vars, start=1):
                 # Announce variable progress
                 self._announce_variable_progress(
-                    section_title, varname, var_index, len(varnames_to_plot)
+                    section_title, varname, var_index, len(available_vars)
                 )
 
                 compute_start = time.perf_counter()
                 var = None
                 base_var = None
                 var_context: dict[str, Any] | None = None
-                has_var = run.has(varname)
+                # Variable existence already confirmed
+                has_var = True
                 if has_var:
                     # Load once so validation checks do not repeatedly call run.get(varname).
                     var = run.get(varname)

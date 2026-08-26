@@ -273,6 +273,7 @@ class Run:
         self._datasets: dict[str, xr.Dataset] = {}
         self._cadence: dict[str, str | pd.Timedelta] = {}
         self._streams_cache: dict[str, xr.Dataset] | None = None
+        self._variable_cache: dict[str, xr.DataArray] = {}
 
         if streams is not None:
             self._stream_files: dict[str, list[Path]] = {}
@@ -448,23 +449,37 @@ class Run:
         KeyError
             If the variable is not found in any tape and cannot be derived.
         """
+        # Check cache first (only for non-tape-specific requests)
+        if tape is None and varname in self._variable_cache:
+            return self._variable_cache[varname]
+
         if tape is not None:
             ds = self._open_stream(tape)
             if varname in ds:
-                return ds[varname]
+                result = ds[varname]
+                # Cache tape-specific request as well
+                if varname not in self._variable_cache:
+                    self._variable_cache[varname] = result
+                return result
             raise KeyError(f"{varname!r} not found in stream {tape}")
 
         for t in self.tape_priority:
             ds = self._open_stream(t)
             if varname in ds:
-                return ds[varname]
+                result = ds[varname]
+                # Cache for future access
+                self._variable_cache[varname] = result
+                return result
 
         # Try to derive the variable if it's not directly available
         from elm_diagnostics.io.derived import can_derive, derive_variable
 
         if can_derive(varname):
             try:
-                return derive_variable(self, varname)
+                result = derive_variable(self, varname)
+                # Cache derived variables
+                self._variable_cache[varname] = result
+                return result
             except (ValueError, KeyError) as e:
                 # Derivation failed - fall through to original error
                 available_tapes = ", ".join(self._tape_order)
@@ -479,11 +494,28 @@ class Run:
         )
 
     def has(self, varname: str) -> bool:
-        """Check whether a variable exists in any tape."""
+        """Check whether a variable exists in any tape or can be derived."""
+        # Check cache first
+        if varname in self._variable_cache:
+            return True
+
+        # Check tapes
         for t in self._tape_order:
             ds = self._open_stream(t)
             if varname in ds:
                 return True
+
+        # Check if derivable AND components are available
+        from elm_diagnostics.io.derived import can_derive, derive_variable
+        if can_derive(varname):
+            try:
+                # Try to derive it - if successful, it's available
+                derive_variable(self, varname)
+                return True
+            except (ValueError, KeyError):
+                # Derivation failed (missing components)
+                return False
+
         return False
 
     def close(self) -> None:

@@ -85,8 +85,14 @@ def test_real_file_has_expected_variables(real_run):
 
 
 def test_real_file_missing_qflx_evap_tot(real_run):
-    """Verify that QFLX_EVAP_TOT is not in the file (needs computation)."""
-    assert not real_run.has("QFLX_EVAP_TOT")
+    """Verify that QFLX_EVAP_TOT is not in the file but can be derived."""
+    # Check that it's not in any of the raw streams
+    for tape in real_run._tape_order:
+        ds = real_run._open_stream(tape)
+        assert "QFLX_EVAP_TOT" not in ds
+
+    # But has() should return True because it can be derived
+    assert real_run.has("QFLX_EVAP_TOT")
 
 
 def test_compute_et_from_real_data(real_run):
