@@ -507,6 +507,7 @@ class Run:
 
         # Check if derivable AND components are available
         from elm_diagnostics.io.derived import can_derive, derive_variable
+
         if can_derive(varname):
             try:
                 # Try to derive it - if successful, it's available
