@@ -336,7 +336,11 @@ def _plot_seasonal_single(
 
                 if include_climos:
                     ax.fill_between(
-                        months, lo_e.compute(), hi_e.compute(), alpha=0.2, color="tab:blue"
+                        months,
+                        lo_e.compute(),
+                        hi_e.compute(),
+                        alpha=0.2,
+                        color="tab:blue",
                     )
                 ax.plot(
                     months,

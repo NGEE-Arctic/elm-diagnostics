@@ -832,7 +832,8 @@ class Report:
                 )
                 # Clear cache after balance section
                 import gc
-                if hasattr(self._run, '_variable_cache'):
+
+                if hasattr(self._run, "_variable_cache"):
                     self._run._variable_cache.clear()
                 gc.collect()
 
@@ -917,7 +918,8 @@ class Report:
                 )
                 # Clear cache after balance section
                 import gc
-                if hasattr(self._run, '_variable_cache'):
+
+                if hasattr(self._run, "_variable_cache"):
                     self._run._variable_cache.clear()
                 gc.collect()
 
@@ -1002,7 +1004,8 @@ class Report:
                 )
                 # Clear cache after balance section
                 import gc
-                if hasattr(self._run, '_variable_cache'):
+
+                if hasattr(self._run, "_variable_cache"):
                     self._run._variable_cache.clear()
                 gc.collect()
 
@@ -1491,7 +1494,8 @@ class Report:
             # Clear variable cache and force garbage collection after each group
             # to prevent memory accumulation across 912 variables
             import gc
-            if hasattr(run, '_variable_cache'):
+
+            if hasattr(run, "_variable_cache"):
                 run._variable_cache.clear()
             gc.collect()
 
