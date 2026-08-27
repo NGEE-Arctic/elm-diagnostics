@@ -242,6 +242,13 @@ def _resolve_analysis_year_filter(
         # Only adjust if not already adjusted by last_n_years logic
         lo -= 1
 
+    # An explicit --last-n-years is a deliberate request to load only recent
+    # years (typically to bound memory/time on large runs). It takes precedence
+    # over climatology's default "use all available years" widening below, which
+    # would otherwise reset the window to (None, None) and load every file.
+    if last_n_years is not None:
+        return lo, hi
+
     if cfg.plots.climatology.include_climos:
         start = cfg.plots.climatology.climo_start_year
         end = cfg.plots.climatology.climo_end_year

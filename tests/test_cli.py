@@ -464,6 +464,35 @@ def test_analysis_year_filter_uses_config_window(tmp_path):
     assert (lo, hi) == (1990, 1995)
 
 
+def test_last_n_years_not_overridden_by_default_climatology(tmp_path):
+    """--last-n-years must win over climatology's 'use all years' widening.
+
+    Regression: with the default config (include_climos=True and
+    climo_start/end_year == -1, meaning "all available years"), the climatology
+    branch reset the resolved window to (None, None), silently discarding an
+    explicit --last-n-years request and loading every file.
+    """
+    from pathlib import Path
+
+    # Minimal ELM-like files spanning three years so max-year detection works.
+    for year in (2010, 2011, 2012):
+        (tmp_path / f"case.elm.h0.{year}-01-01-00000.nc").write_bytes(b"")
+
+    # Default config: climatology enabled with the -1 "all years" sentinel and
+    # a water-year start month of October (prior year is pulled in).
+    lo, hi = _resolve_analysis_year_filter(
+        None, last_n_years=1, elm_path=Path(tmp_path)
+    )
+
+    assert hi == 2012, f"expected max year 2012, got {hi}"
+    # Window must be bounded (not None) — i.e. --last-n-years was honored.
+    assert lo is not None and hi is not None, (
+        f"--last-n-years was discarded: got ({lo}, {hi})"
+    )
+    # last_n_years=1 -> 2012; October water year pulls in the prior year 2011.
+    assert lo == 2011, f"expected lower bound 2011 (water-year prev), got {lo}"
+
+
 # =============================================================================
 # Comparison Mode Tests
 # =============================================================================

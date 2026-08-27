@@ -16,7 +16,12 @@ import pytest
 import xarray as xr
 
 from elm_diagnostics import Run, WaterBalance
-from elm_diagnostics.io.derived import compute_total_et
+from elm_diagnostics.io.derived import (
+    DERIVABLE_REQUIREMENTS,
+    DERIVABLE_VARS,
+    compute_total_et,
+)
+from elm_diagnostics.time.integration import get_time_deltas
 
 # Path to the real h0 file (any file from the set will work - Run auto-discovers all)
 REAL_H0_FILE = (
@@ -259,3 +264,125 @@ def test_water_balance_unit_standardization(real_run):
     if "dS" in comps:
         ds_final = float(comps["dS"].values[-1])
         assert abs(ds_final) < 5000, f"dS out of range: {ds_final}"
+
+
+# ---------------------------------------------------------------------------
+# Memory optimization: cheap combine strategy, sane chunking, index routing
+# ---------------------------------------------------------------------------
+
+
+def test_bounds_dataset_carries_time_bounds(real_run):
+    """bounds_dataset() exposes time + time_bounds and matches full-stream dt."""
+    bounds = real_run.bounds_dataset()
+    assert "time" in bounds.dims
+    assert "time_bounds" in bounds or "time_bnds" in bounds
+
+    full = real_run.streams["h0"]
+    dt_full = get_time_deltas(full)
+    dt_bounds = get_time_deltas(bounds)
+    xr.testing.assert_allclose(dt_bounds, dt_full)
+
+
+def test_has_does_not_open_full_streams(real_run):
+    """has() routes through the header index, never _open_stream."""
+    calls = []
+    orig = real_run._open_stream
+
+    def _spy(tape, *args, **kwargs):
+        calls.append(tape)
+        return orig(tape, *args, **kwargs)
+
+    real_run._open_stream = _spy  # type: ignore[method-assign]
+    try:
+        assert real_run.has("SOILLIQ") is True
+        # QFLX_EVAP_TOT is absent from files but derivable from components.
+        assert real_run.has("QFLX_EVAP_TOT") is True
+        assert real_run.has("NONEXISTENT") is False
+    finally:
+        real_run._open_stream = orig  # type: ignore[method-assign]
+
+    assert calls == [], f"has() opened full streams for tapes: {calls}"
+
+
+def test_get_uses_index_to_route_before_opening(real_run):
+    """get() consults the header index and opens only the owning tape once."""
+    index_calls = []
+    open_calls = []
+    orig_index = real_run._variable_index
+    orig_open = real_run._open_stream
+
+    def _spy_index(tape, *a, **k):
+        index_calls.append(tape)
+        return orig_index(tape, *a, **k)
+
+    def _spy_open(tape, *a, **k):
+        open_calls.append(tape)
+        return orig_open(tape, *a, **k)
+
+    real_run._variable_index = _spy_index  # type: ignore[method-assign]
+    real_run._open_stream = _spy_open  # type: ignore[method-assign]
+    try:
+        da = real_run.get("SOILLIQ")
+    finally:
+        real_run._variable_index = orig_index  # type: ignore[method-assign]
+        real_run._open_stream = orig_open  # type: ignore[method-assign]
+
+    assert "levgrnd" in da.dims
+    # Routed via the index, then opened the single owning tape exactly once.
+    assert "h0" in index_calls
+    assert open_calls == ["h0"], f"expected one open of h0, got {open_calls}"
+
+
+def test_auto_chunks_sizes_from_largest_variable(tmp_path):
+    """_auto_chunks_for_stream sizes from the largest variable, not the dim product.
+
+    The old bug multiplied every non-time dimension in the dataset together
+    (all vertical/sub-grid dims across all variables), producing a bogus
+    per-timestep footprint that forced ``{"time": 1}`` — one chunk per timestep.
+    Here a synthetic file has several *disjoint* extra dimensions (levgrnd=15,
+    levlak=10, natpft=17) used by different variables. Their product (2550) is
+    far larger than any single variable's footprint (max 17), so the buggy
+    formula would collapse the chunk while the fix keeps it large.
+    """
+    import numpy as np
+    from elm_diagnostics.io.run import Run
+
+    n_time = 400
+    ds = xr.Dataset(
+        {
+            "A": (("time", "levgrnd"), np.zeros((n_time, 15), dtype="float32")),
+            "B": (("time", "levlak"), np.zeros((n_time, 10), dtype="float32")),
+            "C": (("time", "natpft"), np.zeros((n_time, 17), dtype="float32")),
+        },
+        coords={"time": np.arange(n_time)},
+    )
+    f = tmp_path / "case.elm.h0.0001-01-01-00000.nc"
+    ds.to_netcdf(f)
+
+    run = Run(str(tmp_path))
+    # target so that 17 elems (largest var) * 8 bytes fits many timesteps, but
+    # 2550 elems (bogus dim-product) * 8 bytes would force time_chunk == 1.
+    run._chunk_target_mb = 1
+    chunks = run._auto_chunks_for_stream([f])
+    run.close()
+
+    assert chunks is not None and "time" in chunks
+    # 1 MiB / (17*8 B) ~= 7710, capped at n_time=400. The dim-product bug would
+    # give 1 MiB / (2550*8 B) ~= 51 — this asserts we are NOT sizing that way.
+    assert chunks["time"] > 51, f"time chunk sized from dim-product bug: {chunks}"
+    assert chunks["time"] == n_time
+
+
+def test_get_missing_variable_raises_keyerror(real_run):
+    """A truly absent, non-derivable variable still raises KeyError with its name."""
+    with pytest.raises(KeyError, match="TOTALLY_ABSENT_VAR"):
+        real_run.get("TOTALLY_ABSENT_VAR")
+
+
+def test_derivable_requirements_consistent_with_registry():
+    """Every derivable variable has a matching requirements entry."""
+    assert set(DERIVABLE_REQUIREMENTS.keys()) == set(DERIVABLE_VARS.keys())
+    for varname, components in DERIVABLE_REQUIREMENTS.items():
+        assert isinstance(components, list) and components, (
+            f"{varname} must list at least one required component"
+        )

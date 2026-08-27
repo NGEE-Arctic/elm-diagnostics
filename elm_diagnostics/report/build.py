@@ -700,15 +700,17 @@ class Report:
         )
 
         run = self._run
-        streams = run.streams
+        # Use the cheap tape list + a single stream (via bounds_dataset) for the
+        # time range, rather than run.streams which eagerly opens every tape.
+        tape_names = list(run._tape_order)
 
         # Collect metadata
         metadata = {}
         metadata["Case Name"] = run.name
 
         # Get time range from first stream, respecting analysis window
-        if streams:
-            first_stream = next(iter(streams.values()))
+        if tape_names:
+            first_stream = run.bounds_dataset(tape_names[0])
             # Apply analysis window filter to get the actual reported time range
             filtered_stream = self._apply_analysis_window(first_stream)
             if len(filtered_stream.time) > 0:
@@ -721,8 +723,8 @@ class Report:
                 metadata["Number of Time Steps"] = 0
 
         # List available streams
-        if streams:
-            metadata["History Streams"] = ", ".join(streams.keys())
+        if tape_names:
+            metadata["History Streams"] = ", ".join(tape_names)
 
         # Add comparison info if applicable
         if self._is_comparison:

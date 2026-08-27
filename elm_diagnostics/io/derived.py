@@ -211,6 +211,17 @@ DERIVABLE_VARS = {
     "PRECT": compute_total_precip,
 }
 
+# Direct source-variable requirements for each derivable variable. Used by
+# Run.has() to check availability cheaply (recursing through has() on the
+# components) WITHOUT executing the derivation (which builds the full array).
+# Keys must stay in sync with DERIVABLE_VARS; components mirror the required
+# lists / aggregations inside each compute_* function above.
+DERIVABLE_REQUIREMENTS: dict[str, list[str]] = {
+    "QFLX_EVAP_TOT": ["QSOIL", "QVEGE", "QVEGT"],
+    "TOTAL_SOIL_WATER": ["SOILLIQ", "SOILICE"],
+    "PRECT": ["RAIN", "SNOW"],
+}
+
 
 def can_derive(varname: str) -> bool:
     """Check if a variable can be derived from components.
