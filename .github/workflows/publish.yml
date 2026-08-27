@@ -56,8 +56,8 @@ jobs:
 
     # Optional: Use a deployment environment for additional protection
     # Uncomment the next two lines after creating a 'pypi' environment in repository settings
-    # environment:
-    #   name: pypi
+    environment:
+      name: pypi
 
     steps:
       - name: Download distribution artifacts
