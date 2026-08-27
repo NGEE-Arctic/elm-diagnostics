@@ -700,15 +700,17 @@ class Report:
         )
 
         run = self._run
-        streams = run.streams
+        # Use the cheap tape list + a single stream (via bounds_dataset) for the
+        # time range, rather than run.streams which eagerly opens every tape.
+        tape_names = list(run._tape_order)
 
         # Collect metadata
         metadata = {}
         metadata["Case Name"] = run.name
 
         # Get time range from first stream, respecting analysis window
-        if streams:
-            first_stream = next(iter(streams.values()))
+        if tape_names:
+            first_stream = run.bounds_dataset(tape_names[0])
             # Apply analysis window filter to get the actual reported time range
             filtered_stream = self._apply_analysis_window(first_stream)
             if len(filtered_stream.time) > 0:
@@ -721,8 +723,8 @@ class Report:
                 metadata["Number of Time Steps"] = 0
 
         # List available streams
-        if streams:
-            metadata["History Streams"] = ", ".join(streams.keys())
+        if tape_names:
+            metadata["History Streams"] = ", ".join(tape_names)
 
         # Add comparison info if applicable
         if self._is_comparison:
@@ -828,6 +830,12 @@ class Report:
                     compute_seconds=compute_seconds,
                     plot_seconds=plot_seconds,
                 )
+                # Clear cache after balance section
+                import gc
+
+                if hasattr(self._run, "_variable_cache"):
+                    self._run._variable_cache.clear()
+                gc.collect()
 
         if self.config.report.sections.energy_balance:
             section_title = "Energy Balance"
@@ -908,6 +916,12 @@ class Report:
                     compute_seconds=compute_seconds,
                     plot_seconds=plot_seconds,
                 )
+                # Clear cache after balance section
+                import gc
+
+                if hasattr(self._run, "_variable_cache"):
+                    self._run._variable_cache.clear()
+                gc.collect()
 
         if self.config.report.sections.carbon_balance:
             section_title = "Carbon Balance"
@@ -988,6 +1002,12 @@ class Report:
                     compute_seconds=compute_seconds,
                     plot_seconds=plot_seconds,
                 )
+                # Clear cache after balance section
+                import gc
+
+                if hasattr(self._run, "_variable_cache"):
+                    self._run._variable_cache.clear()
+                gc.collect()
 
         return sections
 
@@ -1217,12 +1237,12 @@ class Report:
     @staticmethod
     def _final_scalar(da: xr.DataArray) -> float:
         """Return the final time-step value as a Python float."""
-        return float(da.isel(time=-1).values)
+        return float(da.isel(time=-1).compute().item())
 
     @staticmethod
     def _mean_scalar(da: xr.DataArray) -> float:
         """Return the time mean as a Python float."""
-        return float(da.mean().values)
+        return float(da.mean().compute().item())
 
     @staticmethod
     def _long_name_from_da(da: xr.DataArray | None) -> str:
@@ -1355,17 +1375,26 @@ class Report:
                     f"Group '{group_name}': showing {max_vars}/{len(varnames)} variables"
                 )
 
-            for var_index, varname in enumerate(varnames_to_plot, start=1):
+            # Batch check variable existence to avoid repeated stream opens
+            available_vars = [v for v in varnames_to_plot if run.has(v)]
+            if len(available_vars) < len(varnames_to_plot):
+                missing = set(varnames_to_plot) - set(available_vars)
+                self._add_warning(
+                    f"Group '{group_name}': skipping {len(missing)} missing variables: {sorted(missing)}"
+                )
+
+            for var_index, varname in enumerate(available_vars, start=1):
                 # Announce variable progress
                 self._announce_variable_progress(
-                    section_title, varname, var_index, len(varnames_to_plot)
+                    section_title, varname, var_index, len(available_vars)
                 )
 
                 compute_start = time.perf_counter()
                 var = None
                 base_var = None
                 var_context: dict[str, Any] | None = None
-                has_var = run.has(varname)
+                # Variable existence already confirmed
+                has_var = True
                 if has_var:
                     # Load once so validation checks do not repeatedly call run.get(varname).
                     var = run.get(varname)
@@ -1461,6 +1490,14 @@ class Report:
                 compute_seconds=compute_seconds,
                 plot_seconds=plot_seconds,
             )
+
+            # Clear variable cache and force garbage collection after each group
+            # to prevent memory accumulation across 912 variables
+            import gc
+
+            if hasattr(run, "_variable_cache"):
+                run._variable_cache.clear()
+            gc.collect()
 
         return sections
 

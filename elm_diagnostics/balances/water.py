@@ -55,15 +55,10 @@ class WaterBalance(Balance):
         result = {}
         storage_components: dict[str, xr.DataArray] = {}
 
-        # Get parent dataset for time_bounds
-        first_input = bc.inputs[0]
-        parent_ds = self.run.get(first_input).to_dataset(name=first_input)
-        if "time_bounds" not in parent_ds:
-            for tape in self.run._tape_order:
-                ds = self.run._open_stream(tape)
-                if "time_bounds" in ds or "time_bnds" in ds:
-                    parent_ds = ds
-                    break
+        # Dataset carrying time_bounds for flux integration. (A
+        # DataArray.to_dataset() would NOT carry time_bounds, since it is a
+        # separate data variable, so bounds_dataset() is the correct source.)
+        parent_ds = self.run.bounds_dataset()
 
         # Cumulative inputs
         for varname in bc.inputs:
@@ -105,7 +100,7 @@ class WaterBalance(Balance):
                     "Storage component '%s' included in storage decomposition.", varname
                 )
                 if total_storage is None:
-                    total_storage = da.copy()
+                    total_storage = da
                 else:
                     total_storage = total_storage + da
             except KeyError:

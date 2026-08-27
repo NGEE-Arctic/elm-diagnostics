@@ -76,15 +76,8 @@ class CarbonBalance(Balance):
         bc = self._balance_config
         result = {}
 
-        # Get parent dataset for time_bounds
-        parent_ds = None
-        for tape in self.run._tape_order:
-            ds = self.run._open_stream(tape)
-            if "time_bounds" in ds or "time_bnds" in ds:
-                parent_ds = ds
-                break
-        if parent_ds is None:
-            parent_ds = self.run._open_stream(self.run._tape_order[0])
+        # Dataset carrying time_bounds for flux integration.
+        parent_ds = self.run.bounds_dataset()
 
         # Cumulative fluxes
         for varname in bc.fluxes:

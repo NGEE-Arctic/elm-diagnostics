@@ -151,15 +151,77 @@ def _get_run_chunk_options(
     return mode, manual_chunks, target_mb
 
 
+def _compute_max_year_from_files(path: Path) -> int | None:
+    """Extract the maximum year from discovered ELM history files.
+
+    Parameters
+    ----------
+    path : Path
+        Directory containing ELM history files.
+
+    Returns
+    -------
+    int | None
+        Maximum year found in filenames, or None if no parseable years found.
+    """
+    from elm_diagnostics.io.run import _discover_streams, _extract_file_year
+
+    stream_files = _discover_streams(path)
+    all_files = [f for files in stream_files.values() for f in files]
+
+    years = []
+    for file in all_files:
+        year = _extract_file_year(file)
+        if year is not None:
+            years.append(year)
+
+    return max(years) if years else None
+
+
 def _resolve_analysis_year_filter(
     config_path: str | None,
+    last_n_years: int | None = None,
+    elm_path: Path | None = None,
 ) -> tuple[int | None, int | None]:
-    """Return inclusive year range for early loader narrowing when safe."""
+    """Return inclusive year range for early loader narrowing when safe.
+
+    Parameters
+    ----------
+    config_path : str | None
+        Path to user config file.
+    last_n_years : int | None
+        If provided, analyze only the last N years of the simulation.
+    elm_path : Path | None
+        Path to ELM data directory, required if last_n_years is provided.
+
+    Returns
+    -------
+    tuple[int | None, int | None]
+        (min_year, max_year) inclusive range.
+    """
     from elm_diagnostics.config.schema import load_config
 
     cfg = load_config(path=config_path) if config_path else load_config()
     lo = cfg.time.analysis_start_year
     hi = cfg.time.analysis_end_year
+
+    # If --last-n-years is provided, compute year range from files
+    if last_n_years is not None:
+        if elm_path is None:
+            raise ValueError("elm_path required when last_n_years is provided")
+
+        max_year = _compute_max_year_from_files(elm_path)
+        if max_year is None:
+            console.print(
+                "[yellow]Warning:[/yellow] Could not parse years from filenames. "
+                "Using all available data."
+            )
+        else:
+            hi = max_year
+            lo = max_year - last_n_years + 1
+            if cfg.time.water_year_start_month > 1:
+                # Include previous year for water year that doesn't start in January
+                lo -= 1
 
     if lo is None and hi is None:
         return None, None
@@ -176,8 +238,16 @@ def _resolve_analysis_year_filter(
         "water_year" in balance_frames and cfg.time.water_year_start_month > 1
     )
 
-    if lo is not None and needs_prev_year:
+    if lo is not None and needs_prev_year and last_n_years is None:
+        # Only adjust if not already adjusted by last_n_years logic
         lo -= 1
+
+    # An explicit --last-n-years is a deliberate request to load only recent
+    # years (typically to bound memory/time on large runs). It takes precedence
+    # over climatology's default "use all available years" widening below, which
+    # would otherwise reset the window to (None, None) and load every file.
+    if last_n_years is not None:
+        return lo, hi
 
     if cfg.plots.climatology.include_climos:
         start = cfg.plots.climatology.climo_start_year
@@ -255,6 +325,12 @@ def report(
     ),
     out: str = typer.Option("elm_report", "--out", help="Output directory."),
     config: str | None = typer.Option(None, "--config", help="Path to config YAML."),
+    last_n_years: int | None = typer.Option(
+        None,
+        "--last-n-years",
+        help="Analyze only the last N years of the simulation.",
+        min=1,
+    ),
     verbose: bool = typer.Option(False, "--verbose", "-v", help="Verbose output."),
     debug: bool = typer.Option(
         False, "--debug", help="Debug mode with full tracebacks."
@@ -277,6 +353,9 @@ def report(
 
         # Report using year window from config
         elm-diagnostics report /path/to/elm/output --config config.yaml
+
+        # Analyze only the last 5 years
+        elm-diagnostics report /path/to/elm/output --last-n-years 5
 
         # Comparison report
         elm-diagnostics report /path/to/exp --compare /path/to/control
@@ -307,10 +386,20 @@ def report(
         from elm_diagnostics.config.schema import load_config
 
         original_cfg = load_config(path=config) if config else load_config()
-        original_analysis_year_min = original_cfg.time.analysis_start_year
-        original_analysis_year_max = original_cfg.time.analysis_end_year
 
-        analysis_year_min, analysis_year_max = _resolve_analysis_year_filter(config)
+        # Compute analysis year range (handles config + last_n_years)
+        analysis_year_min, analysis_year_max = _resolve_analysis_year_filter(
+            config, last_n_years=last_n_years, elm_path=elm_path
+        )
+
+        # For report metadata, use last_n_years computed range if provided,
+        # otherwise use config values
+        if last_n_years is not None:
+            original_analysis_year_min = analysis_year_min
+            original_analysis_year_max = analysis_year_max
+        else:
+            original_analysis_year_min = original_cfg.time.analysis_start_year
+            original_analysis_year_max = original_cfg.time.analysis_end_year
 
         # Import here to avoid slow startup
         from elm_diagnostics.io.run import Comparison, Run
@@ -438,6 +527,12 @@ def balance(
         None, "--out", help="Output directory for plots/data."
     ),
     config: str | None = typer.Option(None, "--config", help="Path to config YAML."),
+    last_n_years: int | None = typer.Option(
+        None,
+        "--last-n-years",
+        help="Analyze only the last N years of the simulation.",
+        min=1,
+    ),
     verbose: bool = typer.Option(False, "--verbose", "-v", help="Verbose output."),
     debug: bool = typer.Option(
         False, "--debug", help="Debug mode with full tracebacks."
@@ -459,6 +554,9 @@ def balance(
 
         # Energy balance, all available years
         elm-diagnostics balance energy /path/to/output
+
+        # Water balance, last 3 years only
+        elm-diagnostics balance water /path/to/output --last-n-years 3
     """
     setup_logging(verbose=verbose, debug=debug)
     logger = logging.getLogger(__name__)
@@ -475,7 +573,9 @@ def balance(
 
         strict_combine = _get_run_strict_combine(config)
         chunk_mode, manual_chunks, chunk_target_mb = _get_run_chunk_options(config)
-        analysis_year_min, analysis_year_max = _resolve_analysis_year_filter(config)
+        analysis_year_min, analysis_year_max = _resolve_analysis_year_filter(
+            config, last_n_years=last_n_years, elm_path=elm_path
+        )
 
         from elm_diagnostics.balances.carbon import CarbonBalance
         from elm_diagnostics.balances.energy import EnergyBalance
@@ -599,6 +699,12 @@ def plot(
         None, "--out", help="Output file path (e.g. plot.png)."
     ),
     config: str | None = typer.Option(None, "--config", help="Path to config YAML."),
+    last_n_years: int | None = typer.Option(
+        None,
+        "--last-n-years",
+        help="Analyze only the last N years of the simulation.",
+        min=1,
+    ),
     verbose: bool = typer.Option(False, "--verbose", "-v", help="Verbose output."),
     debug: bool = typer.Option(
         False, "--debug", help="Debug mode with full tracebacks."
@@ -627,6 +733,9 @@ def plot(
 
         # Histogram with verbose output
         elm-diagnostics plot ER /path/to/output --kind histogram --verbose
+
+        # Plot only the last 10 years
+        elm-diagnostics plot GPP /path/to/output --last-n-years 10
     """
     setup_logging(verbose=verbose, debug=debug)
     logger = logging.getLogger(__name__)
@@ -643,6 +752,9 @@ def plot(
 
         strict_combine = _get_run_strict_combine(config)
         chunk_mode, manual_chunks, chunk_target_mb = _get_run_chunk_options(config)
+        analysis_year_min, analysis_year_max = _resolve_analysis_year_filter(
+            config, last_n_years=last_n_years, elm_path=elm_path
+        )
 
         from elm_diagnostics.config.schema import load_config as load_config_obj
         from elm_diagnostics.io.run import Run
@@ -689,6 +801,8 @@ def plot(
                     chunk_mode=chunk_mode,
                     chunks=manual_chunks,
                     chunk_target_mb=chunk_target_mb,
+                    analysis_year_min=analysis_year_min,
+                    analysis_year_max=analysis_year_max,
                 )
                 progress.update(task, completed=True)
                 elapsed = time.time() - start_time
@@ -701,6 +815,8 @@ def plot(
                 chunk_mode=chunk_mode,
                 chunks=manual_chunks,
                 chunk_target_mb=chunk_target_mb,
+                analysis_year_min=analysis_year_min,
+                analysis_year_max=analysis_year_max,
             )
 
         if verbose:
