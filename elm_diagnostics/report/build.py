@@ -23,6 +23,7 @@ import sys
 import threading
 import time
 import traceback
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
@@ -1339,6 +1340,118 @@ class Report:
         with self._cached_get_for_var(self._run, varname, experiment_var):
             yield
 
+    def _create_and_save_plot_worker(
+        self,
+        plot_type: str,
+        varname: str,
+        var: xr.DataArray,
+        base_var: xr.DataArray | None,
+        var_context: dict[str, Any] | None,
+        figdir: Path,
+        group_name: str,
+        section_title: str,
+    ) -> dict[str, Any]:
+        """Worker function for parallel plot generation.
+
+        Returns
+        -------
+        dict with keys: success, plot_type, compute_seconds, plot_seconds,
+        io_seconds, full_path, thumb_path, caption, error
+        """
+        result = {
+            "success": False,
+            "plot_type": plot_type,
+            "compute_seconds": 0.0,
+            "plot_seconds": 0.0,
+            "io_seconds": 0.0,
+            "full_path": None,
+            "thumb_path": None,
+            "caption": None,
+            "error": None,
+        }
+
+        fig: plt.Figure | None = None
+        existing_fignums = set(plt.get_fignums())
+
+        try:
+            # Create plot
+            fig, plot_compute_seconds, plot_render_seconds = self._create_plot(
+                plot_type,
+                varname,
+                var,
+                base_var,
+                var_context,
+            )
+            result["compute_seconds"] = plot_compute_seconds
+            result["plot_seconds"] = plot_render_seconds
+
+            # Save figure if created
+            if fig is not None:
+                basename = f"{group_name}_{varname}_{plot_type}"
+                io_start = time.perf_counter()
+                full_path, thumb_path = self._save_figure(fig, figdir, basename)
+                result["io_seconds"] = time.perf_counter() - io_start
+                result["full_path"] = full_path
+                result["thumb_path"] = thumb_path
+                result["caption"] = f"{varname}"
+                result["success"] = True
+
+        except Exception as e:
+            # Log error but don't fail the whole report
+            logger.debug(
+                "Plot generation failed for %s/%s: %s",
+                varname,
+                plot_type,
+                e,
+                exc_info=True,
+            )
+            result["error"] = str(e)
+
+        finally:
+            # Clean up matplotlib figures
+            if fig is not None:
+                plt.close(fig)
+            self._close_new_figures(existing_fignums)
+
+        return result
+
+    def _process_plot_result(
+        self,
+        result: dict[str, Any],
+        section_title: str,
+        varname: str,
+        subsection_by_plot_type: dict[str, _Subsection],
+    ) -> None:
+        """Process a plot result and add to appropriate subsection."""
+        if result["success"] and result["full_path"]:
+            subsection_by_plot_type[result["plot_type"]].add_figure(
+                result["full_path"],
+                result["thumb_path"],
+                result["caption"],
+                result["plot_type"],
+            )
+
+        # Record timing
+        self._record_plot_timing(
+            section_title=section_title,
+            varname=varname,
+            plot_type=result["plot_type"],
+            compute_seconds=result["compute_seconds"],
+            plot_seconds=result["plot_seconds"],
+            io_seconds=result["io_seconds"],
+        )
+
+        # Warn if plot was slow
+        total_time = (
+            result["compute_seconds"] + result["plot_seconds"] + result["io_seconds"]
+        )
+        if total_time > 30:
+            self._check_slow_operation(
+                f"{result['plot_type']} plot for {varname}",
+                total_time,
+                threshold=30.0,
+            )
+
     def _build_variable_sections(self, figdir: Path) -> list[_Section]:
         sections = []
         groups = self.config.variable_groups
@@ -1413,71 +1526,79 @@ class Report:
                 if var is None:
                     continue
 
-                # Try each plot type
+                # Parallel plot generation for this variable
+                n_workers = self.config.report.performance.parallel_plot_workers
                 with self._plot_source_cache_context(varname, var, base_var):
-                    for plot_index, plot_type in enumerate(plot_types, start=1):
-                        # Announce plot progress
-                        self._announce_plot_progress(
-                            varname, plot_type, plot_index, len(plot_types)
-                        )
-                        fig: plt.Figure | None = None
-                        existing_fignums = set(plt.get_fignums())
-                        try:
-                            fig, plot_compute_seconds, plot_render_seconds = (
-                                self._create_plot(
+                    if n_workers == 1:
+                        # Sequential execution (original behavior)
+                        for plot_index, plot_type in enumerate(plot_types, start=1):
+                            self._announce_plot_progress(
+                                varname, plot_type, plot_index, len(plot_types)
+                            )
+                            result = self._create_and_save_plot_worker(
+                                plot_type,
+                                varname,
+                                var,
+                                base_var,
+                                var_context,
+                                figdir,
+                                group_name,
+                                section_title,
+                            )
+                            self._process_plot_result(
+                                result,
+                                section_title,
+                                varname,
+                                subsection_by_plot_type,
+                            )
+                            compute_seconds += result["compute_seconds"]
+                            plot_seconds += result["plot_seconds"]
+                            io_seconds += result["io_seconds"]
+                    else:
+                        # Parallel execution with ThreadPoolExecutor
+                        with ThreadPoolExecutor(max_workers=n_workers) as executor:
+                            # Submit all plot tasks
+                            future_to_plot = {
+                                executor.submit(
+                                    self._create_and_save_plot_worker,
                                     plot_type,
                                     varname,
                                     var,
                                     base_var,
                                     var_context,
-                                )
-                            )
-                            compute_seconds += plot_compute_seconds
-                            plot_seconds += plot_render_seconds
+                                    figdir,
+                                    group_name,
+                                    section_title,
+                                ): plot_type
+                                for plot_type in plot_types
+                            }
 
-                            # Warn if plot was slow
-                            total_plot_time = plot_compute_seconds + plot_render_seconds
-                            if total_plot_time > 30:
-                                self._check_slow_operation(
-                                    f"{plot_type} plot for {varname}",
-                                    total_plot_time,
-                                    threshold=30.0,
+                            # Process results as they complete
+                            for plot_index, future in enumerate(
+                                as_completed(future_to_plot), start=1
+                            ):
+                                plot_type = future_to_plot[future]
+                                self._announce_plot_progress(
+                                    varname, plot_type, plot_index, len(plot_types)
                                 )
-
-                            io_elapsed = 0.0
-                            if fig is not None:
-                                basename = f"{group_name}_{varname}_{plot_type}"
-                                io_start = time.perf_counter()
-                                full_path, thumb_path = self._save_figure(
-                                    fig, figdir, basename
-                                )
-                                io_elapsed = time.perf_counter() - io_start
-                                io_seconds += io_elapsed
-                                caption = f"{varname}"
-                                subsection_by_plot_type[plot_type].add_figure(
-                                    full_path,
-                                    thumb_path,
-                                    caption,
-                                    plot_type,
-                                )
-                            self._record_plot_timing(
-                                section_title=section_title,
-                                varname=varname,
-                                plot_type=plot_type,
-                                compute_seconds=plot_compute_seconds,
-                                plot_seconds=plot_render_seconds,
-                                io_seconds=io_elapsed,
-                            )
-                        except Exception:
-                            # Silently skip individual plot failures
-                            # (e.g., diurnal for monthly data, seasonal for insufficient data)
-                            logger.debug(
-                                "Skipping individual plot after failure", exc_info=True
-                            )
-                        finally:
-                            if fig is not None:
-                                plt.close(fig)
-                            self._close_new_figures(existing_fignums)
+                                try:
+                                    result = future.result()
+                                    self._process_plot_result(
+                                        result,
+                                        section_title,
+                                        varname,
+                                        subsection_by_plot_type,
+                                    )
+                                    compute_seconds += result["compute_seconds"]
+                                    plot_seconds += result["plot_seconds"]
+                                    io_seconds += result["io_seconds"]
+                                except Exception as e:
+                                    logger.debug(
+                                        "Plot worker failed for %s/%s: %s",
+                                        varname,
+                                        plot_type,
+                                        e,
+                                    )
 
             has_grouped_figures = any(sub.figures for sub in sec.subsections)
             if sec.figures or has_grouped_figures:
