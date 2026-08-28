@@ -38,7 +38,7 @@ dev = [
     "pytest>=7.0",
     "pytest-mpl>=0.16",
     "dask[complete]",
-    "ruff==0.16.0",
+    "ruff==0.16.5",
 ]
 docs = [
     "sphinx>=7.0",
@@ -55,13 +55,13 @@ packages = ["elm_diagnostics"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 
-# Linting is pinned to ruff 0.16.0 (see [project.optional-dependencies].dev and
+# Linting is pinned to ruff 0.16.5 (see [project.optional-dependencies].dev and
 # .github/workflows/lint.yml) so `ruff check` locally matches CI exactly.
 [tool.ruff]
 line-length = 88
 target-version = "py310"
 
-# ruff 0.16.0's curated default rule set is enforced, minus three rules that
+# ruff 0.16.5's curated default rule set is enforced, minus three rules that
 # clash with intentional patterns in this codebase:
 #   BLE001 - blind `except Exception:` is used deliberately for report-generation
 #            resilience (one failing section must not abort the whole report)
