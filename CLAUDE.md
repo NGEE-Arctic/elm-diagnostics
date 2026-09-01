@@ -45,6 +45,27 @@ elm_diagnostics/
 └── cli.py           # Typer CLI with rich progress indicators
 ```
 
+### Workspace Directory
+
+The `workspace/` directory is a holding area for specialized or in-progress analyses that `elm-diagnostics` does not currently support. This includes:
+- Exploratory analysis notebooks
+- Experimental plotting or diagnostic functions
+- Custom analysis scripts for specific research questions
+- Work-in-progress features being prototyped before integration into the main package
+
+The workspace is **outside the core Python package** and not part of the installed distribution. Files here are local to the repository and should not import from or depend on being imported by the main `elm_diagnostics/` package structure. **The workspace folder must never be bundled in Python package releases** — verify that `MANIFEST.in` and `pyproject.toml` exclude it.
+
+Use `workspace/` for:
+- Quick one-off analyses that don't warrant a full package feature
+- Prototyping new balance types or plot kinds before formalizing
+- Project-specific diagnostics that aren't generalizable
+- Testing ideas that may or may not make it into the package
+
+Do NOT use `workspace/` for:
+- Core package functionality (belongs in `elm_diagnostics/`)
+- Tests (belongs in `tests/`)
+- Documentation (belongs in `docs/`)
+
 ### Data Flow
 
 1. **Load**: `Run` class auto-discovers `*.elm.h*.nc` files, groups by history tape (`h0`, `h1`, ...), lazy-loads with `xarray.open_mfdataset`
