@@ -8,13 +8,22 @@
 # derivative works, distribute copies to the public, perform publicly and display publicly, and
 # to permit others to do so.
 
-"""Small labeling and argument helpers shared by the plot modules."""
+"""Labeling, argument-checking, and faceting helpers shared by the plot modules."""
 
 from __future__ import annotations
 
 import matplotlib.pyplot as plt
 import numpy as np
 import xarray as xr
+
+from elm_diagnostics.config.schema import PlotStyleConfig
+from elm_diagnostics.io.run import Comparison, Run
+from elm_diagnostics.io.subgrid import SubgridLevel
+from elm_diagnostics.plots.subgrid_helpers import (
+    create_facet_figure,
+    get_subgrid_units,
+    validate_variable_for_subgrid,
+)
 
 
 def format_var_ylabel(varname: str, units: str) -> str:
@@ -48,3 +57,33 @@ def check_by_ax(by: str | None, ax: plt.Axes | None) -> None:
             "Cannot specify both 'by' and 'ax': faceted plots create "
             "their own figure. Remove 'ax' parameter or set by=None."
         )
+
+
+def prepare_facets(
+    source: Run | Comparison,
+    varname: str,
+    by: SubgridLevel,
+    style: PlotStyleConfig,
+) -> tuple[xr.DataArray, xr.DataArray | None, list[int], plt.Figure, np.ndarray]:
+    """Load, validate, and lay out a plot faceted by sub-gridcell unit.
+
+    Returns ``(da, da_base, units, fig, axes)``: ``da`` is the Run's data (or
+    the Comparison's experiment), ``da_base`` the Comparison's base or None,
+    ``units`` the unit ids along ``by``, and one axes per unit (plus spares).
+    """
+    if isinstance(source, Comparison):
+        da_base = source.base.get(varname)
+        da = source.experiment.get(varname)
+    else:
+        da_base = None
+        da = source.get(varname)
+    validate_variable_for_subgrid(da, by, varname)
+    units = get_subgrid_units(da, by)
+    fig, axes = create_facet_figure(len(units), style)
+    return da, da_base, units, fig, axes
+
+
+def hide_unused_axes(axes: np.ndarray, n_used: int) -> None:
+    """Hide the spare axes a facet grid has beyond the units plotted."""
+    for ax in axes.flat[n_used:]:
+        ax.set_visible(False)
