@@ -15,10 +15,15 @@ from __future__ import annotations
 import matplotlib.pyplot as plt
 import numpy as np
 import xarray as xr
+from matplotlib.lines import Line2D
 
 from elm_diagnostics.config.schema import PlotStyleConfig
 from elm_diagnostics.io.run import Comparison, Run
 from elm_diagnostics.io.subgrid import SubgridLevel
+from elm_diagnostics.plots.dimension_helpers import (
+    format_level_label,
+    resolve_dimension_axis,
+)
 from elm_diagnostics.plots.subgrid_helpers import (
     create_facet_figure,
     get_subgrid_units,
@@ -87,3 +92,58 @@ def hide_unused_axes(axes: np.ndarray, n_used: int) -> None:
     """Hide the spare axes a facet grid has beyond the units plotted."""
     for ax in axes.flat[n_used:]:
         ax.set_visible(False)
+
+
+def plot_level_lines(
+    ax: plt.Axes,
+    x,
+    da: xr.DataArray,
+    dim: str,
+    along: str,
+    *,
+    linestyle: str = "-",
+    alpha: float = 1.0,
+    legend_max_entries: int = 8,
+    **line_kw,
+) -> None:
+    """Draw one line per level of ``dim`` against ``x``, colored along viridis.
+
+    ``along`` is the dimension matching ``x`` (e.g. ``"time"`` or ``"month"``).
+    Only a representative subset of levels gets legend labels.
+    """
+    n_levels = da.sizes[dim]
+    level_values, _, level_name, level_units, _ = resolve_dimension_axis(da, dim)
+    legend_idx = legend_level_indices(n_levels, max_entries=legend_max_entries)
+    cmap = plt.get_cmap("viridis")
+    line_values = np.asarray(da.transpose(dim, along).compute())
+
+    for i in range(n_levels):
+        line_label = (
+            format_level_label(level_values[i], level_name, units=level_units)
+            if i in legend_idx
+            else "_nolegend_"
+        )
+        ax.plot(
+            x,
+            line_values[i, :],
+            color=cmap(i / max(n_levels - 1, 1)),
+            linestyle=linestyle,
+            alpha=alpha,
+            label=line_label,
+            **line_kw,
+        )
+
+
+def add_level_and_run_legends(
+    ax: plt.Axes, level_dim: str, base_name: str, exp_name: str, fontsize: str
+) -> None:
+    """Two legends for multi-level comparisons: level colors and run linestyles."""
+    level_legend = ax.legend(
+        loc="upper right", fontsize=fontsize, title=f"{level_dim} levels"
+    )
+    ax.add_artist(level_legend)
+    run_handles = [
+        Line2D([0], [0], color="black", linestyle="--", label=base_name),
+        Line2D([0], [0], color="black", linestyle="-", label=exp_name),
+    ]
+    ax.legend(handles=run_handles, loc="upper left", fontsize=fontsize)
