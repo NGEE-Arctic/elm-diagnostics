@@ -551,6 +551,15 @@ class Run:
         return self._open_stream(tape)
 
     @property
+    def tapes(self) -> list[str]:
+        """History tape names (``h0``, ``h1``, ...) in sorted order."""
+        return list(self._tape_order)
+
+    def clear_variable_cache(self) -> None:
+        """Drop cached variables; open stream datasets are kept."""
+        self._variable_cache.clear()
+
+    @property
     def streams(self) -> dict[str, xr.Dataset]:
         """All streams as open datasets, keyed by tape name."""
         if self._streams_cache is None:

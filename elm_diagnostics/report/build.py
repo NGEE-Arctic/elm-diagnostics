@@ -43,7 +43,7 @@ from PIL import Image
 from elm_diagnostics.balances.carbon import CarbonBalance
 from elm_diagnostics.balances.energy import EnergyBalance
 from elm_diagnostics.balances.water import WaterBalance
-from elm_diagnostics.config.schema import Config, load_config
+from elm_diagnostics.config.schema import _USER_CONFIG_PATH, Config, load_config
 from elm_diagnostics.io.run import Comparison, Run
 from elm_diagnostics.plots import (
     plot_anomaly,
@@ -58,7 +58,7 @@ logger = logging.getLogger(__name__)
 
 _TEMPLATE_DIR = Path(__file__).parent / "templates"
 _ASSETS_DIR = Path(__file__).parent / "assets"
-_DEFAULT_USER_CONFIG_PATH = Path.home() / ".config" / "elm-diagnostics" / "config.yaml"
+_DEFAULT_USER_CONFIG_PATH = _USER_CONFIG_PATH
 
 _RESAMPLING = getattr(Image, "Resampling", Image)
 _PNG_PIL_KWARGS = {"compress_level": 1, "optimize": False}
@@ -679,7 +679,7 @@ class Report:
         run = self._run
         # Use the cheap tape list + a single stream (via bounds_dataset) for the
         # time range, rather than run.streams which eagerly opens every tape.
-        tape_names = list(run._tape_order)
+        tape_names = run.tapes
 
         # Collect metadata
         metadata = {}
@@ -808,7 +808,7 @@ class Report:
                     plot_seconds=plot_seconds,
                 )
                 # Clear cache after balance section
-                self._run._variable_cache.clear()
+                self._run.clear_variable_cache()
                 gc.collect()
 
         if self.config.report.sections.energy_balance:
@@ -890,7 +890,7 @@ class Report:
                     plot_seconds=plot_seconds,
                 )
                 # Clear cache after balance section
-                self._run._variable_cache.clear()
+                self._run.clear_variable_cache()
                 gc.collect()
 
         if self.config.report.sections.carbon_balance:
@@ -971,7 +971,7 @@ class Report:
                     plot_seconds=plot_seconds,
                 )
                 # Clear cache after balance section
-                self._run._variable_cache.clear()
+                self._run.clear_variable_cache()
                 gc.collect()
 
         return sections
@@ -1567,7 +1567,7 @@ class Report:
 
             # Clear variable cache and force garbage collection after each group
             # to prevent memory accumulation across 912 variables
-            run._variable_cache.clear()
+            run.clear_variable_cache()
             gc.collect()
 
         return sections
