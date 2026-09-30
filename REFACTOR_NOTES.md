@@ -35,6 +35,24 @@ difference of each run's own anomalies); `get_available_years` says "complete ye
 years); `aggregate_vertical_storage(vertical_dim=...)` is ignored; CLAUDE.md says 161 tests (290),
 says pint-xarray is used (never imported), and says all balances support `by` faceting.
 
+## Verification method
+
+Every step: full `pytest tests/` (290 passed each time), `ruff check` + `ruff format --check`
+with the pinned ruff 0.16.5, and an out-of-tree golden fingerprint (scratch script, not in the
+repo) comparing a baseline worktree at `9c30a53` against the working tree: figure contents for
+all plot kinds × Run/Comparison × faceting, balance components/residuals/netCDF, full report
+HTML + data files, CLI stdout/exit codes, and helper-function outputs (~31k lines). Diff was
+empty for every committed step.
+
 ## Changes by step
 
-_(filled in as steps land)_
+| Step | Commit | Change |
+|---|---|---|
+| 0 | `237e2e7` | Plan, notes, test proposals |
+| 1 | `b0f2584` | Removed `cli.py.bak` (shipped in wheel), `run/`, `test_plots/`; moved demo script to `workspace/`; sdist excludes `workspace/` |
+| 2 | `75ae111` | Hoisted redundant function-local imports; %-style logging args |
+| 3 | `900750a` | Dead code out of `io.run`, `balances.water`, `report.build`; stale comments/docstrings fixed |
+| 6 | `f104c74` | Balance-override required keys derived from models; `Run.tapes` / `Run.clear_variable_cache()` |
+| 5b | `88b6112` | `time.calendars.year_window_mask()` shared by `Balance` and `Report` |
+
+Remaining (all high risk, awaiting go-ahead): 4, 5a, 7, 8, 9, 10, 11; then 12–13.
