@@ -49,10 +49,70 @@ empty for every committed step.
 | Step | Commit | Change |
 |---|---|---|
 | 0 | `237e2e7` | Plan, notes, test proposals |
-| 1 | `b0f2584` | Removed `cli.py.bak` (shipped in wheel), `run/`, `test_plots/`; moved demo script to `workspace/`; sdist excludes `workspace/` |
-| 2 | `75ae111` | Hoisted redundant function-local imports; %-style logging args |
+| 1 | `b0f2584` | Removed `cli.py.bak` (shipped in the wheel), `run/`, `test_plots/`; demo script moved to `workspace/`; sdist excludes `workspace/` |
+| 2 | `75ae111` | Hoisted redundant function-local imports; %-style logging arguments |
 | 3 | `900750a` | Dead code out of `io.run`, `balances.water`, `report.build`; stale comments/docstrings fixed |
-| 6 | `f104c74` | Balance-override required keys derived from models; `Run.tapes` / `Run.clear_variable_cache()` |
+| 6 | `f104c74` | Balance-override required keys derived from the models; `Run.tapes` / `Run.clear_variable_cache()` |
 | 5b | `88b6112` | `time.calendars.year_window_mask()` shared by `Balance` and `Report` |
+| T | `7cdd706` | Approved characterization tests T1–T5 (new files only, 40 tests) |
+| 4a | `0fb1073` | `plots/_common.py`: shared label/legend/argument helpers replace up to six private copies |
+| 4b | `ffec425` | `prepare_facets()` / `hide_unused_axes()` replace the faceted-plot preamble in five modules |
+| 5a | `1cdd469` | `time.plotting.plot_times` (plots no longer import `balances`); shared bounds-var lookup and cadence helpers |
+| 7 | `07adfc9` | CLI loads config once per command; shared spinner / error handler / Run kwargs |
+| 8 | `ccfb0e1` | Water-balance panels drawn by shared helpers for single and faceted layouts |
+| 9 | `95fe97a` | Report balance sections table-driven (`_BALANCE_SECTIONS`) |
+| 10 | `5f76da2` | Hovmuller run/comparison share axis and color-scale setup |
+| 11 | `371070e` | Shared multi-level line plotting and comparison legends |
+| 12 | `06cbd57` | Type hints on touched public functions; `[tool.mypy]` baseline config |
+| 13 | `9677649` + this | CLAUDE.md corrected; wrap-up |
 
-Remaining (all high risk, awaiting go-ahead): 4, 5a, 7, 8, 9, 10, 11; then 12–13.
+## What changed per module
+
+- **io/run.py** — open kwargs built per branch (dead overwrites/`setdefault`s gone); `_classify_cadence`, `_cadence_seconds`, `_cf_decode_kwargs` replace duplicated blocks; bounds-variable lookup shared with `time.integration`; `_lazy_align` wrapper inlined; new additive `Run.tapes`, `Run.clear_variable_cache()`.
+- **io/derived.py** — `convert_water_to_mm` imported once at module level.
+- **time/** — new `plotting.py` (`plot_times`, formerly `balances.base._plot_time`, still aliased there); `calendars.year_window_mask()`; `integration.TIME_BOUNDS_NAMES` / `find_bounds_var()`.
+- **balances/** — base uses `squeeze_spatial_dims` and `year_window_mask`; water's unreachable storage fallback removed and its four panels drawn by shared helpers (506 → 399 lines); carbon colors from `plots.colors`.
+- **plots/** — new `_common.py` (labels, `check_by_ax`, `prepare_facets`, `hide_unused_axes`, `plot_level_lines`, `add_level_and_run_legends`); duplicate `_squeeze_spatial`/`_is_index_like`/label helpers removed; hovmuller run/comparison share `_extra_dim`/`_depth_axis`/`_mesh_style`; diurnal's nested sub-daily check hoisted; faceted climatology function delegates to the identical non-faceted one.
+- **report/build.py** — balance sections table-driven; `_error_stats`, `_slug`, `_figure_entry`; dead thumbnail/`pil_kwargs`/`hasattr`/`has_var` code removed; uses `Run` public helpers and the shared user-config path (1942 → 1769 lines).
+- **config/schema.py** — override-required keys derived from `model_fields` via `_BALANCE_MODELS`.
+- **cli.py** — one config load per command; `_start_command`, `_handle_errors`, `_spinner`, `_run_kwargs` replace five Run-construction copies and three error handlers; unused `_get_run_*` wrappers removed (855 → 754 lines).
+
+## Observable differences (all intentional, approved or noted in commits)
+
+- A `balances:` override `UserWarning` is emitted once per CLI command instead of 3–4 times (approved).
+- `create_facet_figure`'s large-facet warning is attributed one frame deeper (the private `_plot_*_faceted` function instead of the public `plot_*`). Hovmuller warning stacklevels were adjusted so their attribution is unchanged.
+- New additive API: `Run.tapes`, `Run.clear_variable_cache()`, `time.plotting.plot_times`, `time.calendars.year_window_mask`, `time.integration.find_bounds_var` / `TIME_BOUNDS_NAMES`.
+
+Everything else was verified identical by the golden check (figures, balance data, report HTML/netCDF, CLI output and exit codes, helper outputs).
+
+## Smells deliberately left alone
+
+- **Seasonal/diurnal single vs faceted bodies** — the remaining duplication differs in many small presentation details (labels, legend sizes, line widths); a merged helper would need a flag per difference and read worse.
+- **Broad `except Exception` in report sections, stats, and plot workers** — intentional resilience (ruff BLE001 is disabled for this reason); narrowing them changes which failures abort a report.
+- **`print()` progress in `Report`** — changing it alters stdout for library users; listed under proposed breaking changes in the plan.
+- **Unused config options and dead public functions** (`day_of_year`, `get_registry`, `has_subgrid`, `get_subgrid_level`, `plot_all_years`, `lighten_color`, the faceted-climatology alias, `aggregate_vertical_storage(vertical_dim)`) — public API; removal awaits approval (plan §6).
+- **`defaults.yaml` duplicating pydantic defaults**, and the unused `pint-xarray`/`plotly`/`cartopy` dependencies — plan §6.
+- **Vertical-dimension lists differ** between `derived.aggregate_vertical_storage` (4 dims) and the water balance (2 dims); unifying them changes which variables get summed.
+- **`Report._cached_get_for_var` monkeypatching `run.get`** — part of bug B7 (thread safety); needs a behavioral fix, not a refactor.
+- **mypy baseline** — 15 modules are listed with `ignore_errors`; several errors are real (B11, B12 return `int` residuals).
+
+## Before / after
+
+| Metric | Before (`9c30a53`) | After |
+|---|---|---|
+| Package lines (`elm_diagnostics/**/*.py`) | 9,764 (+537 in `cli.py.bak`) | 9,109 |
+| Tests | 290 passed | 330 passed (290 original + 40 approved characterization tests) |
+| Coverage (branch) | 76.9% | 82.3% |
+| `ruff check` / `ruff format --check` (0.16.5) | clean / clean | clean / clean |
+| mypy (`--ignore-missing-imports`, no config) | 113 errors in 15 files | 88 errors in 15 files |
+| mypy (project config) | not configured | passes (15 baseline modules ignored) |
+
+Coverage by module (before → after): water 82→94, cli 75→83, io/run 66→73, anomaly 66→80, diurnal 39→66, timeseries 78→89, integration 54→78, report 87.5→90; seasonal 63→62 and climatology 73→70 dipped slightly because duplicated covered lines were removed.
+
+## Test directory
+
+`git diff 9c30a53 -- tests/` contains only the four new, approved test modules
+(`test_plot_characterization.py`, `test_report_characterization.py`,
+`test_comparison_and_subdaily.py`, `test_cli_paths.py`; 824 added lines). No existing
+file under `tests/` was modified, renamed, or deleted
+(`git diff 9c30a53 --diff-filter=MDR --name-only -- tests/` is empty).
