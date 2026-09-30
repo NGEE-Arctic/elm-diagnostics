@@ -19,14 +19,12 @@ import xarray as xr
 from elm_diagnostics.config.schema import Config, load_config
 from elm_diagnostics.io.run import Comparison, Run
 from elm_diagnostics.io.subgrid import SubgridLevel
-
-
-def _squeeze_spatial(da: xr.DataArray) -> xr.DataArray:
-    """Squeeze singleton spatial dims (lat/lon/lndgrid/gridcell)."""
-    for dim in ("lat", "lon", "lndgrid", "gridcell"):
-        if dim in da.dims and da.sizes[dim] == 1:
-            da = da.squeeze(dim, drop=True)
-    return da
+from elm_diagnostics.plots._common import (
+    append_long_name_line,
+    check_by_ax,
+    format_var_ylabel,
+)
+from elm_diagnostics.plots.dimension_helpers import squeeze_spatial_dims
 
 
 def _annual_anomaly(da: xr.DataArray) -> tuple[np.ndarray, np.ndarray]:
@@ -40,18 +38,6 @@ def _annual_anomaly(da: xr.DataArray) -> tuple[np.ndarray, np.ndarray]:
     anomalies = annual_values - long_term_mean
     years = np.asarray(annual.year.values)
     return years, anomalies
-
-
-def _format_var_ylabel(varname: str, units: str) -> str:
-    units = str(units).strip()
-    return f"{varname} ({units})" if units else varname
-
-
-def _append_long_name_line(title: str, da: xr.DataArray | None) -> str:
-    if da is None:
-        return title
-    long_name = str(da.attrs.get("long_name", "")).strip()
-    return f"{title}\n{long_name}" if long_name else title
 
 
 def plot_anomaly(
@@ -94,12 +80,7 @@ def plot_anomaly(
     """
     cfg = config or load_config()
 
-    # Validate ax + by compatibility
-    if by is not None and ax is not None:
-        raise ValueError(
-            "Cannot specify both 'by' and 'ax': faceted plots create "
-            "their own figure. Remove 'ax' parameter or set by=None."
-        )
+    check_by_ax(by, ax)
 
     if by is None:
         # Single plot (existing logic)
@@ -124,8 +105,8 @@ def _plot_anomaly_single(
         fig = ax.figure
 
     if isinstance(source, Comparison):
-        da_base = _squeeze_spatial(source.base.get(varname))
-        da_exp = _squeeze_spatial(source.experiment.get(varname))
+        da_base = squeeze_spatial_dims(source.base.get(varname))
+        da_exp = squeeze_spatial_dims(source.experiment.get(varname))
         title_da = da_exp
         years_b, anom_b = _annual_anomaly(da_base)
         years_e, anom_e = _annual_anomaly(da_exp)
@@ -139,7 +120,7 @@ def _plot_anomaly_single(
             colors = ["tab:blue" if v >= 0 else "tab:red" for v in delta]
             ax.bar(common_years, delta, color=colors, alpha=0.8)
             ax.set_title(
-                _append_long_name_line(
+                append_long_name_line(
                     f"{varname} — Annual Anomaly (exp - base)", title_da
                 )
             )
@@ -148,7 +129,7 @@ def _plot_anomaly_single(
                 0.5, 0.5, "No overlapping years", transform=ax.transAxes, ha="center"
             )
     else:
-        da = _squeeze_spatial(source.get(varname))
+        da = squeeze_spatial_dims(source.get(varname))
         title_da = da
         years, anomalies = _annual_anomaly(da)
         colors = ["tab:blue" if v >= 0 else "tab:red" for v in anomalies]
@@ -157,7 +138,7 @@ def _plot_anomaly_single(
         title = f"{varname} — Annual Anomaly"
         if isinstance(source, Run):
             title += f" — {source.name}"
-        ax.set_title(_append_long_name_line(title, title_da))
+        ax.set_title(append_long_name_line(title, title_da))
 
     units = (
         da_base.attrs.get("units", "")
@@ -166,7 +147,7 @@ def _plot_anomaly_single(
     )
 
     ax.set_xlabel("Year")
-    ax.set_ylabel(_format_var_ylabel(varname, units))
+    ax.set_ylabel(format_var_ylabel(varname, units))
     ax.axhline(0, color="gray", linewidth=0.5)
     fig.tight_layout()
 
@@ -211,8 +192,8 @@ def _plot_anomaly_faceted(
     # Plot each subgrid unit
     for unit_id, ax_i in zip(units, axes.flat):
         if isinstance(source, Comparison):
-            da_base_unit = _squeeze_spatial(da_base.sel({by: unit_id}))
-            da_exp_unit = _squeeze_spatial(da_exp.sel({by: unit_id}))
+            da_base_unit = squeeze_spatial_dims(da_base.sel({by: unit_id}))
+            da_exp_unit = squeeze_spatial_dims(da_exp.sel({by: unit_id}))
             years_b, anom_b = _annual_anomaly(da_base_unit)
             years_e, anom_e = _annual_anomaly(da_exp_unit)
 
@@ -227,7 +208,7 @@ def _plot_anomaly_faceted(
 
             units_str = da_base.attrs.get("units", "")
         else:
-            da_unit = _squeeze_spatial(da.sel({by: unit_id}))
+            da_unit = squeeze_spatial_dims(da.sel({by: unit_id}))
             years, anomalies = _annual_anomaly(da_unit)
             colors = ["tab:blue" if v >= 0 else "tab:red" for v in anomalies]
             ax_i.bar(years, anomalies, color=colors, alpha=0.8)

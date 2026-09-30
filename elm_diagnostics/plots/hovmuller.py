@@ -16,12 +16,13 @@ import warnings
 
 import matplotlib.pyplot as plt
 import numpy as np
-import xarray as xr
 
 from elm_diagnostics.balances.base import _plot_time
 from elm_diagnostics.config.schema import Config, load_config
 from elm_diagnostics.io.run import Comparison, Run
+from elm_diagnostics.plots._common import append_long_name_line
 from elm_diagnostics.plots.dimension_helpers import (
+    _is_index_like,
     apply_max_levels,
     detect_additional_dimension,
     resolve_dimension_axis,
@@ -29,22 +30,6 @@ from elm_diagnostics.plots.dimension_helpers import (
 )
 
 _DEPTH_DIMS = {"levgrnd", "levsoi"}
-
-
-def _append_long_name_line(title: str, da: xr.DataArray | None) -> str:
-    if da is None:
-        return title
-    long_name = str(da.attrs.get("long_name", "")).strip()
-    return f"{title}\n{long_name}" if long_name else title
-
-
-def _is_index_like(values: np.ndarray) -> bool:
-    if values.ndim != 1 or values.size == 0:
-        return False
-    if not np.issubdtype(values.dtype, np.number):
-        return False
-    idx = np.arange(values.size)
-    return np.allclose(values.astype(float), idx.astype(float), rtol=0.0, atol=1e-12)
 
 
 def _compute_color_limits(
@@ -313,7 +298,7 @@ def _plot_hovmuller_run(
 
     ax.set_xlabel("Time")
     ax.set_ylabel(ylab)
-    ax.set_title(_append_long_name_line(f"{varname} Hovmuller — {run.name}", da))
+    ax.set_title(append_long_name_line(f"{varname} Hovmuller — {run.name}", da))
     fig.tight_layout()
     return fig
 
@@ -425,7 +410,7 @@ def _plot_hovmuller_comparison(
     axes[1].set_xlabel("Time")
 
     fig.suptitle(
-        _append_long_name_line(
+        append_long_name_line(
             f"{varname} Hovmuller — {source.base.name} vs {source.experiment.name}",
             da_exp,
         )
