@@ -29,7 +29,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, NamedTuple
 
 import jinja2
 import matplotlib
@@ -63,6 +63,81 @@ _DEFAULT_USER_CONFIG_PATH = _USER_CONFIG_PATH
 
 _RESAMPLING = getattr(Image, "Resampling", Image)
 _PNG_PIL_KWARGS = {"compress_level": 1, "optimize": False}
+
+
+class _BalanceSectionSpec(NamedTuple):
+    """How to build one balance section of the report."""
+
+    flag: str  # attribute of ReportSectionsConfig that enables the section
+    title: str
+    description: str
+    balance_cls: type
+    prefix: str  # netCDF file prefix
+    figures: tuple[tuple[str, str], ...]  # (basename, caption) per plot() figure
+    stats_method: str  # Report method producing the statistics table
+    components_only: bool  # netCDF holds components only, export failures tolerated
+
+
+_BALANCE_SECTIONS = (
+    _BalanceSectionSpec(
+        "water_balance",
+        "Water Balance",
+        "Column water budget closure.",
+        WaterBalance,
+        "water",
+        (
+            ("water_cumulative", "Cumulative water balance"),
+            ("water_decomposition", "Water output decomposition"),
+            ("water_input_decomposition", "Water input decomposition"),
+            ("water_storage_decomposition", "Water storage decomposition"),
+        ),
+        "_compute_water_balance_stats",
+        False,
+    ),
+    _BalanceSectionSpec(
+        "energy_balance",
+        "Energy Balance",
+        "Surface energy budget closure.",
+        EnergyBalance,
+        "energy",
+        (
+            ("energy_fluxes", "Surface energy fluxes"),
+            ("energy_residual", "Energy balance residual"),
+        ),
+        "_compute_energy_balance_stats",
+        True,
+    ),
+    _BalanceSectionSpec(
+        "carbon_balance",
+        "Carbon Balance",
+        "Ecosystem carbon budget closure.",
+        CarbonBalance,
+        "carbon",
+        (
+            ("carbon_cumulative", "Cumulative carbon balance"),
+            ("carbon_pools", "Carbon pools"),
+        ),
+        "_compute_carbon_balance_stats",
+        True,
+    ),
+)
+
+
+def _slug(title: str) -> str:
+    """URL-friendly id: lowercase, runs of other characters become '-'."""
+    return re.sub(r"[^a-z0-9]+", "-", title.lower()).strip("-")
+
+
+def _figure_entry(
+    path: str, thumb_path: str, caption: str, plot_type: str
+) -> dict[str, str]:
+    """Template record for one figure."""
+    return {
+        "path": path,
+        "thumb_path": thumb_path,
+        "caption": caption,
+        "plot_type": plot_type,
+    }
 
 
 class _Section:
@@ -106,7 +181,7 @@ class _Section:
             "index.html"; otherwise computed from title as "{id}.html".
         """
         self.title = title
-        self.id = re.sub(r"[^a-z0-9]+", "-", title.lower()).strip("-")
+        self.id = _slug(title)
         self.filename = "index.html" if is_landing else f"{self.id}.html"
         self.description = description
         self.figures: list[dict[str, str]] = []
@@ -165,14 +240,7 @@ class _Section:
         plot_type : str, optional
             Type of plot (timeseries, seasonal, etc.).
         """
-        self.figures.append(
-            {
-                "path": path,
-                "thumb_path": thumb_path,
-                "caption": caption,
-                "plot_type": plot_type,
-            }
-        )
+        self.figures.append(_figure_entry(path, thumb_path, caption, plot_type))
 
     def add_statistics(self, stats: Any) -> None:
         """Add statistics table data to section."""
@@ -198,22 +266,14 @@ class _Subsection:
 
     def __init__(self, section_id: str, title: str):
         self.title = title
-        slug = re.sub(r"[^a-z0-9]+", "-", title.lower()).strip("-")
-        self.id = f"{section_id}-{slug}"
+        self.id = f"{section_id}-{_slug(title)}"
         self.figures: list[dict[str, str]] = []
 
     def add_figure(
         self, path: str, thumb_path: str, caption: str, plot_type: str = ""
     ) -> None:
         """Add a figure to the subsection."""
-        self.figures.append(
-            {
-                "path": path,
-                "thumb_path": thumb_path,
-                "caption": caption,
-                "plot_type": plot_type,
-            }
-        )
+        self.figures.append(_figure_entry(path, thumb_path, caption, plot_type))
 
 
 class Report:
@@ -715,256 +775,102 @@ class Report:
         return sec
 
     def _build_balance_sections(self, figdir: Path, datadir: Path) -> list[_Section]:
+        flags = self.config.report.sections
         sections = []
-        run = self._run
-
-        if self.config.report.sections.water_balance:
-            section_title = "Water Balance"
-            section_start = time.perf_counter()
-            compute_seconds = 0.0
-            plot_seconds = 0.0
-            io_seconds = 0.0
-            figs: tuple[plt.Figure, ...] = ()
-            existing_fignums = set(plt.get_fignums())
-            self._announce_section_progress(section_title)
-            try:
-                compute_start = time.perf_counter()
-                wb = WaterBalance(
-                    run,
-                    year=self.year,
-                    config=self.config,
-                    analysis_year_min=self.analysis_year_min,
-                    analysis_year_max=self.analysis_year_max,
-                )
-                sec = _Section(section_title, "Column water budget closure.")
-                if self.config.report.balance_sections.show_statistics_table:
-                    wb.components()
-                    wb.residual()
-                compute_seconds += time.perf_counter() - compute_start
-
-                # Generate plots
-                plot_start = time.perf_counter()
-                figs = wb.plot()
-                p1, t1 = self._save_figure(figs[0], figdir, "water_cumulative")
-                p2, t2 = self._save_figure(figs[1], figdir, "water_decomposition")
-                sec.add_figure(p1, t1, "Cumulative water balance", "balance")
-                sec.add_figure(p2, t2, "Water output decomposition", "balance")
-
-                if len(figs) >= 3:
-                    p3, t3 = self._save_figure(
-                        figs[2], figdir, "water_input_decomposition"
-                    )
-                    sec.add_figure(p3, t3, "Water input decomposition", "balance")
-
-                if len(figs) >= 4:
-                    p4, t4 = self._save_figure(
-                        figs[3], figdir, "water_storage_decomposition"
-                    )
-                    sec.add_figure(p4, t4, "Water storage decomposition", "balance")
-
-                for fig in figs:
-                    plt.close(fig)
-                plot_seconds += time.perf_counter() - plot_start
-
-                # Add statistics if enabled
-                if self.config.report.balance_sections.show_statistics_table:
-                    compute_start = time.perf_counter()
-                    stats = self._compute_water_balance_stats(wb)
-                    sec.add_statistics(stats)
-                    compute_seconds += time.perf_counter() - compute_start
-
-                # Save NetCDF data
-                if "netcdf" in self.config.report.output_formats:
-                    io_start = time.perf_counter()
-                    nc_file = (
-                        datadir
-                        / f"water_balance{'_' + str(self.year) if self.year else ''}.nc"
-                    )
-                    wb.to_netcdf(nc_file)
-                    io_seconds += time.perf_counter() - io_start
-
-                sections.append(sec)
-            except Exception as e:
-                self._record_error("Water Balance", e)
-            finally:
-                for fig in figs:
-                    plt.close(fig)
-                self._close_new_figures(existing_fignums)
-                self._record_section_timing(
-                    "Water Balance",
-                    section_start,
-                    io_seconds=io_seconds,
-                    compute_seconds=compute_seconds,
-                    plot_seconds=plot_seconds,
-                )
-                # Clear cache after balance section
-                self._run.clear_variable_cache()
-                gc.collect()
-
-        if self.config.report.sections.energy_balance:
-            section_title = "Energy Balance"
-            section_start = time.perf_counter()
-            compute_seconds = 0.0
-            plot_seconds = 0.0
-            io_seconds = 0.0
-            fig1 = None
-            fig2 = None
-            existing_fignums = set(plt.get_fignums())
-            self._announce_section_progress(section_title)
-            try:
-                compute_start = time.perf_counter()
-                eb = EnergyBalance(
-                    run,
-                    year=self.year,
-                    config=self.config,
-                    analysis_year_min=self.analysis_year_min,
-                    analysis_year_max=self.analysis_year_max,
-                )
-                sec = _Section(section_title, "Surface energy budget closure.")
-                if self.config.report.balance_sections.show_statistics_table:
-                    eb.components()
-                    eb.residual()
-                compute_seconds += time.perf_counter() - compute_start
-
-                plot_start = time.perf_counter()
-                fig1, fig2 = eb.plot()
-                p1, t1 = self._save_figure(fig1, figdir, "energy_fluxes")
-                p2, t2 = self._save_figure(fig2, figdir, "energy_residual")
-                sec.add_figure(p1, t1, "Surface energy fluxes", "balance")
-                sec.add_figure(p2, t2, "Energy balance residual", "balance")
-                plt.close(fig1)
-                plt.close(fig2)
-                plot_seconds += time.perf_counter() - plot_start
-
-                # Add statistics if enabled
-                if self.config.report.balance_sections.show_statistics_table:
-                    compute_start = time.perf_counter()
-                    stats = self._compute_energy_balance_stats(eb)
-                    sec.add_statistics(stats)
-                    compute_seconds += time.perf_counter() - compute_start
-
-                # Save NetCDF data
-                if "netcdf" in self.config.report.output_formats:
-                    nc_file = (
-                        datadir
-                        / f"energy_balance{'_' + str(self.year) if self.year else ''}.nc"
-                    )
-                    # Components only: Balance.to_netcdf also writes the residual,
-                    # which raises when energy terms are missing.
-                    try:
-                        io_start = time.perf_counter()
-                        components_ds = xr.Dataset(eb.components())
-                        components_ds.to_netcdf(nc_file)
-                        io_seconds += time.perf_counter() - io_start
-                    except Exception:
-                        # Skip if can't save
-                        logger.debug(
-                            "Could not save energy balance components to netCDF",
-                            exc_info=True,
-                        )
-
-                sections.append(sec)
-            except Exception as e:
-                self._record_error("Energy Balance", e)
-            finally:
-                if fig1 is not None:
-                    plt.close(fig1)
-                if fig2 is not None:
-                    plt.close(fig2)
-                self._close_new_figures(existing_fignums)
-                self._record_section_timing(
-                    "Energy Balance",
-                    section_start,
-                    io_seconds=io_seconds,
-                    compute_seconds=compute_seconds,
-                    plot_seconds=plot_seconds,
-                )
-                # Clear cache after balance section
-                self._run.clear_variable_cache()
-                gc.collect()
-
-        if self.config.report.sections.carbon_balance:
-            section_title = "Carbon Balance"
-            section_start = time.perf_counter()
-            compute_seconds = 0.0
-            plot_seconds = 0.0
-            io_seconds = 0.0
-            fig1 = None
-            fig2 = None
-            existing_fignums = set(plt.get_fignums())
-            self._announce_section_progress(section_title)
-            try:
-                compute_start = time.perf_counter()
-                cb = CarbonBalance(
-                    run,
-                    year=self.year,
-                    config=self.config,
-                    analysis_year_min=self.analysis_year_min,
-                    analysis_year_max=self.analysis_year_max,
-                )
-                sec = _Section(section_title, "Ecosystem carbon budget closure.")
-                if self.config.report.balance_sections.show_statistics_table:
-                    cb.components()
-                    cb.residual()
-                compute_seconds += time.perf_counter() - compute_start
-
-                plot_start = time.perf_counter()
-                fig1, fig2 = cb.plot()
-                p1, t1 = self._save_figure(fig1, figdir, "carbon_cumulative")
-                p2, t2 = self._save_figure(fig2, figdir, "carbon_pools")
-                sec.add_figure(p1, t1, "Cumulative carbon balance", "balance")
-                sec.add_figure(p2, t2, "Carbon pools", "balance")
-                plt.close(fig1)
-                plt.close(fig2)
-                plot_seconds += time.perf_counter() - plot_start
-
-                # Add statistics if enabled
-                if self.config.report.balance_sections.show_statistics_table:
-                    compute_start = time.perf_counter()
-                    stats = self._compute_carbon_balance_stats(cb)
-                    sec.add_statistics(stats)
-                    compute_seconds += time.perf_counter() - compute_start
-
-                # Save NetCDF data
-                if "netcdf" in self.config.report.output_formats:
-                    nc_file = (
-                        datadir
-                        / f"carbon_balance{'_' + str(self.year) if self.year else ''}.nc"
-                    )
-                    # Components only (Balance.to_netcdf would add the residual).
-                    try:
-                        io_start = time.perf_counter()
-                        components_ds = xr.Dataset(cb.components())
-                        components_ds.to_netcdf(nc_file)
-                        io_seconds += time.perf_counter() - io_start
-                    except Exception:
-                        # Skip if can't save
-                        logger.debug(
-                            "Could not save carbon balance components to netCDF",
-                            exc_info=True,
-                        )
-
-                sections.append(sec)
-            except Exception as e:
-                self._record_error("Carbon Balance", e)
-            finally:
-                if fig1 is not None:
-                    plt.close(fig1)
-                if fig2 is not None:
-                    plt.close(fig2)
-                self._close_new_figures(existing_fignums)
-                self._record_section_timing(
-                    "Carbon Balance",
-                    section_start,
-                    io_seconds=io_seconds,
-                    compute_seconds=compute_seconds,
-                    plot_seconds=plot_seconds,
-                )
-                # Clear cache after balance section
-                self._run.clear_variable_cache()
-                gc.collect()
-
+        for spec in _BALANCE_SECTIONS:
+            if getattr(flags, spec.flag):
+                sec = self._build_balance_section(spec, figdir, datadir)
+                if sec is not None:
+                    sections.append(sec)
         return sections
+
+    def _build_balance_section(
+        self, spec: _BalanceSectionSpec, figdir: Path, datadir: Path
+    ) -> _Section | None:
+        """Build one balance section; on failure record the error and return None."""
+        section_start = time.perf_counter()
+        compute_seconds = 0.0
+        plot_seconds = 0.0
+        io_seconds = 0.0
+        figs: tuple[plt.Figure, ...] = ()
+        existing_fignums = set(plt.get_fignums())
+        show_stats = self.config.report.balance_sections.show_statistics_table
+        self._announce_section_progress(spec.title)
+        try:
+            compute_start = time.perf_counter()
+            balance = spec.balance_cls(
+                self._run,
+                year=self.year,
+                config=self.config,
+                analysis_year_min=self.analysis_year_min,
+                analysis_year_max=self.analysis_year_max,
+            )
+            sec = _Section(spec.title, spec.description)
+            if show_stats:
+                balance.components()
+                balance.residual()
+            compute_seconds += time.perf_counter() - compute_start
+
+            plot_start = time.perf_counter()
+            figs = balance.plot()
+            for fig, (basename, caption) in zip(figs, spec.figures):
+                path, thumb_path = self._save_figure(fig, figdir, basename)
+                sec.add_figure(path, thumb_path, caption, "balance")
+            for fig in figs:
+                plt.close(fig)
+            plot_seconds += time.perf_counter() - plot_start
+
+            if show_stats:
+                compute_start = time.perf_counter()
+                sec.add_statistics(getattr(self, spec.stats_method)(balance))
+                compute_seconds += time.perf_counter() - compute_start
+
+            if "netcdf" in self.config.report.output_formats:
+                io_seconds += self._save_balance_data(balance, spec, datadir)
+
+            return sec
+        except Exception as e:
+            self._record_error(spec.title, e)
+            return None
+        finally:
+            for fig in figs:
+                plt.close(fig)
+            self._close_new_figures(existing_fignums)
+            self._record_section_timing(
+                spec.title,
+                section_start,
+                io_seconds=io_seconds,
+                compute_seconds=compute_seconds,
+                plot_seconds=plot_seconds,
+            )
+            # Free cached variables between balance sections.
+            self._run.clear_variable_cache()
+            gc.collect()
+
+    def _save_balance_data(
+        self, balance: Any, spec: _BalanceSectionSpec, datadir: Path
+    ) -> float:
+        """Write the balance's netCDF file and return the seconds spent writing."""
+        year_suffix = f"_{self.year}" if self.year else ""
+        nc_file = datadir / f"{spec.prefix}_balance{year_suffix}.nc"
+        if not spec.components_only:
+            io_start = time.perf_counter()
+            balance.to_netcdf(nc_file)
+            return time.perf_counter() - io_start
+
+        # Components only: Balance.to_netcdf would add the residual, which
+        # raises when energy terms are missing. A failed export is not fatal.
+        try:
+            io_start = time.perf_counter()
+            xr.Dataset(balance.components()).to_netcdf(nc_file)
+            return time.perf_counter() - io_start
+        except Exception:
+            logger.debug(
+                "Could not save %s balance components to netCDF",
+                spec.prefix,
+                exc_info=True,
+            )
+            return 0.0
 
     def _compute_water_balance_stats(self, wb: WaterBalance) -> dict[str, Any]:
         """Compute statistics for water balance section."""
@@ -1080,18 +986,7 @@ class Report:
                     )
             stats["rows"] = rows
         except Exception as e:
-            stats = {
-                "table_kind": "balance_flat",
-                "rows": [
-                    self._make_stats_row(
-                        metric="Error",
-                        long_name="",
-                        value=str(e),
-                        kind="summary",
-                        indent=0,
-                    )
-                ],
-            }
+            stats = self._error_stats(e)
 
         return stats
 
@@ -1117,18 +1012,7 @@ class Report:
                     )
                 )
         except Exception as e:
-            stats = {
-                "table_kind": "balance_flat",
-                "rows": [
-                    self._make_stats_row(
-                        metric="Error",
-                        long_name="",
-                        value=str(e),
-                        kind="summary",
-                        indent=0,
-                    )
-                ],
-            }
+            stats = self._error_stats(e)
 
         return stats
 
@@ -1166,20 +1050,25 @@ class Report:
                         )
                     )
         except Exception as e:
-            stats = {
-                "table_kind": "balance_flat",
-                "rows": [
-                    self._make_stats_row(
-                        metric="Error",
-                        long_name="",
-                        value=str(e),
-                        kind="summary",
-                        indent=0,
-                    )
-                ],
-            }
+            stats = self._error_stats(e)
 
         return stats
+
+    @classmethod
+    def _error_stats(cls, error: Exception) -> dict[str, Any]:
+        """Statistics table holding a single error row."""
+        return {
+            "table_kind": "balance_flat",
+            "rows": [
+                cls._make_stats_row(
+                    metric="Error",
+                    long_name="",
+                    value=str(error),
+                    kind="summary",
+                    indent=0,
+                )
+            ],
+        }
 
     @staticmethod
     def _reduce_non_time_dims(da: xr.DataArray) -> xr.DataArray:
