@@ -9,7 +9,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 **Key features:**
 - Automatic variable derivation (e.g., computing `QFLX_EVAP_TOT` from components if missing)
 - Vertical aggregation of 3D soil variables (`SOILLIQ`, `SOILICE`)
-- Unit-aware flux-to-cumulative integration using `pint`
+- Time-bounds-aware flux-to-cumulative integration
 - Water year support with configurable start month
 - Sub-gridcell support (column, PFT, landunit faceting)
 - HTML report generation with thumbnails, lightbox modal, and statistics tables
@@ -23,7 +23,7 @@ elm_diagnostics/
 ├── io/              # Data loading and preprocessing
 │   ├── run.py       # Run and Comparison classes: auto-discover history streams
 │   ├── derived.py   # Compute missing variables (e.g., QFLX_EVAP_TOT)
-│   ├── units.py     # Unit-aware integration using pint
+│   ├── units.py     # Unit strings, flux/state classification, kg/m² → mm
 │   └── subgrid.py   # Sub-gridcell dimension handling
 ├── balances/        # Budget balance computations
 │   ├── base.py      # Abstract Balance class
@@ -31,12 +31,14 @@ elm_diagnostics/
 │   ├── carbon.py    # CarbonBalance
 │   └── energy.py    # EnergyBalance
 ├── time/            # Time handling
-│   ├── calendars.py # Water year, year selection
-│   └── integration.py # Time-bounds-aware flux integration
+│   ├── calendars.py # Water year, year selection, year-window masks
+│   ├── integration.py # Time-bounds-aware flux integration
+│   └── plotting.py  # cftime → datetime for matplotlib time axes
 ├── plots/           # Plotting functions
 │   ├── timeseries.py, seasonal.py, anomaly.py, ...
 │   ├── hovmuller.py # Depth × time heatmaps
-│   └── subgrid_helpers.py # Faceting logic
+│   ├── _common.py   # Shared labels/legends, faceting preamble, level lines
+│   └── subgrid_helpers.py # Faceting layout and validation
 ├── report/          # HTML report generation
 │   └── build.py     # Report class: thumbnails, lightbox, statistics
 ├── config/          # Configuration management
@@ -71,7 +73,7 @@ Do NOT use `workspace/` for:
 1. **Load**: `Run` class auto-discovers `*.elm.h*.nc` files, groups by history tape (`h0`, `h1`, ...), lazy-loads with `xarray.open_mfdataset`
 2. **Derive**: If variable missing, `derived.py` computes it (e.g., `QFLX_EVAP_TOT = QSOIL + QVEGE + QVEGT`)
 3. **Aggregate**: 3D soil variables (`levgrnd` dimension) summed vertically
-4. **Integrate**: Fluxes converted to cumulative using time bounds via `pint-xarray`
+4. **Integrate**: Fluxes converted to cumulative by multiplying by `time_bounds` widths
 5. **Balance**: Components grouped as inputs/outputs/storage, residual computed
 6. **Plot**: Matplotlib figures for each variable and balance
 7. **Report**: HTML with thumbnails, lightbox modal, and statistics tables
@@ -112,10 +114,10 @@ All variable names verified against E3SM IM1 ELM source (`/code/E3SM/IM1/compone
 - Water year support: configurable start month (default October)
 
 **Unit System:**
-`pint-xarray` for unit-aware operations. Fluxes in `mm/s`, storage in `mm`, integration to cumulative `mm`.
+Units are handled as attribute strings (`io/units.py`, `time/integration.py`); `pint` is only used to parse unit strings, and `pint-xarray` is declared but not used. Fluxes in `mm/s`, storage in `mm`, integration to cumulative `mm`.
 
 **Sub-gridcell:**
-For runs with `dov2xy = .false.`, all plots and balances support faceting via `by="column"`, `by="pft"`, or `by="landunit"`.
+For runs with `dov2xy = .false.`, timeseries/seasonal/anomaly/histogram/diurnal plots and the water balance support faceting via `by="column"`, `by="pft"`, or `by="landunit"`. `plot_hovmuller` has no `by`, and carbon/energy balances accept `by` but do not facet (see REFACTOR_NOTES.md B16).
 
 ## Development Commands
 
@@ -127,17 +129,17 @@ pip install -e ".[all]"          # Include dask, plotly, cartopy
 
 ### Testing
 ```bash
-pytest tests/                    # Run all tests (161 tests)
+pytest tests/                    # Run all tests (330 tests)
 pytest tests/test_water_balance.py -v  # Specific module
 pytest -k "sub_gridcell"         # Keyword filter
-pytest --mpl                     # Include image comparison tests
 ```
 
 **Test data:** Real ELM output in `tests/fixtures/data/` (Oak Harbor single-point simulation, Oct 2000 - Dec 2001).
 
 ### Code Quality
 ```bash
-# No linter configured yet; use project conventions
+ruff check elm_diagnostics/ && ruff format --check elm_diagnostics/   # ruff pinned to 0.16.5 (CI)
+mypy                            # config in pyproject.toml; baseline modules listed there
 python -m pytest tests/         # Tests enforce correctness
 ```
 
@@ -169,7 +171,7 @@ User config at `~/.config/elm-diagnostics/config.yaml` (optional). Defaults in `
        """
        # Check components, compute, set attrs
    ```
-3. Register in `Run.get()` fallback chain (in `io/run.py`)
+3. Register it in `DERIVABLE_VARS` and its components in `DERIVABLE_REQUIREMENTS` (both in `io/derived.py`); `Run.get()`/`Run.has()` consult these
 4. Add test in `tests/test_real_data.py` or new test file
 5. Update `docs/variable-mappings.md` with source code reference
 
@@ -183,10 +185,10 @@ User config at `~/.config/elm-diagnostics/config.yaml` (optional). Defaults in `
 ### Adding a New Balance Type
 
 1. Create `elm_diagnostics/balances/my_balance.py` inheriting from `balances/base.py:Balance`
-2. Implement abstract methods: `components()`, `residual()`, `plot()`
+2. Implement abstract methods: `_get_balance_config()`, `_get_variable_names()`, `_compute_components()`, `_compute_residual()`, `plot()` (the base class caches `components()`/`residual()`)
 3. Export in `elm_diagnostics/balances/__init__.py` and top-level `__init__.py`
-4. Add default balance definition to `config/defaults.yaml` under `balances.my_balance`
-5. Add Pydantic model to `config/schema.py:BalanceConfig`
+4. Add a Pydantic model whose field defaults are the balance definition, add it to `config/schema.py:BalancesConfig` and `_BALANCE_MODELS` (balance definitions are not in `defaults.yaml`)
+5. Add a `_BalanceSectionSpec` entry in `report/build.py:_BALANCE_SECTIONS` if it belongs in the report
 6. Add CLI command in `cli.py` under `balance` subcommand
 7. Add tests in `tests/test_my_balance.py`
 
@@ -210,7 +212,7 @@ User config at `~/.config/elm-diagnostics/config.yaml` (optional). Defaults in `
 ## Important Conventions
 
 - **Variable names:** Use exact ELM history field names (verified against source code)
-- **Units:** Always use `pint-xarray` for unit-aware operations; never assume units
+- **Units:** Read units from attributes and convert explicitly (`io/units.py`); never assume units
 - **Time handling:** Use `time_bounds` for integration, not `time` coordinate alone
 - **Vertical aggregation:** Check for `levgrnd`/`levsoi` dimension before summing
 - **Water year:** Default start month is October (configurable via `time.water_year_start_month`)
@@ -219,8 +221,8 @@ User config at `~/.config/elm-diagnostics/config.yaml` (optional). Defaults in `
 
 ## Testing Notes
 
-- **161 tests passing** (35 CLI, 17 report, 45 sub-gridcell, 21 plots, 20 balance/integration, 23 config/data)
-- Image comparison tests use `pytest-mpl` (baseline images in `tests/baseline/`)
+- **330 tests passing**, including characterization tests for plot contents, report structure, CLI paths, and Comparison/sub-daily behavior
+- No image-comparison tests exist (`pytest-mpl` is installed but unused); plot tests assert figure contents instead
 - Real data tests use Oak Harbor fixture (15 months, complete water year)
 - CLI tests use `typer.testing.CliRunner` with captured output
 - Sub-gridcell tests validate faceting logic for column/PFT/landunit
