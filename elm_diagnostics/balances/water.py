@@ -19,6 +19,7 @@ import xarray as xr
 
 from elm_diagnostics.balances.base import Balance, _plot_time
 from elm_diagnostics.config.schema import WaterBalanceConfig
+from elm_diagnostics.io.units import convert_water_to_mm
 from elm_diagnostics.time.integration import (
     cumulative_integral,
     storage_change,
@@ -90,8 +91,6 @@ class WaterBalance(Balance):
                     da = da.sum(dim=vdim, keep_attrs=True)
 
                 # Convert storage to mm for consistency (kg/m² → mm for water)
-                from elm_diagnostics.io.units import convert_water_to_mm
-
                 da = convert_water_to_mm(da)
 
                 da = self._select_year(da)
@@ -165,8 +164,6 @@ class WaterBalance(Balance):
                 if "levgrnd" in da.dims or "levsoi" in da.dims:
                     vdim = "levgrnd" if "levgrnd" in da.dims else "levsoi"
                     da = da.sum(dim=vdim, keep_attrs=True)
-
-                from elm_diagnostics.io.units import convert_water_to_mm
 
                 da = convert_water_to_mm(da)
                 da = self._select_year(da)

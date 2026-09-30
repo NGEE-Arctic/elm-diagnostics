@@ -202,8 +202,6 @@ def apply_max_levels(
         return da  # Already within limit
 
     # Warn user about truncation
-    import warnings
-
     warnings.warn(
         f"Limiting {dim} to {max_levels} of {n_levels} levels for clearer visualization.",
         UserWarning,

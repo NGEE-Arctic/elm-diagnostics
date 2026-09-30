@@ -18,11 +18,12 @@ from typing import Any
 
 import cftime
 import matplotlib.pyplot as plt
+import numpy as np
 import xarray as xr
 
 from elm_diagnostics.config.schema import Config, load_config
 from elm_diagnostics.io.run import Run
-from elm_diagnostics.io.subgrid import SubgridLevel
+from elm_diagnostics.io.subgrid import SubgridLevel, validate_by_keyword
 from elm_diagnostics.time.calendars import (
     get_available_years,
     select_year,
@@ -91,8 +92,6 @@ class Balance(ABC):
 
         # Validate sub-gridcell dimension if requested
         if by is not None:
-            from elm_diagnostics.io.subgrid import validate_by_keyword
-
             # Get first stream to check
             first_stream = self.run._open_stream(self.run._tape_order[0])
             validate_by_keyword(first_stream, by)
@@ -145,8 +144,6 @@ class Balance(ABC):
                 if isinstance(ds_or_da, xr.DataArray):
                     return ds_or_da
                 return ds
-
-            import numpy as np
 
             times = ds["time"].values
             years = []
