@@ -110,8 +110,8 @@ class Balance(ABC):
         Preserves the sub-gridcell dimension specified by self.by if set.
         """
         da = self.run.get(varname)
-        # Squeeze singleton spatial dims for single-point data
-        # But preserve the sub-gridcell dimension if specified
+        # Only spatial dims are squeezed, so sub-gridcell dims (column/pft/
+        # landunit) survive for faceting.
         for dim in ("lat", "lon", "lndgrid", "gridcell"):
             if dim in da.dims and da.sizes[dim] == 1:
                 da = da.squeeze(dim, drop=True)

@@ -369,7 +369,6 @@ class Report:
         start_year = self.analysis_year_min or -1
         end_year = self.analysis_year_max or -1
 
-        # Convert actual years to sentinel format for subset_climo_years
         times = ds["time"].values
         years = []
         for t in times:
@@ -377,14 +376,6 @@ class Report:
                 years.append(int(t.year))
             else:
                 years.append(int(np.datetime64(t, "Y").astype(int) + 1970))
-
-        if not years:
-            return ds
-
-        min_year = min(years) if years else None
-        max_year = max(years) if years else None
-        if min_year is None or max_year is None:
-            return ds
 
         # Create mask for time dimension
         mask = np.array(
@@ -414,16 +405,9 @@ class Report:
         full_path = figdir / f"{basename}.png"
         thumb_path = figdir / f"{basename}_thumb.png"
 
-        # Save full resolution with faster PNG settings when supported.
-        savefig_kwargs = {
-            "dpi": self.config.plots.style.dpi,
-            "pil_kwargs": _PNG_PIL_KWARGS,
-        }
-        try:
-            fig.savefig(full_path, **savefig_kwargs)
-        except TypeError:
-            savefig_kwargs.pop("pil_kwargs", None)
-            fig.savefig(full_path, **savefig_kwargs)
+        fig.savefig(
+            full_path, dpi=self.config.plots.style.dpi, pil_kwargs=_PNG_PIL_KWARGS
+        )
 
         # Save thumbnail by resizing the already-written full image.
         if self.config.report.thumbnails.enabled:
@@ -434,20 +418,14 @@ class Report:
                     thumb.thumbnail(thumb_size, _RESAMPLING.LANCZOS)
                     thumb.save(thumb_path, **_PNG_PIL_KWARGS)
             except Exception:
-                # Fall back to legacy behavior if image resize fails.
-                fallback_kwargs = {
-                    "dpi": self.config.report.thumbnails.dpi,
-                    "pil_kwargs": _PNG_PIL_KWARGS,
-                }
-                try:
-                    fig.savefig(thumb_path, **fallback_kwargs)
-                except TypeError:
-                    fallback_kwargs.pop("pil_kwargs", None)
-                    fig.savefig(thumb_path, **fallback_kwargs)
-        else:
-            # If thumbnails disabled, use same file for both
-            thumb_path = full_path
-
+                # Resizing failed; render the thumbnail from the figure instead.
+                fig.savefig(
+                    thumb_path,
+                    dpi=self.config.report.thumbnails.dpi,
+                    pil_kwargs=_PNG_PIL_KWARGS,
+                )
+        # With thumbnails disabled the template links the full image directly,
+        # so the thumbnail path returned here is never dereferenced.
         return f"figures/{basename}.png", f"figures/{basename}_thumb.png"
 
     def _record_error(self, section: str, error: Exception) -> None:
@@ -830,8 +808,7 @@ class Report:
                     plot_seconds=plot_seconds,
                 )
                 # Clear cache after balance section
-                if hasattr(self._run, "_variable_cache"):
-                    self._run._variable_cache.clear()
+                self._run._variable_cache.clear()
                 gc.collect()
 
         if self.config.report.sections.energy_balance:
@@ -882,12 +859,11 @@ class Report:
                         datadir
                         / f"energy_balance{'_' + str(self.year) if self.year else ''}.nc"
                     )
-                    # Energy balance doesn't have to_netcdf yet, save components directly
+                    # Components only: Balance.to_netcdf also writes the residual,
+                    # which raises when energy terms are missing.
                     try:
                         io_start = time.perf_counter()
-                        components_ds = xr.Dataset(
-                            {k: v for k, v in eb.components().items()}
-                        )
+                        components_ds = xr.Dataset(eb.components())
                         components_ds.to_netcdf(nc_file)
                         io_seconds += time.perf_counter() - io_start
                     except Exception:
@@ -914,8 +890,7 @@ class Report:
                     plot_seconds=plot_seconds,
                 )
                 # Clear cache after balance section
-                if hasattr(self._run, "_variable_cache"):
-                    self._run._variable_cache.clear()
+                self._run._variable_cache.clear()
                 gc.collect()
 
         if self.config.report.sections.carbon_balance:
@@ -966,12 +941,10 @@ class Report:
                         datadir
                         / f"carbon_balance{'_' + str(self.year) if self.year else ''}.nc"
                     )
-                    # Carbon balance doesn't have to_netcdf yet, save components directly
+                    # Components only (Balance.to_netcdf would add the residual).
                     try:
                         io_start = time.perf_counter()
-                        components_ds = xr.Dataset(
-                            {k: v for k, v in cb.components().items()}
-                        )
+                        components_ds = xr.Dataset(cb.components())
                         components_ds.to_netcdf(nc_file)
                         io_seconds += time.perf_counter() - io_start
                     except Exception:
@@ -998,8 +971,7 @@ class Report:
                     plot_seconds=plot_seconds,
                 )
                 # Clear cache after balance section
-                if hasattr(self._run, "_variable_cache"):
-                    self._run._variable_cache.clear()
+                self._run._variable_cache.clear()
                 gc.collect()
 
         return sections
@@ -1341,7 +1313,6 @@ class Report:
         var_context: dict[str, Any] | None,
         figdir: Path,
         group_name: str,
-        section_title: str,
     ) -> dict[str, Any]:
         """Worker function for parallel plot generation.
 
@@ -1495,17 +1466,12 @@ class Report:
                 )
 
                 compute_start = time.perf_counter()
-                var = None
+                # Load once so validation checks do not repeatedly call run.get(varname).
+                var = run.get(varname)
                 base_var = None
-                var_context: dict[str, Any] | None = None
-                # Variable existence already confirmed
-                has_var = True
-                if has_var:
-                    # Load once so validation checks do not repeatedly call run.get(varname).
-                    var = run.get(varname)
-                    if isinstance(self.source, Comparison):
-                        base_var = self.source.base.get(varname)
-                    var_context = self._build_var_plot_context(var)
+                if isinstance(self.source, Comparison):
+                    base_var = self.source.base.get(varname)
+                var_context = self._build_var_plot_context(var)
                 var_load_time = time.perf_counter() - compute_start
                 compute_seconds += var_load_time
 
@@ -1514,9 +1480,6 @@ class Report:
                     self._check_slow_operation(
                         f"Loading {varname}", var_load_time, threshold=30.0
                     )
-
-                if var is None:
-                    continue
 
                 # Parallel plot generation for this variable
                 n_workers = self.config.report.performance.parallel_plot_workers
@@ -1535,7 +1498,6 @@ class Report:
                                 var_context,
                                 figdir,
                                 group_name,
-                                section_title,
                             )
                             self._process_plot_result(
                                 result,
@@ -1560,7 +1522,6 @@ class Report:
                                     var_context,
                                     figdir,
                                     group_name,
-                                    section_title,
                                 ): plot_type
                                 for plot_type in plot_types
                             }
@@ -1606,8 +1567,7 @@ class Report:
 
             # Clear variable cache and force garbage collection after each group
             # to prevent memory accumulation across 912 variables
-            if hasattr(run, "_variable_cache"):
-                run._variable_cache.clear()
+            run._variable_cache.clear()
             gc.collect()
 
         return sections

@@ -113,7 +113,6 @@ class WaterBalance(Balance):
             result["dS"] = ds_change
 
         self._storage_components_cache = storage_components
-        self._storage_components_cache_key = self._cache_key()
 
         return result
 
@@ -142,42 +141,10 @@ class WaterBalance(Balance):
         Each returned variable is a storage-change time series with the same
         definition used for dS: S(t) - S(0).
         """
-        key = self._cache_key()
-        cached = getattr(self, "_storage_components_cache", None)
-        cached_key = getattr(self, "_storage_components_cache_key", None)
-        if cached is not None and cached_key == key:
-            return cached
-
+        # _compute_components() fills this cache alongside the components, so
+        # making sure the components are current is enough.
         self.components()
-        cached = getattr(self, "_storage_components_cache", None)
-        cached_key = getattr(self, "_storage_components_cache_key", None)
-        if cached is not None and cached_key == key:
-            return cached
-
-        bc = self._balance_config
-        storage_components: dict[str, xr.DataArray] = {}
-
-        for varname in bc.storages:
-            try:
-                da = self._get_var(varname)
-
-                if "levgrnd" in da.dims or "levsoi" in da.dims:
-                    vdim = "levgrnd" if "levgrnd" in da.dims else "levsoi"
-                    da = da.sum(dim=vdim, keep_attrs=True)
-
-                da = convert_water_to_mm(da)
-                da = self._select_year(da)
-                storage_components[varname] = storage_change(da)
-                logger.info(
-                    "Storage component '%s' included in storage decomposition.", varname
-                )
-            except KeyError:
-                logger.warning("Missing expected water storage variable '%s'", varname)
-
-        self._storage_components_cache = storage_components
-        self._storage_components_cache_key = key
-
-        return storage_components
+        return self._storage_components_cache
 
     def plot(self) -> tuple[plt.Figure, plt.Figure, plt.Figure, plt.Figure]:
         """Generate water balance plots.

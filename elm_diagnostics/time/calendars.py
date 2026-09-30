@@ -113,7 +113,7 @@ def get_available_years(
     start_month: int = 10,
     dim: str = "time",
 ) -> list[int]:
-    """Return sorted list of complete years available in the dataset."""
+    """Return the sorted list of years present in the dataset (partial years included)."""
     times = ds[dim].values
 
     if frame == "water_year":
