@@ -110,9 +110,7 @@ def _infer_cadence(ds: xr.Dataset) -> str | pd.Timedelta:
 def _extract_casename(path: Path) -> str:
     """Extract ELM case name from the first history file found."""
     for f in sorted(path.glob("*.elm.h*.nc")):
-        parts = f.name.split(".elm.")
-        if parts:
-            return parts[0]
+        return f.name.split(".elm.")[0]
     return path.name
 
 
@@ -398,25 +396,26 @@ class Run:
         """
         if strict_combine is None:
             strict_combine = self._strict_combine
-        kwargs: dict = {
-            "combine": "by_coords",
-            "data_vars": "all",
-        }
+        kwargs: dict
         if strict_combine:
             # Strict: verify coords/vars are equal across files (debugging).
-            kwargs["combine"] = "by_coords"
-            kwargs["data_vars"] = "all"
-            kwargs["join"] = "override"
-            kwargs["compat"] = "equals"
+            kwargs = {
+                "combine": "by_coords",
+                "data_vars": "all",
+                "join": "override",
+                "compat": "equals",
+            }
         else:
             # Performance path: trust the files to be consistent and skip the
             # cross-file equality materialization (see Notes above).
-            kwargs["combine"] = "nested"
-            kwargs["concat_dim"] = "time"
-            kwargs["data_vars"] = "minimal"
-            kwargs["coords"] = "minimal"
-            kwargs["join"] = "override"
-            kwargs["compat"] = "override"
+            kwargs = {
+                "combine": "nested",
+                "concat_dim": "time",
+                "data_vars": "minimal",
+                "coords": "minimal",
+                "join": "override",
+                "compat": "override",
+            }
         # Use CFDatetimeCoder for cftime decoding (xarray >= 2024)
         try:
             coder = xr.coders.CFDatetimeCoder(use_cftime=True)
@@ -434,8 +433,6 @@ class Run:
             else:
                 # Avoid requiring dask when not explicitly requested
                 kwargs["chunks"] = None
-        kwargs.setdefault("compat", "no_conflicts")
-        kwargs.setdefault("join", "outer")
         return kwargs
 
     def _open_stream(self, tape: str, strict_combine: bool | None = None) -> xr.Dataset:
@@ -738,33 +735,6 @@ class Run:
         return f"Run(name={self.name!r}, tapes=[{tapes}])"
 
 
-def _lazy_align(
-    da_base: xr.DataArray,
-    da_exp: xr.DataArray,
-    join: Literal["inner", "outer"],
-) -> tuple[xr.DataArray, xr.DataArray]:
-    """Align arrays on coordinates while preserving chunking.
-
-    Uses xarray's align with copy=False to avoid triggering computation
-    on dask-backed arrays.
-
-    Parameters
-    ----------
-    da_base, da_exp : xr.DataArray
-        Arrays to align, potentially with dask chunks
-    join : {"inner", "outer"}
-        How to combine coordinate indices
-
-    Returns
-    -------
-    tuple of aligned arrays, still chunked if inputs were chunked
-    """
-    # copy=False is critical - returns views/references rather than
-    # materializing new arrays
-    aligned = xr.align(da_base, da_exp, join=join, copy=False)
-    return aligned
-
-
 class Comparison:
     """Pair of runs for side-by-side diagnostics.
 
@@ -805,7 +775,8 @@ class Comparison:
         da_exp = self.experiment.get(varname, tape=tape)
 
         join = "inner" if self.align == "intersect" else "outer"
-        return _lazy_align(da_base, da_exp, join=join)
+        # copy=False keeps dask-backed arrays lazy (no materialized copies).
+        return xr.align(da_base, da_exp, join=join, copy=False)
 
     def __repr__(self) -> str:
         return (

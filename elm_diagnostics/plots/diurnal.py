@@ -119,11 +119,13 @@ def plot_diurnal(
     -------
     matplotlib Figure
 
+    Data that is not sub-daily produces a figure with an explanatory text
+    panel rather than an error.
+
     Raises
     ------
     ValueError
-        If data is not sub-daily (less than 24 time steps per day),
-        or if `by` is specified but variable doesn't have that dimension,
+        If `by` is specified but variable doesn't have that dimension,
         or if dataset uses gridcell-averaged output (dov2xy=.true.),
         or if both `by` and `ax` are specified.
     """

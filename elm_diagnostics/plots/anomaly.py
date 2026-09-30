@@ -65,7 +65,9 @@ def plot_anomaly(
     """Plot annual anomalies of a variable as a bar chart.
 
     Positive anomalies in blue, negative in red.
-    For a Comparison, shows the difference (experiment - base).
+    For a Comparison, shows the difference of the two runs' anomalies
+    (experiment - base) over their common years; each run's anomaly is taken
+    relative to its own long-term mean.
 
     Parameters
     ----------

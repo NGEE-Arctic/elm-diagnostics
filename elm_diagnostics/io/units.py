@@ -234,7 +234,7 @@ def convert_water_to_mm(da: xr.DataArray) -> xr.DataArray:
         result.attrs["units"] = "mm"
         return result
 
-    # mm H2O variant → mm
+    # Fluxes must be integrated, not relabeled
     if normalized == "mm/s":
         raise ValueError(
             f"Cannot convert flux units '{units_str}' to mm. "
