@@ -18,8 +18,14 @@ import matplotlib.pyplot as plt
 import xarray as xr
 
 from elm_diagnostics.balances.base import Balance
-from elm_diagnostics.config.schema import WaterBalanceConfig
+from elm_diagnostics.config.schema import PlotStyleConfig, WaterBalanceConfig
 from elm_diagnostics.io.units import convert_water_to_mm
+from elm_diagnostics.plots._common import hide_unused_axes
+from elm_diagnostics.plots.subgrid_helpers import (
+    create_facet_figure,
+    format_subgrid_title,
+    get_subgrid_units,
+)
 from elm_diagnostics.time.integration import (
     cumulative_integral,
     storage_change,
@@ -178,113 +184,34 @@ class WaterBalance(Balance):
         comps: dict[str, xr.DataArray],
         storage_comps: dict[str, xr.DataArray],
         bc: WaterBalanceConfig,
-        style,
+        style: PlotStyleConfig,
     ) -> tuple[plt.Figure, plt.Figure, plt.Figure, plt.Figure]:
         """Plot single water balance (no faceting)."""
-        # --- Cumulative panel ---
-        fig1, ax1 = plt.subplots(figsize=style.figsize, dpi=style.dpi)
-
-        # Sum inputs
-        inputs_available = [v for v in bc.inputs if v in comps]
-        if inputs_available:
-            total_in = sum(comps[v] for v in inputs_available)
-            ax1.plot(
-                plot_times(total_in), total_in, label="P (total input)", color="blue"
-            )
-
-        # Sum outputs
-        outputs_available = [v for v in bc.outputs if v in comps]
-        if outputs_available:
-            total_out = sum(comps[v] for v in outputs_available)
-            ax1.plot(
-                plot_times(total_out), total_out, label="Total output", color="red"
-            )
-
-        # Storage change
-        if "dS" in comps:
-            ax1.plot(
-                plot_times(comps["dS"]),
-                comps["dS"],
-                label="dS (storage change)",
-                color="green",
-            )
-
-        # Residual
-        res = self.residual()
-        ax1.plot(plot_times(res), res, label="Residual", color="black", linestyle="--")
-
-        ax1.set_xlabel("Time")
-        ax1.set_ylabel("Cumulative (mm)")
-        title = f"Water Balance — {self.run.name}"
+        name = self.run.name
+        title = f"Water Balance — {name}"
         if self.year:
             title += f" ({self.frame} {self.year})"
-        ax1.set_title(title)
-        ax1.legend(loc="best", fontsize="small")
-        ax1.axhline(0, color="gray", linewidth=0.5)
+
+        fig1, ax1 = plt.subplots(figsize=style.figsize, dpi=style.dpi)
+        _plot_budget_lines(ax1, comps, self.residual(), bc, _SINGLE_BUDGET_LABELS)
+        _decorate(ax1, "Cumulative (mm)", title, zero_line=True)
         fig1.tight_layout()
 
-        # --- Output decomposition panel ---
         fig2, ax2 = plt.subplots(figsize=style.figsize, dpi=style.dpi)
-
-        colors = plt.cm.tab10.colors
-        for i, varname in enumerate(outputs_available):
-            ax2.plot(
-                plot_times(comps[varname]),
-                comps[varname],
-                label=varname,
-                color=colors[i % len(colors)],
-            )
-
-        ax2.set_xlabel("Time")
-        ax2.set_ylabel("Cumulative (mm)")
-        ax2.set_title(f"Water Output Decomposition — {self.run.name}")
-        ax2.legend(loc="best", fontsize="small")
+        _plot_series(ax2, comps, _available(bc.outputs, comps))
+        _decorate(ax2, "Cumulative (mm)", f"Water Output Decomposition — {name}")
         fig2.tight_layout()
 
-        # --- Input decomposition panel ---
         fig3, ax3 = plt.subplots(figsize=style.figsize, dpi=style.dpi)
-
-        for i, varname in enumerate(inputs_available):
-            ax3.plot(
-                plot_times(comps[varname]),
-                comps[varname],
-                label=varname,
-                color=colors[i % len(colors)],
-            )
-
-        ax3.set_xlabel("Time")
-        ax3.set_ylabel("Cumulative (mm)")
-        ax3.set_title(f"Water Input Decomposition — {self.run.name}")
-        ax3.legend(loc="best", fontsize="small")
+        _plot_series(ax3, comps, _available(bc.inputs, comps))
+        _decorate(ax3, "Cumulative (mm)", f"Water Input Decomposition — {name}")
         fig3.tight_layout()
 
-        # --- Storage decomposition panel ---
         fig4, ax4 = plt.subplots(figsize=style.figsize, dpi=style.dpi)
-        storage_available = [v for v in bc.storages if v in storage_comps]
-
-        for i, varname in enumerate(storage_available):
-            ax4.plot(
-                plot_times(storage_comps[varname]),
-                storage_comps[varname],
-                label=varname,
-                color=colors[i % len(colors)],
-            )
-
-        if storage_available:
-            total_storage_change = sum(storage_comps[v] for v in storage_available)
-            ax4.plot(
-                plot_times(total_storage_change),
-                total_storage_change,
-                label="Total",
-                color="black",
-                linewidth=2.5,
-            )
-
-        ax4.set_xlabel("Time")
-        ax4.set_ylabel("Change (mm)")
-        ax4.set_title(f"Water Storage Decomposition — {self.run.name}")
-        ax4.legend(loc="best", fontsize="small")
-        ax4.axhline(0, color="gray", linewidth=0.5)
+        _plot_storage(ax4, storage_comps, _available(bc.storages, storage_comps))
+        _decorate(
+            ax4, "Change (mm)", f"Water Storage Decomposition — {name}", zero_line=True
+        )
         fig4.tight_layout()
 
         return fig1, fig2, fig3, fig4
@@ -294,178 +221,177 @@ class WaterBalance(Balance):
         comps: dict[str, xr.DataArray],
         storage_comps: dict[str, xr.DataArray],
         bc: WaterBalanceConfig,
-        style,
+        style: PlotStyleConfig,
     ) -> tuple[plt.Figure, plt.Figure, plt.Figure, plt.Figure]:
         """Plot faceted water balance by sub-gridcell dimension."""
-        from elm_diagnostics.plots.subgrid_helpers import (
-            create_facet_figure,
-            format_subgrid_title,
-            get_subgrid_units,
-        )
-
         # Get subgrid units from first component
         first_comp = next(iter(comps.values()))
         units = get_subgrid_units(first_comp, self.by)
 
-        # Create faceted figures
         fig1, axes1 = create_facet_figure(len(units), style)
         fig2, axes2 = create_facet_figure(len(units), style)
         fig3, axes3 = create_facet_figure(len(units), style)
         fig4, axes4 = create_facet_figure(len(units), style)
 
-        # Plot each subgrid unit
+        residual = self.residual()
         for unit_id, ax1, ax2, ax3, ax4 in zip(
-            units,
-            axes1.flat,
-            axes2.flat,
-            axes3.flat,
-            axes4.flat,
+            units, axes1.flat, axes2.flat, axes3.flat, axes4.flat
         ):
-            # Select this unit from all components
             comps_unit = {k: v.sel({self.by: unit_id}) for k, v in comps.items()}
             storage_unit = {
                 k: v.sel({self.by: unit_id}) for k, v in storage_comps.items()
             }
+            unit_title = format_subgrid_title(self.by, unit_id)
 
-            # --- Cumulative panel ---
-            inputs_available = [v for v in bc.inputs if v in comps_unit]
-            if inputs_available:
-                total_in = sum(comps_unit[v] for v in inputs_available)
-                ax1.plot(
-                    plot_times(total_in), total_in, label="P", color="blue", linewidth=1
-                )
-
-            outputs_available = [v for v in bc.outputs if v in comps_unit]
-            if outputs_available:
-                total_out = sum(comps_unit[v] for v in outputs_available)
-                ax1.plot(
-                    plot_times(total_out),
-                    total_out,
-                    label="Out",
-                    color="red",
-                    linewidth=1,
-                )
-
-            if "dS" in comps_unit:
-                ax1.plot(
-                    plot_times(comps_unit["dS"]),
-                    comps_unit["dS"],
-                    label="dS",
-                    color="green",
-                    linewidth=1,
-                )
-
-            # Residual for this unit
-            res_unit = self.residual().sel({self.by: unit_id})
-            ax1.plot(
-                plot_times(res_unit),
-                res_unit,
-                label="Res",
-                color="black",
-                linestyle="--",
+            _plot_budget_lines(
+                ax1,
+                comps_unit,
+                residual.sel({self.by: unit_id}),
+                bc,
+                _FACET_BUDGET_LABELS,
                 linewidth=1,
             )
+            _decorate(ax1, "Cumulative (mm)", unit_title, zero_line=True, facet=True)
 
-            ax1.set_xlabel("Time", fontsize="small")
-            ax1.set_ylabel("Cumulative (mm)", fontsize="small")
-            ax1.set_title(format_subgrid_title(self.by, unit_id), fontsize="medium")
-            ax1.legend(loc="best", fontsize="x-small")
-            ax1.axhline(0, color="gray", linewidth=0.5)
-            ax1.tick_params(labelsize="small")
+            _plot_series(
+                ax2, comps_unit, _available(bc.outputs, comps_unit), linewidth=1
+            )
+            _decorate(ax2, "Cumulative (mm)", unit_title, facet=True)
 
-            # --- Decomposition panel ---
-            colors = plt.cm.tab10.colors
-            for i, varname in enumerate(outputs_available):
-                ax2.plot(
-                    plot_times(comps_unit[varname]),
-                    comps_unit[varname],
-                    label=varname,
-                    color=colors[i % len(colors)],
-                    linewidth=1,
-                )
+            _plot_series(
+                ax3, comps_unit, _available(bc.inputs, comps_unit), linewidth=1
+            )
+            _decorate(ax3, "Cumulative (mm)", unit_title, facet=True)
 
-            ax2.set_xlabel("Time", fontsize="small")
-            ax2.set_ylabel("Cumulative (mm)", fontsize="small")
-            ax2.set_title(format_subgrid_title(self.by, unit_id), fontsize="medium")
-            ax2.legend(loc="best", fontsize="x-small")
-            ax2.tick_params(labelsize="small")
+            _plot_storage(
+                ax4,
+                storage_unit,
+                _available(bc.storages, storage_unit),
+                linewidth=1,
+            )
+            _decorate(ax4, "Change (mm)", unit_title, zero_line=True, facet=True)
 
-            # --- Input decomposition panel ---
-            for i, varname in enumerate(inputs_available):
-                ax3.plot(
-                    plot_times(comps_unit[varname]),
-                    comps_unit[varname],
-                    label=varname,
-                    color=colors[i % len(colors)],
-                    linewidth=1,
-                )
+        for axes in (axes1, axes2, axes3, axes4):
+            hide_unused_axes(axes, len(units))
 
-            ax3.set_xlabel("Time", fontsize="small")
-            ax3.set_ylabel("Cumulative (mm)", fontsize="small")
-            ax3.set_title(format_subgrid_title(self.by, unit_id), fontsize="medium")
-            ax3.legend(loc="best", fontsize="x-small")
-            ax3.tick_params(labelsize="small")
-
-            # --- Storage decomposition panel ---
-            storage_available = [v for v in bc.storages if v in storage_unit]
-            for i, varname in enumerate(storage_available):
-                ax4.plot(
-                    plot_times(storage_unit[varname]),
-                    storage_unit[varname],
-                    label=varname,
-                    color=colors[i % len(colors)],
-                    linewidth=1,
-                )
-
-            if storage_available:
-                total_storage_change = sum(storage_unit[v] for v in storage_available)
-                ax4.plot(
-                    plot_times(total_storage_change),
-                    total_storage_change,
-                    label="Total",
-                    color="black",
-                    linewidth=2.5,
-                )
-
-            ax4.set_xlabel("Time", fontsize="small")
-            ax4.set_ylabel("Change (mm)", fontsize="small")
-            ax4.set_title(format_subgrid_title(self.by, unit_id), fontsize="medium")
-            ax4.legend(loc="best", fontsize="x-small")
-            ax4.axhline(0, color="gray", linewidth=0.5)
-            ax4.tick_params(labelsize="small")
-
-        # Hide unused subplots
-        for ax1 in axes1.flat[len(units) :]:
-            ax1.set_visible(False)
-        for ax2 in axes2.flat[len(units) :]:
-            ax2.set_visible(False)
-        for ax3 in axes3.flat[len(units) :]:
-            ax3.set_visible(False)
-        for ax4 in axes4.flat[len(units) :]:
-            ax4.set_visible(False)
-
-        # Overall titles
-        title_base = f"Water Balance — {self.run.name}"
+        name = self.run.name
+        title_base = f"Water Balance — {name}"
         if self.year:
             title_base += f" ({self.frame} {self.year})"
 
         fig1.suptitle(f"{title_base} by {self.by}", fontsize="large")
         fig2.suptitle(
-            f"Water Output Decomposition — {self.run.name} by {self.by}",
-            fontsize="large",
+            f"Water Output Decomposition — {name} by {self.by}", fontsize="large"
         )
         fig3.suptitle(
-            f"Water Input Decomposition — {self.run.name} by {self.by}",
-            fontsize="large",
+            f"Water Input Decomposition — {name} by {self.by}", fontsize="large"
         )
         fig4.suptitle(
-            f"Water Storage Decomposition — {self.run.name} by {self.by}",
-            fontsize="large",
+            f"Water Storage Decomposition — {name} by {self.by}", fontsize="large"
         )
 
-        fig1.tight_layout()
-        fig2.tight_layout()
-        fig3.tight_layout()
-        fig4.tight_layout()
+        for fig in (fig1, fig2, fig3, fig4):
+            fig.tight_layout()
 
         return fig1, fig2, fig3, fig4
+
+
+_SINGLE_BUDGET_LABELS = (
+    "P (total input)",
+    "Total output",
+    "dS (storage change)",
+    "Residual",
+)
+_FACET_BUDGET_LABELS = ("P", "Out", "dS", "Res")
+
+
+def _available(names: list[str], comps: dict[str, xr.DataArray]) -> list[str]:
+    """Names from ``names`` (in order) that have a component."""
+    return [v for v in names if v in comps]
+
+
+def _plot_budget_lines(
+    ax: plt.Axes,
+    comps: dict[str, xr.DataArray],
+    residual: xr.DataArray,
+    bc: WaterBalanceConfig,
+    labels: tuple[str, str, str, str],
+    **line_kw,
+) -> None:
+    """Draw total input, total output, dS, and residual on one axes."""
+    inputs = _available(bc.inputs, comps)
+    if inputs:
+        total_in = sum(comps[v] for v in inputs)
+        ax.plot(
+            plot_times(total_in), total_in, label=labels[0], color="blue", **line_kw
+        )
+
+    outputs = _available(bc.outputs, comps)
+    if outputs:
+        total_out = sum(comps[v] for v in outputs)
+        ax.plot(
+            plot_times(total_out), total_out, label=labels[1], color="red", **line_kw
+        )
+
+    if "dS" in comps:
+        ax.plot(
+            plot_times(comps["dS"]),
+            comps["dS"],
+            label=labels[2],
+            color="green",
+            **line_kw,
+        )
+
+    ax.plot(
+        plot_times(residual),
+        residual,
+        label=labels[3],
+        color="black",
+        linestyle="--",
+        **line_kw,
+    )
+
+
+def _plot_series(
+    ax: plt.Axes, comps: dict[str, xr.DataArray], names: list[str], **line_kw
+) -> None:
+    """Draw one line per named component, colored by tab10 position."""
+    colors = plt.cm.tab10.colors
+    for i, varname in enumerate(names):
+        ax.plot(
+            plot_times(comps[varname]),
+            comps[varname],
+            label=varname,
+            color=colors[i % len(colors)],
+            **line_kw,
+        )
+
+
+def _plot_storage(
+    ax: plt.Axes, storage_comps: dict[str, xr.DataArray], names: list[str], **line_kw
+) -> None:
+    """Draw per-storage changes plus their bold black total."""
+    _plot_series(ax, storage_comps, names, **line_kw)
+    if names:
+        total = sum(storage_comps[v] for v in names)
+        ax.plot(plot_times(total), total, label="Total", color="black", linewidth=2.5)
+
+
+def _decorate(
+    ax: plt.Axes,
+    ylabel: str,
+    title: str,
+    *,
+    zero_line: bool = False,
+    facet: bool = False,
+) -> None:
+    """Axis labels, title, legend, and optional zero line; smaller when faceted."""
+    label_kw = {"fontsize": "small"} if facet else {}
+    ax.set_xlabel("Time", **label_kw)
+    ax.set_ylabel(ylabel, **label_kw)
+    ax.set_title(title, **({"fontsize": "medium"} if facet else {}))
+    ax.legend(loc="best", fontsize="x-small" if facet else "small")
+    if zero_line:
+        ax.axhline(0, color="gray", linewidth=0.5)
+    if facet:
+        ax.tick_params(labelsize="small")
