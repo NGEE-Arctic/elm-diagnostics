@@ -20,6 +20,12 @@ from matplotlib.lines import Line2D
 from elm_diagnostics.config.schema import Config, load_config
 from elm_diagnostics.io.run import Comparison, Run
 from elm_diagnostics.io.subgrid import SubgridLevel
+from elm_diagnostics.plots._common import (
+    append_long_name_line,
+    check_by_ax,
+    format_var_ylabel,
+    legend_level_indices,
+)
 from elm_diagnostics.plots.climatology import (
     compute_climo_stats,
     compute_individual_year_seasonal_cycles,
@@ -34,28 +40,6 @@ from elm_diagnostics.plots.dimension_helpers import (
 )
 
 _MONTH_LABELS = ["J", "F", "M", "A", "M", "J", "J", "A", "S", "O", "N", "D"]
-
-
-def _format_var_ylabel(varname: str, units: str) -> str:
-    units = str(units).strip()
-    return f"{varname} ({units})" if units else varname
-
-
-def _append_long_name_line(title: str, da: xr.DataArray | None) -> str:
-    if da is None:
-        return title
-    long_name = str(da.attrs.get("long_name", "")).strip()
-    return f"{title}\n{long_name}" if long_name else title
-
-
-def _legend_level_indices(n_levels: int, max_entries: int = 8) -> set[int]:
-    """Choose representative vertical levels for concise legends."""
-    if max_entries <= 0:
-        return set()
-    if n_levels <= max_entries:
-        return set(range(n_levels))
-    idx = np.linspace(0, n_levels - 1, max_entries).astype(int)
-    return set(idx.tolist())
 
 
 def _plot_multilevel_seasonal_lines(
@@ -75,7 +59,7 @@ def _plot_multilevel_seasonal_lines(
 
     n_levels = mean_da.sizes[dim]
     level_values, _, level_name, level_units, _ = resolve_dimension_axis(mean_da, dim)
-    legend_idx = _legend_level_indices(n_levels, max_entries=legend_max_entries)
+    legend_idx = legend_level_indices(n_levels, max_entries=legend_max_entries)
     cmap = plt.get_cmap("viridis")
     line_values = np.asarray(mean_da.transpose(dim, "month").compute())
 
@@ -158,12 +142,7 @@ def plot_seasonal(
     """
     cfg = config or load_config()
 
-    # Validate ax + by compatibility
-    if by is not None and ax is not None:
-        raise ValueError(
-            "Cannot specify both 'by' and 'ax': faceted plots create "
-            "their own figure. Remove 'ax' parameter or set by=None."
-        )
+    check_by_ax(by, ax)
 
     if by is None:
         # Single plot (existing logic)
@@ -425,12 +404,12 @@ def _plot_seasonal_single(
     ax.set_xticks(months)
     ax.set_xticklabels(_MONTH_LABELS)
     ax.set_xlabel("Month")
-    ax.set_ylabel(_format_var_ylabel(varname, units))
+    ax.set_ylabel(format_var_ylabel(varname, units))
 
     title = f"{varname} — Seasonal Cycle"
     if isinstance(source, Run):
         title += f" — {source.name}"
-    ax.set_title(_append_long_name_line(title, title_da))
+    ax.set_title(append_long_name_line(title, title_da))
     fig.tight_layout()
 
     return fig
