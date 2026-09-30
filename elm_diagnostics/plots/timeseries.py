@@ -17,7 +17,6 @@ import numpy as np
 import xarray as xr
 from matplotlib.lines import Line2D
 
-from elm_diagnostics.balances.base import _plot_time
 from elm_diagnostics.config.schema import Config, load_config
 from elm_diagnostics.io.run import Comparison, Run
 from elm_diagnostics.io.subgrid import SubgridLevel
@@ -38,6 +37,7 @@ from elm_diagnostics.plots.dimension_helpers import (
     squeeze_spatial_dims,
 )
 from elm_diagnostics.plots.subgrid_helpers import format_subgrid_title
+from elm_diagnostics.time.plotting import plot_times
 
 
 def _plot_multilevel_lines(
@@ -71,7 +71,7 @@ def _plot_multilevel_lines(
     level_values, _, level_name, level_units, _ = resolve_dimension_axis(da, dim)
     legend_idx = legend_level_indices(n_levels, max_entries=legend_max_entries)
     cmap = plt.get_cmap("viridis")
-    time_values = _plot_time(da)
+    time_values = plot_times(da)
     line_values = np.asarray(da.transpose(dim, "time").compute())
 
     for i in range(n_levels):
@@ -197,14 +197,14 @@ def _plot_timeseries_single(
             ax.legend(handles=run_handles, loc="upper left", fontsize="x-small")
         else:
             ax.plot(
-                _plot_time(da_base),
+                plot_times(da_base),
                 da_base.compute(),
                 color="gray",
                 label=source.base.name,
                 alpha=0.8,
             )
             ax.plot(
-                _plot_time(da_exp),
+                plot_times(da_exp),
                 da_exp.compute(),
                 color="tab:blue",
                 label=source.experiment.name,
@@ -218,7 +218,7 @@ def _plot_timeseries_single(
         if level_dim is not None:
             ax.legend(loc="best", fontsize="x-small", title=f"{level_dim} levels")
         else:
-            ax.plot(_plot_time(da), da.compute(), color="tab:blue")
+            ax.plot(plot_times(da), da.compute(), color="tab:blue")
 
             # Climatology envelope if multi-year
             _add_climatology_envelope(
@@ -307,14 +307,14 @@ def _plot_timeseries_faceted(
                     )
             else:
                 ax_i.plot(
-                    _plot_time(da_base_unit),
+                    plot_times(da_base_unit),
                     da_base_unit.compute(),
                     color="gray",
                     label=source.base.name,
                     alpha=0.8,
                 )
                 ax_i.plot(
-                    _plot_time(da_exp_unit),
+                    plot_times(da_exp_unit),
                     da_exp_unit.compute(),
                     color="tab:blue",
                     label=source.experiment.name,
@@ -330,7 +330,7 @@ def _plot_timeseries_faceted(
                     loc="best", fontsize="xx-small", title=f"{level_dim} levels"
                 )
             if level_dim is None:
-                ax_i.plot(_plot_time(da_unit), da_unit.compute(), color="tab:blue")
+                ax_i.plot(plot_times(da_unit), da_unit.compute(), color="tab:blue")
 
                 # Climatology envelope
                 _add_climatology_envelope(
@@ -391,7 +391,7 @@ def _add_climatology_envelope(
         return
 
     # Map climatology values to actual dates from the timeseries
-    plot_times = _plot_time(da)
+    envelope_times = plot_times(da)
     # Array of month numbers (1-12) for each time point
     months = da.time.dt.month.compute()
 
@@ -402,7 +402,7 @@ def _add_climatology_envelope(
     # Plot using actual dates (not month indices 1-12)
     ax_twin = ax.twinx()
     ax_twin.fill_between(
-        plot_times,
+        envelope_times,
         lo_mapped,
         hi_mapped,
         alpha=0.15,

@@ -24,10 +24,9 @@ import numpy as np
 import pandas as pd
 import xarray as xr
 
-_FILE_STAMP_PATTERN = re.compile(r"\.h\d+\.([^.]+)\.nc$")
+from elm_diagnostics.time.integration import TIME_BOUNDS_NAMES, find_bounds_var
 
-# Time-bounds variable names, in preference order.
-_TIME_BOUNDS_NAMES = ("time_bounds", "time_bnds")
+_FILE_STAMP_PATTERN = re.compile(r"\.h\d+\.([^.]+)\.nc$")
 
 
 def _discover_streams(path: Path) -> dict[str, list[Path]]:
@@ -45,16 +44,40 @@ def _discover_streams(path: Path) -> dict[str, list[Path]]:
     return streams
 
 
+def _classify_cadence(median_days: float) -> str | pd.Timedelta:
+    """Map a median step length in days to 'monthly', 'annual', or a Timedelta."""
+    if 28 <= median_days <= 31:
+        return "monthly"
+    if 360 <= median_days <= 366:
+        return "annual"
+    return pd.Timedelta(days=float(median_days))
+
+
+def _cadence_seconds(cadence: str | pd.Timedelta) -> float:
+    """Approximate cadence length in seconds, for finest-first tape ordering."""
+    if isinstance(cadence, pd.Timedelta):
+        return cadence.total_seconds()
+    if cadence == "annual":
+        return 365 * 86400
+    return 30 * 86400  # "monthly" and any unrecognized label
+
+
+def _cf_decode_kwargs() -> dict:
+    """``open_dataset`` kwargs that decode times to cftime objects."""
+    try:
+        # xarray >= 2025.01
+        return {"decode_times": xr.coders.CFDatetimeCoder(use_cftime=True)}
+    except AttributeError:
+        return {"decode_times": True, "use_cftime": True}
+
+
 def _infer_cadence(ds: xr.Dataset) -> str | pd.Timedelta:
     """Infer temporal cadence from time_bounds.
 
     Returns 'monthly', 'annual', or a pd.Timedelta for uniform sub-monthly.
     """
-    if "time_bounds" in ds:
-        bounds_var = "time_bounds"
-    elif "time_bnds" in ds:
-        bounds_var = "time_bnds"
-    else:
+    bounds_var = find_bounds_var(ds)
+    if bounds_var is None:
         # Fall back to diff of time coordinate
         times = ds["time"].values
         if len(times) < 2:
@@ -68,11 +91,7 @@ def _infer_cadence(ds: xr.Dataset) -> str | pd.Timedelta:
         else:
             td = np.diff(times[:13])
             median_days = np.median(td / np.timedelta64(1, "D"))
-        if 28 <= median_days <= 31:
-            return "monthly"
-        if 360 <= median_days <= 366:
-            return "annual"
-        return pd.Timedelta(days=float(median_days))
+        return _classify_cadence(median_days)
 
     bounds = ds[bounds_var]
     # Compute dt from bounds
@@ -98,13 +117,7 @@ def _infer_cadence(ds: xr.Dataset) -> str | pd.Timedelta:
         else:
             day_diffs.append(float(val) / 86400.0)
 
-    median_days = float(np.median(day_diffs))
-
-    if 28 <= median_days <= 31:
-        return "monthly"
-    if 360 <= median_days <= 366:
-        return "annual"
-    return pd.Timedelta(days=float(median_days))
+    return _classify_cadence(float(np.median(day_diffs)))
 
 
 def _extract_casename(path: Path) -> str:
@@ -416,13 +429,7 @@ class Run:
                 "join": "override",
                 "compat": "override",
             }
-        # Use CFDatetimeCoder for cftime decoding (xarray >= 2024)
-        try:
-            coder = xr.coders.CFDatetimeCoder(use_cftime=True)
-            kwargs["decode_times"] = coder
-        except AttributeError:
-            kwargs["decode_times"] = True
-            kwargs["use_cftime"] = True
+        kwargs.update(_cf_decode_kwargs())
         if chunks != "default":
             kwargs["chunks"] = chunks
         elif self._chunks is not None:
@@ -493,12 +500,7 @@ class Run:
                 self._cadence[tape] = "monthly"
             else:
                 try:
-                    coder = xr.coders.CFDatetimeCoder(use_cftime=True)
-                    open_kwargs = {"decode_times": coder}
-                except AttributeError:
-                    open_kwargs = {"decode_times": True, "use_cftime": True}
-                try:
-                    with xr.open_dataset(files[0], **open_kwargs) as ds0:
+                    with xr.open_dataset(files[0], **_cf_decode_kwargs()) as ds0:
                         self._cadence[tape] = _infer_cadence(ds0)
                 except Exception:
                     self._cadence[tape] = "monthly"
@@ -511,17 +513,9 @@ class Run:
         full streams (used on the ``get()`` hot path).
         """
 
-        def _key(tape: str) -> float:
-            c = self._cheap_cadence(tape)
-            if isinstance(c, pd.Timedelta):
-                return c.total_seconds()
-            if c == "monthly":
-                return 30 * 86400
-            if c == "annual":
-                return 365 * 86400
-            return 30 * 86400
-
-        return sorted(self._tape_order, key=_key)
+        return sorted(
+            self._tape_order, key=lambda t: _cadence_seconds(self._cheap_cadence(t))
+        )
 
     def _first_tape_with_bounds(self) -> str:
         """First tape whose files[0] header contains a time-bounds variable.
@@ -530,9 +524,8 @@ class Run:
         streams); callers still handle a missing-bounds dataset gracefully.
         """
         for tape in self._tape_order:
-            if _TIME_BOUNDS_NAMES[0] in self._variable_index(
-                tape
-            ) or _TIME_BOUNDS_NAMES[1] in self._variable_index(tape):
+            index = self._variable_index(tape)
+            if any(name in index for name in TIME_BOUNDS_NAMES):
                 return tape
         return self._tape_order[0]
 
@@ -582,14 +575,7 @@ class Run:
 
         def _cadence_key(tape: str) -> float:
             self._open_stream(tape)
-            c = self._cadence[tape]
-            if isinstance(c, pd.Timedelta):
-                return c.total_seconds()
-            if c == "monthly":
-                return 30 * 86400
-            if c == "annual":
-                return 365 * 86400
-            return 30 * 86400
+            return _cadence_seconds(self._cadence[tape])
 
         return sorted(self._tape_order, key=_cadence_key)
 

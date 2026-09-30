@@ -15,6 +15,17 @@ from __future__ import annotations
 import numpy as np
 import xarray as xr
 
+# Time-bounds variable names, in preference order.
+TIME_BOUNDS_NAMES = ("time_bounds", "time_bnds")
+
+
+def find_bounds_var(ds: xr.Dataset) -> str | None:
+    """Return the name of ``ds``'s time-bounds variable, or None if absent."""
+    for name in TIME_BOUNDS_NAMES:
+        if name in ds:
+            return name
+    return None
+
 
 def get_time_deltas(ds: xr.Dataset, dim: str = "time") -> xr.DataArray:
     """Compute time step widths (in seconds) from time_bounds.
@@ -34,11 +45,8 @@ def get_time_deltas(ds: xr.Dataset, dim: str = "time") -> xr.DataArray:
     xr.DataArray
         Time deltas in seconds, with the same time coordinate.
     """
-    if "time_bounds" in ds:
-        bounds_var = "time_bounds"
-    elif "time_bnds" in ds:
-        bounds_var = "time_bnds"
-    else:
+    bounds_var = find_bounds_var(ds)
+    if bounds_var is None:
         # Fallback: estimate from coordinate diffs
         return _estimate_dt_from_coords(ds, dim)
 

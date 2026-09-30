@@ -16,9 +16,10 @@ import matplotlib.pyplot as plt
 import numpy as np
 import xarray as xr
 
-from elm_diagnostics.balances.base import Balance, _plot_time
+from elm_diagnostics.balances.base import Balance
 from elm_diagnostics.config.schema import CarbonBalanceConfig
 from elm_diagnostics.time.integration import cumulative_integral, storage_change
+from elm_diagnostics.time.plotting import plot_times
 
 
 class CarbonBalance(Balance):
@@ -158,12 +159,12 @@ class CarbonBalance(Balance):
             if varname in comps:
                 c = flux_colors.get(varname, None)
                 ax1.plot(
-                    _plot_time(comps[varname]), comps[varname], label=varname, color=c
+                    plot_times(comps[varname]), comps[varname], label=varname, color=c
                 )
 
         if "dTOTECOSYSC" in comps:
             ax1.plot(
-                _plot_time(comps["dTOTECOSYSC"]),
+                plot_times(comps["dTOTECOSYSC"]),
                 comps["dTOTECOSYSC"],
                 label="dTOTECOSYSC",
                 color="black",
@@ -173,7 +174,7 @@ class CarbonBalance(Balance):
         res = self.residual()
         if isinstance(res, xr.DataArray):
             ax1.plot(
-                _plot_time(res),
+                plot_times(res),
                 res,
                 label="Residual",
                 color="black",
@@ -198,7 +199,7 @@ class CarbonBalance(Balance):
         for i, varname in enumerate(bc.pools):
             if varname in comps:
                 ax2.plot(
-                    _plot_time(comps[varname]),
+                    plot_times(comps[varname]),
                     comps[varname],
                     label=varname,
                     color=pool_colors[i % len(pool_colors)],
