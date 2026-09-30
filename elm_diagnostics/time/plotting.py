@@ -14,13 +14,14 @@
 from __future__ import annotations
 
 import cftime
+import numpy as np
 import xarray as xr
 
 _PLOT_TIME_CACHE: dict[tuple[int, int], list] = {}
 _PLOT_TIME_CACHE_MAX = 4096
 
 
-def plot_times(da: xr.DataArray):
+def plot_times(da: xr.DataArray) -> list | np.ndarray:
     """Return ``da``'s time values in a form matplotlib can plot.
 
     cftime dates are converted to ``datetime.datetime`` (matplotlib cannot plot

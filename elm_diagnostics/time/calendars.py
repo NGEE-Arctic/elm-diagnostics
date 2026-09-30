@@ -12,26 +12,28 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 import cftime
 import numpy as np
 import xarray as xr
 
 
-def _get_month(time_val) -> int:
+def _get_month(time_val: Any) -> int:
     """Extract month from a cftime or numpy datetime."""
     if hasattr(time_val, "month"):
         return int(time_val.month)
     return int(np.datetime64(time_val, "M").astype(int) % 12 + 1)
 
 
-def _get_year(time_val) -> int:
+def _get_year(time_val: Any) -> int:
     """Extract year from a cftime or numpy datetime."""
     if hasattr(time_val, "year"):
         return int(time_val.year)
     return int(np.datetime64(time_val, "Y").astype(int) + 1970)
 
 
-def water_year(time_val, start_month: int = 10) -> int:
+def water_year(time_val: Any, start_month: int = 10) -> int:
     """Compute the water year for a given time value.
 
     A water year starting in October means that Oct 2014 - Sep 2015
@@ -173,7 +175,7 @@ def subset_climo_years(
     return da.isel({dim: mask})
 
 
-def day_of_year(time_val, start_month: int = 1) -> int:
+def day_of_year(time_val: Any, start_month: int = 1) -> int:
     """Compute day-of-year, optionally offset by start_month.
 
     For water-year-relative DOY, pass start_month=10.

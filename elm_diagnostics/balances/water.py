@@ -13,6 +13,7 @@
 from __future__ import annotations
 
 import logging
+from typing import Any
 
 import matplotlib.pyplot as plt
 import xarray as xr
@@ -386,10 +387,11 @@ def _decorate(
     facet: bool = False,
 ) -> None:
     """Axis labels, title, legend, and optional zero line; smaller when faceted."""
-    label_kw = {"fontsize": "small"} if facet else {}
+    label_kw: dict[str, Any] = {"fontsize": "small"} if facet else {}
+    title_kw: dict[str, Any] = {"fontsize": "medium"} if facet else {}
     ax.set_xlabel("Time", **label_kw)
     ax.set_ylabel(ylabel, **label_kw)
-    ax.set_title(title, **({"fontsize": "medium"} if facet else {}))
+    ax.set_title(title, **title_kw)
     ax.legend(loc="best", fontsize="x-small" if facet else "small")
     if zero_line:
         ax.axhline(0, color="gray", linewidth=0.5)

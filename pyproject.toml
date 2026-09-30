@@ -52,6 +52,37 @@ elm-diagnostics = "elm_diagnostics.cli:app"
 [tool.hatch.build.targets.wheel]
 packages = ["elm_diagnostics"]
 
+# workspace/ holds local, in-progress analyses and must never ship in a release.
+[tool.hatch.build.targets.sdist]
+exclude = ["/workspace"]
+
+[tool.mypy]
+files = ["elm_diagnostics"]
+ignore_missing_imports = true
+
+# Baseline: these modules still had errors when mypy was introduced (88 in
+# total, several reflecting real issues logged in REFACTOR_NOTES.md). Remove a
+# module from this list once it type-checks cleanly; new modules are checked.
+[[tool.mypy.overrides]]
+module = [
+    "elm_diagnostics.balances.carbon",
+    "elm_diagnostics.balances.water",
+    "elm_diagnostics.cli",
+    "elm_diagnostics.io.run",
+    "elm_diagnostics.io.units",
+    "elm_diagnostics.plots.anomaly",
+    "elm_diagnostics.plots.dimension_helpers",
+    "elm_diagnostics.plots.diurnal",
+    "elm_diagnostics.plots.histogram",
+    "elm_diagnostics.plots.hovmuller",
+    "elm_diagnostics.plots.seasonal",
+    "elm_diagnostics.plots.timeseries",
+    "elm_diagnostics.report.build",
+    "elm_diagnostics.time.calendars",
+    "elm_diagnostics.time.integration",
+]
+ignore_errors = true
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 
