@@ -16,8 +16,9 @@ import warnings
 
 import matplotlib.pyplot as plt
 import numpy as np
+import xarray as xr
 
-from elm_diagnostics.config.schema import Config, load_config
+from elm_diagnostics.config.schema import Config, HovmullerConfig, load_config
 from elm_diagnostics.io.run import Comparison, Run
 from elm_diagnostics.plots._common import append_long_name_line
 from elm_diagnostics.plots.dimension_helpers import (
@@ -78,7 +79,7 @@ def _compute_color_limits(
                     "color_limit_quantile_high; using full_range instead."
                 ),
                 UserWarning,
-                stacklevel=3,
+                stacklevel=4,
             )
             return vmin_full, vmax_full, "neither"
         vmin = float(np.nanpercentile(finite, q_low))
@@ -94,7 +95,7 @@ def _compute_color_limits(
         warnings.warn(
             f"Unknown plots.hovmuller.color_limit_method='{method}'; using full_range.",
             UserWarning,
-            stacklevel=3,
+            stacklevel=4,
         )
         return vmin_full, vmax_full, "neither"
 
@@ -105,7 +106,7 @@ def _compute_color_limits(
                 "using full_range instead."
             ),
             UserWarning,
-            stacklevel=3,
+            stacklevel=4,
         )
         return vmin_full, vmax_full, "neither"
 
@@ -213,6 +214,68 @@ def _enforce_depth_convention(
     return values, label, True
 
 
+def _extra_dim(da: xr.DataArray, varname: str) -> str:
+    """The dimension plotted on the y axis; error if there is none."""
+    dim = detect_additional_dimension(da)
+    if dim is None:
+        raise ValueError(
+            f"Variable '{varname}' has no additional dimension for Hovmuller plotting."
+        )
+    return dim
+
+
+def _depth_axis(
+    da2: xr.DataArray, dim: str, hov_config: HovmullerConfig
+) -> tuple[np.ndarray, str, bool, bool]:
+    """Resolve y values, y label, depth-likeness, and whether y is index-based.
+
+    ``da2`` is already transposed to (time, dim) and level-limited.
+    """
+    yvals_raw, axis_label_raw, _, level_units, is_depth_like = resolve_dimension_axis(
+        da2, dim
+    )
+    is_index_based_axis = axis_label_raw == f"{dim} index" or _is_index_like(
+        np.asarray(yvals_raw)
+    )
+    yvals, ylab, is_depth_like = _enforce_depth_convention(
+        dim,
+        yvals_raw,
+        units=level_units,
+        is_depth_like=is_depth_like,
+    )
+    # stacklevel=4: report at the caller of plot_hovmuller.
+    if level_units == "" and dim in _DEPTH_DIMS:
+        warnings.warn(
+            f"No explicit depth units found for dimension '{dim}'; using raw values.",
+            UserWarning,
+            stacklevel=4,
+        )
+    elif ylab.endswith(" index"):
+        warnings.warn(
+            f"No coordinate found for dimension '{dim}'; using index values.",
+            UserWarning,
+            stacklevel=4,
+        )
+    return yvals, ylab, is_depth_like, is_index_based_axis
+
+
+def _mesh_style(values: np.ndarray, hov_config: HovmullerConfig) -> tuple[dict, str]:
+    """pcolormesh kwargs and colorbar ``extend`` for the configured color limits."""
+    clim = _compute_color_limits(
+        values,
+        method=hov_config.color_limit_method,
+        q_low=hov_config.color_limit_quantile_low,
+        q_high=hov_config.color_limit_quantile_high,
+        sigma_count=hov_config.color_limit_sigma,
+    )
+    mesh_kwargs = {"shading": "auto", "cmap": "viridis"}
+    if clim is None:
+        return mesh_kwargs, "neither"
+    mesh_kwargs["vmin"] = clim[0]
+    mesh_kwargs["vmax"] = clim[1]
+    return mesh_kwargs, clim[2]
+
+
 def _plot_hovmuller_run(
     run: Run,
     varname: str,
@@ -227,40 +290,11 @@ def _plot_hovmuller_run(
         fig = ax.figure
 
     da = squeeze_spatial_dims(run.get(varname))
-    dim = detect_additional_dimension(da)
-    if dim is None:
-        raise ValueError(
-            f"Variable '{varname}' has no additional dimension for Hovmuller plotting."
-        )
-
-    da2 = da.transpose("time", dim)
-    # Apply max_levels filter if configured (check group-specific config first)
+    dim = _extra_dim(da, varname)
+    # Group-specific hovmuller settings take precedence over the global ones.
     hov_config = config.get_variable_group_hovmuller_config(varname)
-    da2 = apply_max_levels(da2, dim, hov_config.max_levels)
-    yvals_raw, axis_label_raw, _, level_units, is_depth_like = resolve_dimension_axis(
-        da2, dim
-    )
-    is_index_based_axis = axis_label_raw == f"{dim} index" or _is_index_like(
-        np.asarray(yvals_raw)
-    )
-    yvals, ylab, is_depth_like = _enforce_depth_convention(
-        dim,
-        yvals_raw,
-        units=level_units,
-        is_depth_like=is_depth_like,
-    )
-    if level_units == "" and dim in _DEPTH_DIMS:
-        warnings.warn(
-            f"No explicit depth units found for dimension '{dim}'; using raw values.",
-            UserWarning,
-            stacklevel=3,
-        )
-    elif ylab.endswith(" index"):
-        warnings.warn(
-            f"No coordinate found for dimension '{dim}'; using index values.",
-            UserWarning,
-            stacklevel=3,
-        )
+    da2 = apply_max_levels(da.transpose("time", dim), dim, hov_config.max_levels)
+    yvals, ylab, is_depth_like, is_index_based_axis = _depth_axis(da2, dim, hov_config)
     field = da2.transpose(dim, "time").compute()
     mask = _max_depth_mask(
         yvals,
@@ -268,30 +302,12 @@ def _plot_hovmuller_run(
         dim=dim,
         is_index_based_axis=is_index_based_axis,
     )
-    yvals, field = _apply_max_depth_limit(
-        yvals,
-        field,
-        mask=mask,
-    )
+    yvals, field = _apply_max_depth_limit(yvals, field, mask=mask)
 
-    clim = _compute_color_limits(
-        field,
-        method=hov_config.color_limit_method,
-        q_low=hov_config.color_limit_quantile_low,
-        q_high=hov_config.color_limit_quantile_high,
-        sigma_count=hov_config.color_limit_sigma,
-    )
-    mesh_kwargs = {"shading": "auto", "cmap": "viridis"}
-    cbar_extend = "neither"
-    if clim is not None:
-        mesh_kwargs["vmin"] = clim[0]
-        mesh_kwargs["vmax"] = clim[1]
-        cbar_extend = clim[2]
-
+    mesh_kwargs, cbar_extend = _mesh_style(field, hov_config)
     mesh = ax.pcolormesh(plot_times(da2), yvals, field, **mesh_kwargs)
     cbar = fig.colorbar(mesh, ax=ax, extend=cbar_extend)
-    units = str(da.attrs.get("units", "")).strip()
-    cbar.set_label(units)
+    cbar.set_label(str(da.attrs.get("units", "")).strip())
 
     if is_depth_like and np.nanmin(yvals) >= 0.0:
         ax.invert_yaxis()
@@ -320,42 +336,13 @@ def _plot_hovmuller_comparison(
 
     da_base = squeeze_spatial_dims(source.base.get(varname))
     da_exp = squeeze_spatial_dims(source.experiment.get(varname))
-    dim = detect_additional_dimension(da_exp)
-    if dim is None:
-        raise ValueError(
-            f"Variable '{varname}' has no additional dimension for Hovmuller plotting."
-        )
-
-    base2 = da_base.transpose("time", dim)
-    exp2 = da_exp.transpose("time", dim)
-    # Apply max_levels filter if configured (check group-specific config first)
+    dim = _extra_dim(da_exp, varname)
+    # Group-specific hovmuller settings take precedence over the global ones.
     hov_config = config.get_variable_group_hovmuller_config(varname)
-    base2 = apply_max_levels(base2, dim, hov_config.max_levels)
-    exp2 = apply_max_levels(exp2, dim, hov_config.max_levels)
-    yvals_raw, axis_label_raw, _, level_units, is_depth_like = resolve_dimension_axis(
-        exp2, dim
-    )
-    is_index_based_axis = axis_label_raw == f"{dim} index" or _is_index_like(
-        np.asarray(yvals_raw)
-    )
-    yvals, ylab, is_depth_like = _enforce_depth_convention(
-        dim,
-        yvals_raw,
-        units=level_units,
-        is_depth_like=is_depth_like,
-    )
-    if level_units == "" and dim in _DEPTH_DIMS:
-        warnings.warn(
-            f"No explicit depth units found for dimension '{dim}'; using raw values.",
-            UserWarning,
-            stacklevel=3,
-        )
-    elif ylab.endswith(" index"):
-        warnings.warn(
-            f"No coordinate found for dimension '{dim}'; using index values.",
-            UserWarning,
-            stacklevel=3,
-        )
+    base2 = apply_max_levels(da_base.transpose("time", dim), dim, hov_config.max_levels)
+    exp2 = apply_max_levels(da_exp.transpose("time", dim), dim, hov_config.max_levels)
+    # The experiment defines the shared y axis.
+    yvals, ylab, is_depth_like, is_index_based_axis = _depth_axis(exp2, dim, hov_config)
 
     base_field = base2.transpose(dim, "time").compute()
     exp_field = exp2.transpose(dim, "time").compute()
@@ -365,31 +352,14 @@ def _plot_hovmuller_comparison(
         dim=dim,
         is_index_based_axis=is_index_based_axis,
     )
-    yvals_full = yvals
-    yvals, base_field = _apply_max_depth_limit(
-        yvals_full,
-        base_field,
-        mask=mask,
-    )
-    _, exp_field = _apply_max_depth_limit(
-        yvals_full,
-        exp_field,
-        mask=mask,
-    )
-    clim = _compute_color_limits(
-        np.concatenate([np.asarray(base_field).ravel(), np.asarray(exp_field).ravel()]),
-        method=hov_config.color_limit_method,
-        q_low=hov_config.color_limit_quantile_low,
-        q_high=hov_config.color_limit_quantile_high,
-        sigma_count=hov_config.color_limit_sigma,
-    )
-    mesh_kwargs = {"shading": "auto", "cmap": "viridis"}
-    cbar_extend = "neither"
-    if clim is not None:
-        mesh_kwargs["vmin"] = clim[0]
-        mesh_kwargs["vmax"] = clim[1]
-        cbar_extend = clim[2]
+    _, exp_field = _apply_max_depth_limit(yvals, exp_field, mask=mask)
+    yvals, base_field = _apply_max_depth_limit(yvals, base_field, mask=mask)
 
+    # One color scale for both panels.
+    mesh_kwargs, cbar_extend = _mesh_style(
+        np.concatenate([np.asarray(base_field).ravel(), np.asarray(exp_field).ravel()]),
+        hov_config,
+    )
     mesh_base = axes[0].pcolormesh(plot_times(base2), yvals, base_field, **mesh_kwargs)
     mesh_exp = axes[1].pcolormesh(plot_times(exp2), yvals, exp_field, **mesh_kwargs)
 
