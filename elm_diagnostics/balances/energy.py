@@ -15,8 +15,9 @@ from __future__ import annotations
 import matplotlib.pyplot as plt
 import xarray as xr
 
-from elm_diagnostics.balances.base import Balance, _plot_time
+from elm_diagnostics.balances.base import Balance
 from elm_diagnostics.config.schema import EnergyBalanceConfig
+from elm_diagnostics.time.plotting import plot_times
 
 
 class EnergyBalance(Balance):
@@ -103,23 +104,23 @@ class EnergyBalance(Balance):
         # Radiation
         if "Rnet" in comps:
             ax1.plot(
-                _plot_time(comps["Rnet"]),
+                plot_times(comps["Rnet"]),
                 comps["Rnet"],
                 label="Rnet",
                 color="orange",
                 linewidth=2,
             )
         if "FSH" in comps:
-            ax1.plot(_plot_time(comps["FSH"]), comps["FSH"], label="FSH", color="red")
+            ax1.plot(plot_times(comps["FSH"]), comps["FSH"], label="FSH", color="red")
         if "EFLX_LH_TOT" in comps:
             ax1.plot(
-                _plot_time(comps["EFLX_LH_TOT"]),
+                plot_times(comps["EFLX_LH_TOT"]),
                 comps["EFLX_LH_TOT"],
                 label="LE",
                 color="blue",
             )
         if "FGR" in comps:
-            ax1.plot(_plot_time(comps["FGR"]), comps["FGR"], label="FGR", color="brown")
+            ax1.plot(plot_times(comps["FGR"]), comps["FGR"], label="FGR", color="brown")
 
         ax1.set_xlabel("Time")
         ax1.set_ylabel("W/m²")
@@ -138,7 +139,7 @@ class EnergyBalance(Balance):
 
         try:
             res = self.residual()
-            ax2.plot(_plot_time(res), res, color="black", linewidth=1)
+            ax2.plot(plot_times(res), res, color="black", linewidth=1)
             ax2.axhline(0, color="gray", linewidth=0.5)
             ax2.set_ylabel("W/m²")
             ax2.set_xlabel("Time")

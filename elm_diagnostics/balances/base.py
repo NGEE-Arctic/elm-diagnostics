@@ -16,45 +16,22 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Any
 
-import cftime
 import matplotlib.pyplot as plt
 import xarray as xr
 
 from elm_diagnostics.config.schema import Config, load_config
 from elm_diagnostics.io.run import Run
 from elm_diagnostics.io.subgrid import SubgridLevel, validate_by_keyword
+from elm_diagnostics.plots.dimension_helpers import squeeze_spatial_dims
 from elm_diagnostics.time.calendars import (
     get_available_years,
     select_year,
     year_window_mask,
 )
+from elm_diagnostics.time.plotting import plot_times
 
-_PLOT_TIME_CACHE: dict[tuple[int, int], list] = {}
-_PLOT_TIME_CACHE_MAX = 4096
-
-
-def _plot_time(da: xr.DataArray):
-    """Return time values suitable for matplotlib plotting.
-
-    Converts cftime dates to Python datetime objects since matplotlib
-    cannot handle cftime types natively without nc_time_axis.
-    """
-    time_data = da.coords["time"].data
-    # Use (id, length) tuple as cache key to avoid returning wrong-length
-    # cached result when object IDs are reused after garbage collection
-    cache_key = (id(time_data), len(time_data))
-    cached = _PLOT_TIME_CACHE.get(cache_key)
-    if cached is not None:
-        return cached
-
-    times = da.time.values
-    if len(times) > 0 and isinstance(times[0], cftime.datetime):
-        converted = [t._to_real_datetime() for t in times]
-        if len(_PLOT_TIME_CACHE) >= _PLOT_TIME_CACHE_MAX:
-            _PLOT_TIME_CACHE.clear()
-        _PLOT_TIME_CACHE[cache_key] = converted
-        return converted
-    return times
+# Re-exported for backward compatibility; plot_times lives in time.plotting.
+_plot_time = plot_times
 
 
 class Balance(ABC):
@@ -109,13 +86,9 @@ class Balance(ABC):
 
         Preserves the sub-gridcell dimension specified by self.by if set.
         """
-        da = self.run.get(varname)
         # Only spatial dims are squeezed, so sub-gridcell dims (column/pft/
         # landunit) survive for faceting.
-        for dim in ("lat", "lon", "lndgrid", "gridcell"):
-            if dim in da.dims and da.sizes[dim] == 1:
-                da = da.squeeze(dim, drop=True)
-        return da
+        return squeeze_spatial_dims(self.run.get(varname))
 
     def _select_year(self, ds_or_da):
         """Subset to the requested year or analysis window if set."""

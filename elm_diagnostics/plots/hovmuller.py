@@ -17,7 +17,6 @@ import warnings
 import matplotlib.pyplot as plt
 import numpy as np
 
-from elm_diagnostics.balances.base import _plot_time
 from elm_diagnostics.config.schema import Config, load_config
 from elm_diagnostics.io.run import Comparison, Run
 from elm_diagnostics.plots._common import append_long_name_line
@@ -28,6 +27,7 @@ from elm_diagnostics.plots.dimension_helpers import (
     resolve_dimension_axis,
     squeeze_spatial_dims,
 )
+from elm_diagnostics.time.plotting import plot_times
 
 _DEPTH_DIMS = {"levgrnd", "levsoi"}
 
@@ -288,7 +288,7 @@ def _plot_hovmuller_run(
         mesh_kwargs["vmax"] = clim[1]
         cbar_extend = clim[2]
 
-    mesh = ax.pcolormesh(_plot_time(da2), yvals, field, **mesh_kwargs)
+    mesh = ax.pcolormesh(plot_times(da2), yvals, field, **mesh_kwargs)
     cbar = fig.colorbar(mesh, ax=ax, extend=cbar_extend)
     units = str(da.attrs.get("units", "")).strip()
     cbar.set_label(units)
@@ -390,8 +390,8 @@ def _plot_hovmuller_comparison(
         mesh_kwargs["vmax"] = clim[1]
         cbar_extend = clim[2]
 
-    mesh_base = axes[0].pcolormesh(_plot_time(base2), yvals, base_field, **mesh_kwargs)
-    mesh_exp = axes[1].pcolormesh(_plot_time(exp2), yvals, exp_field, **mesh_kwargs)
+    mesh_base = axes[0].pcolormesh(plot_times(base2), yvals, base_field, **mesh_kwargs)
+    mesh_exp = axes[1].pcolormesh(plot_times(exp2), yvals, exp_field, **mesh_kwargs)
 
     units = str(da_exp.attrs.get("units", "")).strip()
     cbar0 = fig.colorbar(mesh_base, ax=axes[0], extend=cbar_extend)

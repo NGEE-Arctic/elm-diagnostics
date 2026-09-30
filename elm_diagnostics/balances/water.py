@@ -17,13 +17,14 @@ import logging
 import matplotlib.pyplot as plt
 import xarray as xr
 
-from elm_diagnostics.balances.base import Balance, _plot_time
+from elm_diagnostics.balances.base import Balance
 from elm_diagnostics.config.schema import WaterBalanceConfig
 from elm_diagnostics.io.units import convert_water_to_mm
 from elm_diagnostics.time.integration import (
     cumulative_integral,
     storage_change,
 )
+from elm_diagnostics.time.plotting import plot_times
 
 logger = logging.getLogger(__name__)
 
@@ -188,7 +189,7 @@ class WaterBalance(Balance):
         if inputs_available:
             total_in = sum(comps[v] for v in inputs_available)
             ax1.plot(
-                _plot_time(total_in), total_in, label="P (total input)", color="blue"
+                plot_times(total_in), total_in, label="P (total input)", color="blue"
             )
 
         # Sum outputs
@@ -196,13 +197,13 @@ class WaterBalance(Balance):
         if outputs_available:
             total_out = sum(comps[v] for v in outputs_available)
             ax1.plot(
-                _plot_time(total_out), total_out, label="Total output", color="red"
+                plot_times(total_out), total_out, label="Total output", color="red"
             )
 
         # Storage change
         if "dS" in comps:
             ax1.plot(
-                _plot_time(comps["dS"]),
+                plot_times(comps["dS"]),
                 comps["dS"],
                 label="dS (storage change)",
                 color="green",
@@ -210,7 +211,7 @@ class WaterBalance(Balance):
 
         # Residual
         res = self.residual()
-        ax1.plot(_plot_time(res), res, label="Residual", color="black", linestyle="--")
+        ax1.plot(plot_times(res), res, label="Residual", color="black", linestyle="--")
 
         ax1.set_xlabel("Time")
         ax1.set_ylabel("Cumulative (mm)")
@@ -228,7 +229,7 @@ class WaterBalance(Balance):
         colors = plt.cm.tab10.colors
         for i, varname in enumerate(outputs_available):
             ax2.plot(
-                _plot_time(comps[varname]),
+                plot_times(comps[varname]),
                 comps[varname],
                 label=varname,
                 color=colors[i % len(colors)],
@@ -245,7 +246,7 @@ class WaterBalance(Balance):
 
         for i, varname in enumerate(inputs_available):
             ax3.plot(
-                _plot_time(comps[varname]),
+                plot_times(comps[varname]),
                 comps[varname],
                 label=varname,
                 color=colors[i % len(colors)],
@@ -263,7 +264,7 @@ class WaterBalance(Balance):
 
         for i, varname in enumerate(storage_available):
             ax4.plot(
-                _plot_time(storage_comps[varname]),
+                plot_times(storage_comps[varname]),
                 storage_comps[varname],
                 label=varname,
                 color=colors[i % len(colors)],
@@ -272,7 +273,7 @@ class WaterBalance(Balance):
         if storage_available:
             total_storage_change = sum(storage_comps[v] for v in storage_available)
             ax4.plot(
-                _plot_time(total_storage_change),
+                plot_times(total_storage_change),
                 total_storage_change,
                 label="Total",
                 color="black",
@@ -331,14 +332,14 @@ class WaterBalance(Balance):
             if inputs_available:
                 total_in = sum(comps_unit[v] for v in inputs_available)
                 ax1.plot(
-                    _plot_time(total_in), total_in, label="P", color="blue", linewidth=1
+                    plot_times(total_in), total_in, label="P", color="blue", linewidth=1
                 )
 
             outputs_available = [v for v in bc.outputs if v in comps_unit]
             if outputs_available:
                 total_out = sum(comps_unit[v] for v in outputs_available)
                 ax1.plot(
-                    _plot_time(total_out),
+                    plot_times(total_out),
                     total_out,
                     label="Out",
                     color="red",
@@ -347,7 +348,7 @@ class WaterBalance(Balance):
 
             if "dS" in comps_unit:
                 ax1.plot(
-                    _plot_time(comps_unit["dS"]),
+                    plot_times(comps_unit["dS"]),
                     comps_unit["dS"],
                     label="dS",
                     color="green",
@@ -357,7 +358,7 @@ class WaterBalance(Balance):
             # Residual for this unit
             res_unit = self.residual().sel({self.by: unit_id})
             ax1.plot(
-                _plot_time(res_unit),
+                plot_times(res_unit),
                 res_unit,
                 label="Res",
                 color="black",
@@ -376,7 +377,7 @@ class WaterBalance(Balance):
             colors = plt.cm.tab10.colors
             for i, varname in enumerate(outputs_available):
                 ax2.plot(
-                    _plot_time(comps_unit[varname]),
+                    plot_times(comps_unit[varname]),
                     comps_unit[varname],
                     label=varname,
                     color=colors[i % len(colors)],
@@ -392,7 +393,7 @@ class WaterBalance(Balance):
             # --- Input decomposition panel ---
             for i, varname in enumerate(inputs_available):
                 ax3.plot(
-                    _plot_time(comps_unit[varname]),
+                    plot_times(comps_unit[varname]),
                     comps_unit[varname],
                     label=varname,
                     color=colors[i % len(colors)],
@@ -409,7 +410,7 @@ class WaterBalance(Balance):
             storage_available = [v for v in bc.storages if v in storage_unit]
             for i, varname in enumerate(storage_available):
                 ax4.plot(
-                    _plot_time(storage_unit[varname]),
+                    plot_times(storage_unit[varname]),
                     storage_unit[varname],
                     label=varname,
                     color=colors[i % len(colors)],
@@ -419,7 +420,7 @@ class WaterBalance(Balance):
             if storage_available:
                 total_storage_change = sum(storage_unit[v] for v in storage_available)
                 ax4.plot(
-                    _plot_time(total_storage_change),
+                    plot_times(total_storage_change),
                     total_storage_change,
                     label="Total",
                     color="black",
