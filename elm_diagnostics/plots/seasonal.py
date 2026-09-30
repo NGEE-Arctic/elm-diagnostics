@@ -15,17 +15,17 @@ from __future__ import annotations
 import matplotlib.pyplot as plt
 import numpy as np
 import xarray as xr
-from matplotlib.lines import Line2D
 
 from elm_diagnostics.config.schema import Config, load_config
 from elm_diagnostics.io.run import Comparison, Run
 from elm_diagnostics.io.subgrid import SubgridLevel
 from elm_diagnostics.plots._common import (
+    add_level_and_run_legends,
     append_long_name_line,
     check_by_ax,
     format_var_ylabel,
     hide_unused_axes,
-    legend_level_indices,
+    plot_level_lines,
     prepare_facets,
 )
 from elm_diagnostics.plots.climatology import (
@@ -36,8 +36,6 @@ from elm_diagnostics.plots.climatology import (
 )
 from elm_diagnostics.plots.dimension_helpers import (
     detect_additional_dimension,
-    format_level_label,
-    resolve_dimension_axis,
     squeeze_spatial_dims,
 )
 from elm_diagnostics.plots.subgrid_helpers import format_subgrid_title
@@ -60,29 +58,17 @@ def _plot_multilevel_seasonal_lines(
     if dim is None:
         return None
 
-    n_levels = mean_da.sizes[dim]
-    level_values, _, level_name, level_units, _ = resolve_dimension_axis(mean_da, dim)
-    legend_idx = legend_level_indices(n_levels, max_entries=legend_max_entries)
-    cmap = plt.get_cmap("viridis")
-    line_values = np.asarray(mean_da.transpose(dim, "month").compute())
-
-    for i in range(n_levels):
-        fraction = i / max(n_levels - 1, 1)
-        line_label = (
-            format_level_label(level_values[i], level_name, units=level_units)
-            if i in legend_idx
-            else "_nolegend_"
-        )
-        ax.plot(
-            months,
-            line_values[i, :],
-            color=cmap(fraction),
-            linestyle=linestyle,
-            alpha=alpha,
-            linewidth=linewidth,
-            label=line_label,
-        )
-
+    plot_level_lines(
+        ax,
+        months,
+        mean_da,
+        dim,
+        "month",
+        linestyle=linestyle,
+        alpha=alpha,
+        legend_max_entries=legend_max_entries,
+        linewidth=linewidth,
+    )
     return dim
 
 
@@ -223,17 +209,13 @@ def _plot_seasonal_single(
                 linewidth=1.8,
                 legend_max_entries=0,
             )
-            depth_legend = ax.legend(
-                loc="upper right", fontsize="x-small", title=f"{level_dim} levels"
+            add_level_and_run_legends(
+                ax,
+                level_dim,
+                source.base.name,
+                source.experiment.name,
+                "x-small",
             )
-            ax.add_artist(depth_legend)
-            run_handles = [
-                Line2D([0], [0], color="black", linestyle="--", label=source.base.name),
-                Line2D(
-                    [0], [0], color="black", linestyle="-", label=source.experiment.name
-                ),
-            ]
-            ax.legend(handles=run_handles, loc="upper left", fontsize="x-small")
         else:
             # Fast-path: count years without computing full seasonal cycles
             n_years_b = count_years_in_window(
@@ -529,30 +511,12 @@ def _plot_seasonal_faceted(
                         legend_max_entries=0,
                     )
                     if unit_id == units[0]:
-                        depth_legend = ax_i.legend(
-                            loc="upper right",
-                            fontsize="xx-small",
-                            title=f"{level_dim} levels",
-                        )
-                        ax_i.add_artist(depth_legend)
-                        run_handles = [
-                            Line2D(
-                                [0],
-                                [0],
-                                color="black",
-                                linestyle="--",
-                                label=source.base.name,
-                            ),
-                            Line2D(
-                                [0],
-                                [0],
-                                color="black",
-                                linestyle="-",
-                                label=source.experiment.name,
-                            ),
-                        ]
-                        ax_i.legend(
-                            handles=run_handles, loc="upper left", fontsize="xx-small"
+                        add_level_and_run_legends(
+                            ax_i,
+                            level_dim,
+                            source.base.name,
+                            source.experiment.name,
+                            "xx-small",
                         )
                 else:
                     # Check if we pre-computed individual year cycles

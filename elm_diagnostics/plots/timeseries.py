@@ -13,27 +13,24 @@
 from __future__ import annotations
 
 import matplotlib.pyplot as plt
-import numpy as np
 import xarray as xr
-from matplotlib.lines import Line2D
 
 from elm_diagnostics.config.schema import Config, load_config
 from elm_diagnostics.io.run import Comparison, Run
 from elm_diagnostics.io.subgrid import SubgridLevel
 from elm_diagnostics.plots._common import (
+    add_level_and_run_legends,
     append_long_name_line,
     check_by_ax,
     format_var_ylabel,
     hide_unused_axes,
-    legend_level_indices,
+    plot_level_lines,
     prepare_facets,
 )
 from elm_diagnostics.plots.climatology import compute_climo_stats
 from elm_diagnostics.plots.dimension_helpers import (
     apply_max_levels,
     detect_additional_dimension,
-    format_level_label,
-    resolve_dimension_axis,
     squeeze_spatial_dims,
 )
 from elm_diagnostics.plots.subgrid_helpers import format_subgrid_title
@@ -67,29 +64,16 @@ def _plot_multilevel_lines(
     hov_config = config.get_variable_group_hovmuller_config(varname)
     da = apply_max_levels(da, dim, hov_config.max_levels)
 
-    n_levels = da.sizes[dim]
-    level_values, _, level_name, level_units, _ = resolve_dimension_axis(da, dim)
-    legend_idx = legend_level_indices(n_levels, max_entries=legend_max_entries)
-    cmap = plt.get_cmap("viridis")
-    time_values = plot_times(da)
-    line_values = np.asarray(da.transpose(dim, "time").compute())
-
-    for i in range(n_levels):
-        fraction = i / max(n_levels - 1, 1)
-        line_label = (
-            format_level_label(level_values[i], level_name, units=level_units)
-            if i in legend_idx
-            else "_nolegend_"
-        )
-        ax.plot(
-            time_values,
-            line_values[i, :],
-            color=cmap(fraction),
-            linestyle=linestyle,
-            alpha=alpha,
-            label=line_label,
-        )
-
+    plot_level_lines(
+        ax,
+        plot_times(da),
+        da,
+        dim,
+        "time",
+        linestyle=linestyle,
+        alpha=alpha,
+        legend_max_entries=legend_max_entries,
+    )
     return dim
 
 
@@ -182,19 +166,13 @@ def _plot_timeseries_single(
                 alpha=0.7,
                 legend_max_entries=0,
             )
-            depth_legend = ax.legend(
-                loc="upper right",
-                fontsize="x-small",
-                title=f"{level_dim} levels",
+            add_level_and_run_legends(
+                ax,
+                level_dim,
+                source.base.name,
+                source.experiment.name,
+                "x-small",
             )
-            ax.add_artist(depth_legend)
-            run_handles = [
-                Line2D([0], [0], color="black", linestyle="--", label=source.base.name),
-                Line2D(
-                    [0], [0], color="black", linestyle="-", label=source.experiment.name
-                ),
-            ]
-            ax.legend(handles=run_handles, loc="upper left", fontsize="x-small")
         else:
             ax.plot(
                 plot_times(da_base),
@@ -280,30 +258,12 @@ def _plot_timeseries_faceted(
                     legend_max_entries=0,
                 )
                 if unit_id == units[0]:
-                    depth_legend = ax_i.legend(
-                        loc="upper right",
-                        fontsize="xx-small",
-                        title=f"{level_dim} levels",
-                    )
-                    ax_i.add_artist(depth_legend)
-                    run_handles = [
-                        Line2D(
-                            [0],
-                            [0],
-                            color="black",
-                            linestyle="--",
-                            label=source.base.name,
-                        ),
-                        Line2D(
-                            [0],
-                            [0],
-                            color="black",
-                            linestyle="-",
-                            label=source.experiment.name,
-                        ),
-                    ]
-                    ax_i.legend(
-                        handles=run_handles, loc="upper left", fontsize="xx-small"
+                    add_level_and_run_legends(
+                        ax_i,
+                        level_dim,
+                        source.base.name,
+                        source.experiment.name,
+                        "xx-small",
                     )
             else:
                 ax_i.plot(
