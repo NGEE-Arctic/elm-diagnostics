@@ -53,6 +53,7 @@ from elm_diagnostics.plots import (
     plot_seasonal,
     plot_timeseries,
 )
+from elm_diagnostics.time.calendars import year_window_mask
 
 logger = logging.getLogger(__name__)
 
@@ -366,24 +367,13 @@ class Report:
         if "time" not in ds.dims or len(ds["time"]) == 0:
             return ds
 
+        # Falsy bounds (None, and also 0; see B17) and -1 mean "open".
         start_year = self.analysis_year_min or -1
         end_year = self.analysis_year_max or -1
-
-        times = ds["time"].values
-        years = []
-        for t in times:
-            if hasattr(t, "year"):
-                years.append(int(t.year))
-            else:
-                years.append(int(np.datetime64(t, "Y").astype(int) + 1970))
-
-        # Create mask for time dimension
-        mask = np.array(
-            [
-                (start_year == -1 or y >= start_year)
-                and (end_year == -1 or y <= end_year)
-                for y in years
-            ]
+        mask = year_window_mask(
+            ds["time"].values,
+            None if start_year == -1 else start_year,
+            None if end_year == -1 else end_year,
         )
 
         if not mask.any():

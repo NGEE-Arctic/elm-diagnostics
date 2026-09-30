@@ -18,7 +18,6 @@ from typing import Any
 
 import cftime
 import matplotlib.pyplot as plt
-import numpy as np
 import xarray as xr
 
 from elm_diagnostics.config.schema import Config, load_config
@@ -27,6 +26,7 @@ from elm_diagnostics.io.subgrid import SubgridLevel, validate_by_keyword
 from elm_diagnostics.time.calendars import (
     get_available_years,
     select_year,
+    year_window_mask,
 )
 
 _PLOT_TIME_CACHE: dict[tuple[int, int], list] = {}
@@ -145,27 +145,9 @@ class Balance(ABC):
                     return ds_or_da
                 return ds
 
-            times = ds["time"].values
-            years = []
-            for t in times:
-                if hasattr(t, "year"):
-                    years.append(int(t.year))
-                else:
-                    years.append(int(np.datetime64(t, "Y").astype(int) + 1970))
-
-            # Apply window filter
-            min_yr = (
-                self.analysis_year_min
-                if self.analysis_year_min is not None
-                else min(years)
+            mask = year_window_mask(
+                ds["time"].values, self.analysis_year_min, self.analysis_year_max
             )
-            max_yr = (
-                self.analysis_year_max
-                if self.analysis_year_max is not None
-                else max(years)
-            )
-
-            mask = np.array([min_yr <= y <= max_yr for y in years])
             ds = ds.isel(time=mask)
 
             if isinstance(ds_or_da, xr.DataArray):

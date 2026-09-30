@@ -75,6 +75,24 @@ def add_water_year_coord(
     return ds.assign_coords(water_year=(dim, wy))
 
 
+def year_window_mask(
+    times: np.ndarray,
+    year_min: int | None,
+    year_max: int | None,
+) -> np.ndarray:
+    """Boolean mask of time values whose calendar year is in ``[year_min, year_max]``.
+
+    ``None`` leaves that side of the window open.
+    """
+    years = np.array([_get_year(t) for t in times], dtype=int)
+    mask = np.ones(years.shape, dtype=bool)
+    if year_min is not None:
+        mask &= years >= year_min
+    if year_max is not None:
+        mask &= years <= year_max
+    return mask
+
+
 def select_year(
     ds: xr.Dataset,
     year: int,
