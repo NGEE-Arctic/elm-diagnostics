@@ -12,6 +12,7 @@
 
 from __future__ import annotations
 
+import datetime
 import re
 import warnings
 from collections import OrderedDict
@@ -82,8 +83,6 @@ def _infer_cadence(ds: xr.Dataset) -> str | pd.Timedelta:
 
     # Sample first few time steps
     sample = min(len(dts), 12)
-
-    import datetime
 
     day_diffs = []
     for i in range(sample):

@@ -428,7 +428,7 @@ def report(
                 progress.update(task, completed=True)
                 elapsed = time.time() - start_time
                 if verbose:
-                    logger.info(f"Loaded data in {elapsed:.1f}s")
+                    logger.info("Loaded data in %.1fs", elapsed)
         else:
             run = Run(
                 str(elm_path),
@@ -498,9 +498,9 @@ def report(
         _print_report_section_timings(rpt.section_timings, rpt.build_total_seconds)
 
         if verbose:
-            logger.info(f"Output directory: {Path(out).resolve()}")
-            logger.info(f"Figures: {Path(out) / 'figures'}")
-            logger.info(f"Data: {Path(out) / 'data'}")
+            logger.info("Output directory: %s", Path(out).resolve())
+            logger.info("Figures: %s", Path(out) / "figures")
+            logger.info("Data: %s", Path(out) / "data")
 
         run.close()
 
@@ -616,7 +616,7 @@ def balance(
                 progress.update(task, completed=True)
                 elapsed = time.time() - start_time
                 if verbose:
-                    logger.info(f"Loaded data in {elapsed:.1f}s")
+                    logger.info("Loaded data in %.1fs", elapsed)
         else:
             run = Run(
                 str(elm_path),
@@ -643,7 +643,7 @@ def balance(
             bal = balance_classes[kind](run, config=config)
 
         if verbose:
-            logger.info(f"Balance type: {kind}")
+            logger.info("Balance type: %s", kind)
 
         # Generate plots
         if not quiet:
@@ -663,8 +663,8 @@ def balance(
             console.print(f"[green]✓[/green] Saved to {outdir.resolve()}/")
             if verbose:
                 for i in range(1, len(figures) + 1):
-                    logger.info(f"  - {kind}_panel{i}.png")
-                logger.info(f"  - {kind}_balance.nc")
+                    logger.info("  - %s_panel%d.png", kind, i)
+                logger.info("  - %s_balance.nc", kind)
         else:
             import matplotlib.pyplot as plt
 
@@ -807,7 +807,7 @@ def plot(
                 progress.update(task, completed=True)
                 elapsed = time.time() - start_time
                 if verbose:
-                    logger.info(f"Loaded data in {elapsed:.1f}s")
+                    logger.info("Loaded data in %.1fs", elapsed)
         else:
             run = Run(
                 str(elm_path),
@@ -820,8 +820,8 @@ def plot(
             )
 
         if verbose:
-            logger.info(f"Variable: {varname}")
-            logger.info(f"Plot type: {kind}")
+            logger.info("Variable: %s", varname)
+            logger.info("Plot type: %s", kind)
 
         # Generate plot
         if not quiet:

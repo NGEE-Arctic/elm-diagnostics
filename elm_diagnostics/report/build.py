@@ -13,10 +13,12 @@
 from __future__ import annotations
 
 import functools
+import gc
 import getpass
 import logging
 import os
 import re
+import shutil
 import socket
 import subprocess
 import sys
@@ -313,7 +315,7 @@ class Report:
         """
         lnd_in_path = self._run.path / "lnd_in"
         if not lnd_in_path.exists():
-            logger.warning(f"lnd_in file not found in run directory: {self._run.path}")
+            logger.warning("lnd_in file not found in run directory: %s", self._run.path)
             return None
 
         try:
@@ -374,8 +376,6 @@ class Report:
             if hasattr(t, "year"):
                 years.append(int(t.year))
             else:
-                import numpy as np
-
                 years.append(int(np.datetime64(t, "Y").astype(int) + 1970))
 
         if not years:
@@ -387,8 +387,6 @@ class Report:
             return ds
 
         # Create mask for time dimension
-        import numpy as np
-
         mask = np.array(
             [
                 (start_year == -1 or y >= start_year)
@@ -832,8 +830,6 @@ class Report:
                     plot_seconds=plot_seconds,
                 )
                 # Clear cache after balance section
-                import gc
-
                 if hasattr(self._run, "_variable_cache"):
                     self._run._variable_cache.clear()
                 gc.collect()
@@ -918,8 +914,6 @@ class Report:
                     plot_seconds=plot_seconds,
                 )
                 # Clear cache after balance section
-                import gc
-
                 if hasattr(self._run, "_variable_cache"):
                     self._run._variable_cache.clear()
                 gc.collect()
@@ -1004,8 +998,6 @@ class Report:
                     plot_seconds=plot_seconds,
                 )
                 # Clear cache after balance section
-                import gc
-
                 if hasattr(self._run, "_variable_cache"):
                     self._run._variable_cache.clear()
                 gc.collect()
@@ -1614,8 +1606,6 @@ class Report:
 
             # Clear variable cache and force garbage collection after each group
             # to prevent memory accumulation across 912 variables
-            import gc
-
             if hasattr(run, "_variable_cache"):
                 run._variable_cache.clear()
             gc.collect()
@@ -1823,19 +1813,17 @@ class Report:
 
     def _copy_assets(self, assetsdir: Path) -> None:
         """Copy CSS and JS assets to output assets/ directory."""
-        import shutil
-
         try:
             shutil.copyfile(_ASSETS_DIR / "style.css", assetsdir / "style.css")
             shutil.copyfile(_ASSETS_DIR / "lightbox.js", assetsdir / "lightbox.js")
         except FileNotFoundError as e:
-            logger.error(f"Asset file not found: {e}")
+            logger.error("Asset file not found: %s", e)
             raise RuntimeError(
                 f"Required asset file missing from {_ASSETS_DIR}. "
                 "Report generation cannot continue."
             ) from e
         except OSError as e:
-            logger.error(f"Failed to copy assets to {assetsdir}: {e}")
+            logger.error("Failed to copy assets to %s: %s", assetsdir, e)
             raise RuntimeError(
                 f"Cannot write to output directory {assetsdir}. Check permissions."
             ) from e
@@ -1909,7 +1897,7 @@ class Report:
         try:
             section_template = env.get_template("section.html.j2")
         except jinja2.TemplateNotFound as e:
-            logger.error(f"Template not found: {e}")
+            logger.error("Template not found: %s", e)
             raise RuntimeError(
                 f"Report template 'section.html.j2' not found in {_TEMPLATE_DIR}. "
                 "Package installation may be corrupted."
