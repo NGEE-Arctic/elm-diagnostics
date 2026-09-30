@@ -23,8 +23,11 @@ from elm_diagnostics.plots._common import (
     append_long_name_line,
     check_by_ax,
     format_var_ylabel,
+    hide_unused_axes,
+    prepare_facets,
 )
 from elm_diagnostics.plots.dimension_helpers import squeeze_spatial_dims
+from elm_diagnostics.plots.subgrid_helpers import format_subgrid_title
 
 
 def _annual_anomaly(da: xr.DataArray) -> tuple[np.ndarray, np.ndarray]:
@@ -161,39 +164,15 @@ def _plot_anomaly_faceted(
     config: Config,
 ) -> plt.Figure:
     """Plot faceted anomaly charts by sub-gridcell dimension."""
-    from elm_diagnostics.plots.subgrid_helpers import (
-        create_facet_figure,
-        format_subgrid_title,
-        get_subgrid_units,
-        validate_variable_for_subgrid,
-    )
-
     style = config.plots.style
 
-    # Get data and validate
-    if isinstance(source, Comparison):
-        da_base = source.base.get(varname)
-        da_exp = source.experiment.get(varname)
-        # Validate using experiment structure
-        validate_variable_for_subgrid(da_exp, by, varname)
-    else:
-        da = source.get(varname)
-        validate_variable_for_subgrid(da, by, varname)
-
-    # Get subgrid units
-    if isinstance(source, Comparison):
-        units = get_subgrid_units(da_exp, by)
-    else:
-        units = get_subgrid_units(da, by)
-
-    # Create faceted figure
-    fig, axes = create_facet_figure(len(units), style)
+    da, da_base, units, fig, axes = prepare_facets(source, varname, by, style)
 
     # Plot each subgrid unit
     for unit_id, ax_i in zip(units, axes.flat):
         if isinstance(source, Comparison):
             da_base_unit = squeeze_spatial_dims(da_base.sel({by: unit_id}))
-            da_exp_unit = squeeze_spatial_dims(da_exp.sel({by: unit_id}))
+            da_exp_unit = squeeze_spatial_dims(da.sel({by: unit_id}))
             years_b, anom_b = _annual_anomaly(da_base_unit)
             years_e, anom_e = _annual_anomaly(da_exp_unit)
 
@@ -222,9 +201,7 @@ def _plot_anomaly_faceted(
         ax_i.tick_params(labelsize="small")
         ax_i.axhline(0, color="gray", linewidth=0.5)
 
-    # Hide unused subplots
-    for ax_i in axes.flat[len(units) :]:
-        ax_i.set_visible(False)
+    hide_unused_axes(axes, len(units))
 
     # Overall title
     if isinstance(source, Comparison):

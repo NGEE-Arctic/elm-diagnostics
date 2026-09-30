@@ -24,7 +24,9 @@ from elm_diagnostics.plots._common import (
     append_long_name_line,
     check_by_ax,
     format_var_ylabel,
+    hide_unused_axes,
     legend_level_indices,
+    prepare_facets,
 )
 from elm_diagnostics.plots.climatology import (
     compute_climo_stats,
@@ -38,6 +40,7 @@ from elm_diagnostics.plots.dimension_helpers import (
     resolve_dimension_axis,
     squeeze_spatial_dims,
 )
+from elm_diagnostics.plots.subgrid_helpers import format_subgrid_title
 
 _MONTH_LABELS = ["J", "F", "M", "A", "M", "J", "J", "A", "S", "O", "N", "D"]
 
@@ -422,35 +425,11 @@ def _plot_seasonal_faceted(
     config: Config,
 ) -> plt.Figure:
     """Plot faceted seasonal cycle by sub-gridcell dimension."""
-    from elm_diagnostics.plots.subgrid_helpers import (
-        create_facet_figure,
-        format_subgrid_title,
-        get_subgrid_units,
-        validate_variable_for_subgrid,
-    )
-
     style = config.plots.style
     include_climos = config.plots.climatology.include_climos
     envelope = config.plots.climatology.envelope if include_climos else "none"
 
-    # Get data and validate
-    if isinstance(source, Comparison):
-        da_base = source.base.get(varname)
-        da_exp = source.experiment.get(varname)
-        # Validate using experiment structure
-        validate_variable_for_subgrid(da_exp, by, varname)
-    else:
-        da = source.get(varname)
-        validate_variable_for_subgrid(da, by, varname)
-
-    # Get subgrid units
-    if isinstance(source, Comparison):
-        units = get_subgrid_units(da_exp, by)
-    else:
-        units = get_subgrid_units(da, by)
-
-    # Create faceted figure
-    fig, axes = create_facet_figure(len(units), style)
+    da, da_base, units, fig, axes = prepare_facets(source, varname, by, style)
 
     months = np.arange(1, 13)
 
@@ -467,7 +446,7 @@ def _plot_seasonal_faceted(
             config.plots.climatology.climo_end_year,
         )
         n_years_e = count_years_in_window(
-            da_exp,
+            da,
             config.plots.climatology.climo_start_year,
             config.plots.climatology.climo_end_year,
         )
@@ -487,7 +466,7 @@ def _plot_seasonal_faceted(
             )
             _years_e_faceted, year_cycles_e_faceted = (
                 compute_individual_year_seasonal_cycles_faceted(
-                    da_exp,
+                    da,
                     by,
                     config.plots.climatology.climo_start_year,
                     config.plots.climatology.climo_end_year,
@@ -514,7 +493,7 @@ def _plot_seasonal_faceted(
     for unit_id, ax_i in zip(units, axes.flat):
         if isinstance(source, Comparison):
             da_base_unit = squeeze_spatial_dims(da_base.sel({by: unit_id}))
-            da_exp_unit = squeeze_spatial_dims(da_exp.sel({by: unit_id}))
+            da_exp_unit = squeeze_spatial_dims(da.sel({by: unit_id}))
 
             mean_b, lo_b, hi_b = _seasonal_stats(
                 da_base_unit,
@@ -732,9 +711,7 @@ def _plot_seasonal_faceted(
         ax_i.set_title(format_subgrid_title(by, unit_id), fontsize="medium")
         ax_i.tick_params(labelsize="small")
 
-    # Hide unused subplots
-    for ax_i in axes.flat[len(units) :]:
-        ax_i.set_visible(False)
+    hide_unused_axes(axes, len(units))
 
     # Overall title
     if isinstance(source, Comparison):
