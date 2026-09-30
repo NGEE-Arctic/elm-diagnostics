@@ -18,6 +18,7 @@ import xarray as xr
 
 from elm_diagnostics.balances.base import Balance
 from elm_diagnostics.config.schema import CarbonBalanceConfig
+from elm_diagnostics.plots.colors import get_balance_colors
 from elm_diagnostics.time.integration import cumulative_integral, storage_change
 from elm_diagnostics.time.plotting import plot_times
 
@@ -145,16 +146,7 @@ class CarbonBalance(Balance):
         # --- Cumulative flux panel ---
         fig1, ax1 = plt.subplots(figsize=style.figsize, dpi=style.dpi)
 
-        flux_colors = {
-            "GPP": "green",
-            "ER": "red",
-            "HR": "orange",
-            "AR": "salmon",
-            "NEE": "purple",
-            "TOTFIRE": "gray",
-            "WOOD_HARVESTC": "brown",
-        }
-
+        flux_colors = get_balance_colors()["carbon"]
         for varname in bc.fluxes:
             if varname in comps:
                 c = flux_colors.get(varname, None)
