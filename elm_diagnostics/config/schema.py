@@ -66,7 +66,7 @@ class HovmullerConfig(BaseModel):
     color_limit_sigma: float = Field(default=2.0, gt=0.0)
 
     @model_validator(mode="after")
-    def validate_depth_limits(self):
+    def validate_depth_limits(self) -> HovmullerConfig:
         """Ensure max_levels and max_depth_m are mutually exclusive."""
         if self.max_levels is not None and self.max_depth_m is not None:
             raise ValueError("Cannot set both max_levels and max_depth_m")

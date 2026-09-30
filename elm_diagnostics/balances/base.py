@@ -13,6 +13,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
 
@@ -178,7 +179,7 @@ class Balance(ABC):
         ds["residual"] = self.residual()
         ds.to_netcdf(path)
 
-    def plot_all_years(self):
+    def plot_all_years(self) -> Iterator[tuple[plt.Figure, ...]]:
         """Iterate over all available years, yielding plot tuples."""
         # Get a representative dataset for year discovery
         first_var = next(iter(self._get_variable_names()))
