@@ -52,6 +52,10 @@ elm-diagnostics = "elm_diagnostics.cli:app"
 [tool.hatch.build.targets.wheel]
 packages = ["elm_diagnostics"]
 
+# workspace/ holds local, in-progress analyses and must never ship in a release.
+[tool.hatch.build.targets.sdist]
+exclude = ["/workspace"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 
