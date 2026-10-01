@@ -13,47 +13,26 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
 
-import cftime
 import matplotlib.pyplot as plt
 import xarray as xr
 
 from elm_diagnostics.config.schema import Config, load_config
 from elm_diagnostics.io.run import Run
-from elm_diagnostics.io.subgrid import SubgridLevel
+from elm_diagnostics.io.subgrid import SubgridLevel, validate_by_keyword
+from elm_diagnostics.plots.dimension_helpers import squeeze_spatial_dims
 from elm_diagnostics.time.calendars import (
     get_available_years,
     select_year,
+    year_window_mask,
 )
+from elm_diagnostics.time.plotting import plot_times
 
-_PLOT_TIME_CACHE: dict[tuple[int, int], list] = {}
-_PLOT_TIME_CACHE_MAX = 4096
-
-
-def _plot_time(da: xr.DataArray):
-    """Return time values suitable for matplotlib plotting.
-
-    Converts cftime dates to Python datetime objects since matplotlib
-    cannot handle cftime types natively without nc_time_axis.
-    """
-    time_data = da.coords["time"].data
-    # Use (id, length) tuple as cache key to avoid returning wrong-length
-    # cached result when object IDs are reused after garbage collection
-    cache_key = (id(time_data), len(time_data))
-    cached = _PLOT_TIME_CACHE.get(cache_key)
-    if cached is not None:
-        return cached
-
-    times = da.time.values
-    if len(times) > 0 and isinstance(times[0], cftime.datetime):
-        converted = [t._to_real_datetime() for t in times]
-        if len(_PLOT_TIME_CACHE) >= _PLOT_TIME_CACHE_MAX:
-            _PLOT_TIME_CACHE.clear()
-        _PLOT_TIME_CACHE[cache_key] = converted
-        return converted
-    return times
+# Re-exported for backward compatibility; plot_times lives in time.plotting.
+_plot_time = plot_times
 
 
 class Balance(ABC):
@@ -91,8 +70,6 @@ class Balance(ABC):
 
         # Validate sub-gridcell dimension if requested
         if by is not None:
-            from elm_diagnostics.io.subgrid import validate_by_keyword
-
             # Get first stream to check
             first_stream = self.run._open_stream(self.run._tape_order[0])
             validate_by_keyword(first_stream, by)
@@ -110,13 +87,9 @@ class Balance(ABC):
 
         Preserves the sub-gridcell dimension specified by self.by if set.
         """
-        da = self.run.get(varname)
-        # Squeeze singleton spatial dims for single-point data
-        # But preserve the sub-gridcell dimension if specified
-        for dim in ("lat", "lon", "lndgrid", "gridcell"):
-            if dim in da.dims and da.sizes[dim] == 1:
-                da = da.squeeze(dim, drop=True)
-        return da
+        # Only spatial dims are squeezed, so sub-gridcell dims (column/pft/
+        # landunit) survive for faceting.
+        return squeeze_spatial_dims(self.run.get(varname))
 
     def _select_year(self, ds_or_da):
         """Subset to the requested year or analysis window if set."""
@@ -146,29 +119,9 @@ class Balance(ABC):
                     return ds_or_da
                 return ds
 
-            import numpy as np
-
-            times = ds["time"].values
-            years = []
-            for t in times:
-                if hasattr(t, "year"):
-                    years.append(int(t.year))
-                else:
-                    years.append(int(np.datetime64(t, "Y").astype(int) + 1970))
-
-            # Apply window filter
-            min_yr = (
-                self.analysis_year_min
-                if self.analysis_year_min is not None
-                else min(years)
+            mask = year_window_mask(
+                ds["time"].values, self.analysis_year_min, self.analysis_year_max
             )
-            max_yr = (
-                self.analysis_year_max
-                if self.analysis_year_max is not None
-                else max(years)
-            )
-
-            mask = np.array([min_yr <= y <= max_yr for y in years])
             ds = ds.isel(time=mask)
 
             if isinstance(ds_or_da, xr.DataArray):
@@ -226,7 +179,7 @@ class Balance(ABC):
         ds["residual"] = self.residual()
         ds.to_netcdf(path)
 
-    def plot_all_years(self):
+    def plot_all_years(self) -> Iterator[tuple[plt.Figure, ...]]:
         """Iterate over all available years, yielding plot tuples."""
         # Get a representative dataset for year discovery
         first_var = next(iter(self._get_variable_names()))

@@ -12,6 +12,7 @@
 
 from __future__ import annotations
 
+import datetime
 import re
 import warnings
 from collections import OrderedDict
@@ -23,10 +24,9 @@ import numpy as np
 import pandas as pd
 import xarray as xr
 
-_FILE_STAMP_PATTERN = re.compile(r"\.h\d+\.([^.]+)\.nc$")
+from elm_diagnostics.time.integration import TIME_BOUNDS_NAMES, find_bounds_var
 
-# Time-bounds variable names, in preference order.
-_TIME_BOUNDS_NAMES = ("time_bounds", "time_bnds")
+_FILE_STAMP_PATTERN = re.compile(r"\.h\d+\.([^.]+)\.nc$")
 
 
 def _discover_streams(path: Path) -> dict[str, list[Path]]:
@@ -44,16 +44,40 @@ def _discover_streams(path: Path) -> dict[str, list[Path]]:
     return streams
 
 
+def _classify_cadence(median_days: float) -> str | pd.Timedelta:
+    """Map a median step length in days to 'monthly', 'annual', or a Timedelta."""
+    if 28 <= median_days <= 31:
+        return "monthly"
+    if 360 <= median_days <= 366:
+        return "annual"
+    return pd.Timedelta(days=float(median_days))
+
+
+def _cadence_seconds(cadence: str | pd.Timedelta) -> float:
+    """Approximate cadence length in seconds, for finest-first tape ordering."""
+    if isinstance(cadence, pd.Timedelta):
+        return cadence.total_seconds()
+    if cadence == "annual":
+        return 365 * 86400
+    return 30 * 86400  # "monthly" and any unrecognized label
+
+
+def _cf_decode_kwargs() -> dict:
+    """``open_dataset`` kwargs that decode times to cftime objects."""
+    try:
+        # xarray >= 2025.01
+        return {"decode_times": xr.coders.CFDatetimeCoder(use_cftime=True)}
+    except AttributeError:
+        return {"decode_times": True, "use_cftime": True}
+
+
 def _infer_cadence(ds: xr.Dataset) -> str | pd.Timedelta:
     """Infer temporal cadence from time_bounds.
 
     Returns 'monthly', 'annual', or a pd.Timedelta for uniform sub-monthly.
     """
-    if "time_bounds" in ds:
-        bounds_var = "time_bounds"
-    elif "time_bnds" in ds:
-        bounds_var = "time_bnds"
-    else:
+    bounds_var = find_bounds_var(ds)
+    if bounds_var is None:
         # Fall back to diff of time coordinate
         times = ds["time"].values
         if len(times) < 2:
@@ -67,11 +91,7 @@ def _infer_cadence(ds: xr.Dataset) -> str | pd.Timedelta:
         else:
             td = np.diff(times[:13])
             median_days = np.median(td / np.timedelta64(1, "D"))
-        if 28 <= median_days <= 31:
-            return "monthly"
-        if 360 <= median_days <= 366:
-            return "annual"
-        return pd.Timedelta(days=float(median_days))
+        return _classify_cadence(median_days)
 
     bounds = ds[bounds_var]
     # Compute dt from bounds
@@ -82,8 +102,6 @@ def _infer_cadence(ds: xr.Dataset) -> str | pd.Timedelta:
 
     # Sample first few time steps
     sample = min(len(dts), 12)
-
-    import datetime
 
     day_diffs = []
     for i in range(sample):
@@ -99,21 +117,13 @@ def _infer_cadence(ds: xr.Dataset) -> str | pd.Timedelta:
         else:
             day_diffs.append(float(val) / 86400.0)
 
-    median_days = float(np.median(day_diffs))
-
-    if 28 <= median_days <= 31:
-        return "monthly"
-    if 360 <= median_days <= 366:
-        return "annual"
-    return pd.Timedelta(days=float(median_days))
+    return _classify_cadence(float(np.median(day_diffs)))
 
 
 def _extract_casename(path: Path) -> str:
     """Extract ELM case name from the first history file found."""
     for f in sorted(path.glob("*.elm.h*.nc")):
-        parts = f.name.split(".elm.")
-        if parts:
-            return parts[0]
+        return f.name.split(".elm.")[0]
     return path.name
 
 
@@ -399,32 +409,27 @@ class Run:
         """
         if strict_combine is None:
             strict_combine = self._strict_combine
-        kwargs: dict = {
-            "combine": "by_coords",
-            "data_vars": "all",
-        }
+        kwargs: dict
         if strict_combine:
             # Strict: verify coords/vars are equal across files (debugging).
-            kwargs["combine"] = "by_coords"
-            kwargs["data_vars"] = "all"
-            kwargs["join"] = "override"
-            kwargs["compat"] = "equals"
+            kwargs = {
+                "combine": "by_coords",
+                "data_vars": "all",
+                "join": "override",
+                "compat": "equals",
+            }
         else:
             # Performance path: trust the files to be consistent and skip the
             # cross-file equality materialization (see Notes above).
-            kwargs["combine"] = "nested"
-            kwargs["concat_dim"] = "time"
-            kwargs["data_vars"] = "minimal"
-            kwargs["coords"] = "minimal"
-            kwargs["join"] = "override"
-            kwargs["compat"] = "override"
-        # Use CFDatetimeCoder for cftime decoding (xarray >= 2024)
-        try:
-            coder = xr.coders.CFDatetimeCoder(use_cftime=True)
-            kwargs["decode_times"] = coder
-        except AttributeError:
-            kwargs["decode_times"] = True
-            kwargs["use_cftime"] = True
+            kwargs = {
+                "combine": "nested",
+                "concat_dim": "time",
+                "data_vars": "minimal",
+                "coords": "minimal",
+                "join": "override",
+                "compat": "override",
+            }
+        kwargs.update(_cf_decode_kwargs())
         if chunks != "default":
             kwargs["chunks"] = chunks
         elif self._chunks is not None:
@@ -435,8 +440,6 @@ class Run:
             else:
                 # Avoid requiring dask when not explicitly requested
                 kwargs["chunks"] = None
-        kwargs.setdefault("compat", "no_conflicts")
-        kwargs.setdefault("join", "outer")
         return kwargs
 
     def _open_stream(self, tape: str, strict_combine: bool | None = None) -> xr.Dataset:
@@ -497,12 +500,7 @@ class Run:
                 self._cadence[tape] = "monthly"
             else:
                 try:
-                    coder = xr.coders.CFDatetimeCoder(use_cftime=True)
-                    open_kwargs = {"decode_times": coder}
-                except AttributeError:
-                    open_kwargs = {"decode_times": True, "use_cftime": True}
-                try:
-                    with xr.open_dataset(files[0], **open_kwargs) as ds0:
+                    with xr.open_dataset(files[0], **_cf_decode_kwargs()) as ds0:
                         self._cadence[tape] = _infer_cadence(ds0)
                 except Exception:
                     self._cadence[tape] = "monthly"
@@ -515,17 +513,9 @@ class Run:
         full streams (used on the ``get()`` hot path).
         """
 
-        def _key(tape: str) -> float:
-            c = self._cheap_cadence(tape)
-            if isinstance(c, pd.Timedelta):
-                return c.total_seconds()
-            if c == "monthly":
-                return 30 * 86400
-            if c == "annual":
-                return 365 * 86400
-            return 30 * 86400
-
-        return sorted(self._tape_order, key=_key)
+        return sorted(
+            self._tape_order, key=lambda t: _cadence_seconds(self._cheap_cadence(t))
+        )
 
     def _first_tape_with_bounds(self) -> str:
         """First tape whose files[0] header contains a time-bounds variable.
@@ -534,9 +524,8 @@ class Run:
         streams); callers still handle a missing-bounds dataset gracefully.
         """
         for tape in self._tape_order:
-            if _TIME_BOUNDS_NAMES[0] in self._variable_index(
-                tape
-            ) or _TIME_BOUNDS_NAMES[1] in self._variable_index(tape):
+            index = self._variable_index(tape)
+            if any(name in index for name in TIME_BOUNDS_NAMES):
                 return tape
         return self._tape_order[0]
 
@@ -553,6 +542,15 @@ class Run:
         if tape is None:
             tape = self._first_tape_with_bounds()
         return self._open_stream(tape)
+
+    @property
+    def tapes(self) -> list[str]:
+        """History tape names (``h0``, ``h1``, ...) in sorted order."""
+        return list(self._tape_order)
+
+    def clear_variable_cache(self) -> None:
+        """Drop cached variables; open stream datasets are kept."""
+        self._variable_cache.clear()
 
     @property
     def streams(self) -> dict[str, xr.Dataset]:
@@ -577,14 +575,7 @@ class Run:
 
         def _cadence_key(tape: str) -> float:
             self._open_stream(tape)
-            c = self._cadence[tape]
-            if isinstance(c, pd.Timedelta):
-                return c.total_seconds()
-            if c == "monthly":
-                return 30 * 86400
-            if c == "annual":
-                return 365 * 86400
-            return 30 * 86400
+            return _cadence_seconds(self._cadence[tape])
 
         return sorted(self._tape_order, key=_cadence_key)
 
@@ -739,33 +730,6 @@ class Run:
         return f"Run(name={self.name!r}, tapes=[{tapes}])"
 
 
-def _lazy_align(
-    da_base: xr.DataArray,
-    da_exp: xr.DataArray,
-    join: Literal["inner", "outer"],
-) -> tuple[xr.DataArray, xr.DataArray]:
-    """Align arrays on coordinates while preserving chunking.
-
-    Uses xarray's align with copy=False to avoid triggering computation
-    on dask-backed arrays.
-
-    Parameters
-    ----------
-    da_base, da_exp : xr.DataArray
-        Arrays to align, potentially with dask chunks
-    join : {"inner", "outer"}
-        How to combine coordinate indices
-
-    Returns
-    -------
-    tuple of aligned arrays, still chunked if inputs were chunked
-    """
-    # copy=False is critical - returns views/references rather than
-    # materializing new arrays
-    aligned = xr.align(da_base, da_exp, join=join, copy=False)
-    return aligned
-
-
 class Comparison:
     """Pair of runs for side-by-side diagnostics.
 
@@ -806,7 +770,8 @@ class Comparison:
         da_exp = self.experiment.get(varname, tape=tape)
 
         join = "inner" if self.align == "intersect" else "outer"
-        return _lazy_align(da_base, da_exp, join=join)
+        # copy=False keeps dask-backed arrays lazy (no materialized copies).
+        return xr.align(da_base, da_exp, join=join, copy=False)
 
     def __repr__(self) -> str:
         return (
