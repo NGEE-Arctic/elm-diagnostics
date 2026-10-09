@@ -13,42 +13,28 @@
 from __future__ import annotations
 
 import matplotlib.pyplot as plt
-import numpy as np
 import xarray as xr
-from matplotlib.lines import Line2D
 
-from elm_diagnostics.balances.base import _plot_time
 from elm_diagnostics.config.schema import Config, load_config
 from elm_diagnostics.io.run import Comparison, Run
 from elm_diagnostics.io.subgrid import SubgridLevel
+from elm_diagnostics.plots._common import (
+    add_level_and_run_legends,
+    append_long_name_line,
+    check_by_ax,
+    format_var_ylabel,
+    hide_unused_axes,
+    plot_level_lines,
+    prepare_facets,
+)
 from elm_diagnostics.plots.climatology import compute_climo_stats
 from elm_diagnostics.plots.dimension_helpers import (
     apply_max_levels,
     detect_additional_dimension,
-    format_level_label,
-    resolve_dimension_axis,
     squeeze_spatial_dims,
 )
-
-
-def _legend_level_indices(n_levels: int, max_entries: int = 8) -> set[int]:
-    """Choose representative vertical levels for concise legends."""
-    if n_levels <= max_entries:
-        return set(range(n_levels))
-    idx = np.linspace(0, n_levels - 1, max_entries).astype(int)
-    return set(idx.tolist())
-
-
-def _format_var_ylabel(varname: str, units: str) -> str:
-    units = str(units).strip()
-    return f"{varname} ({units})" if units else varname
-
-
-def _append_long_name_line(title: str, da: xr.DataArray | None) -> str:
-    if da is None:
-        return title
-    long_name = str(da.attrs.get("long_name", "")).strip()
-    return f"{title}\n{long_name}" if long_name else title
+from elm_diagnostics.plots.subgrid_helpers import format_subgrid_title
+from elm_diagnostics.time.plotting import plot_times
 
 
 def _plot_multilevel_lines(
@@ -78,29 +64,16 @@ def _plot_multilevel_lines(
     hov_config = config.get_variable_group_hovmuller_config(varname)
     da = apply_max_levels(da, dim, hov_config.max_levels)
 
-    n_levels = da.sizes[dim]
-    level_values, _, level_name, level_units, _ = resolve_dimension_axis(da, dim)
-    legend_idx = _legend_level_indices(n_levels, max_entries=legend_max_entries)
-    cmap = plt.get_cmap("viridis")
-    time_values = _plot_time(da)
-    line_values = np.asarray(da.transpose(dim, "time").compute())
-
-    for i in range(n_levels):
-        fraction = i / max(n_levels - 1, 1)
-        line_label = (
-            format_level_label(level_values[i], level_name, units=level_units)
-            if i in legend_idx
-            else "_nolegend_"
-        )
-        ax.plot(
-            time_values,
-            line_values[i, :],
-            color=cmap(fraction),
-            linestyle=linestyle,
-            alpha=alpha,
-            label=line_label,
-        )
-
+    plot_level_lines(
+        ax,
+        plot_times(da),
+        da,
+        dim,
+        "time",
+        linestyle=linestyle,
+        alpha=alpha,
+        legend_max_entries=legend_max_entries,
+    )
     return dim
 
 
@@ -151,12 +124,7 @@ def plot_timeseries(
     """
     cfg = config or load_config()
 
-    # Validate ax + by compatibility
-    if by is not None and ax is not None:
-        raise ValueError(
-            "Cannot specify both 'by' and 'ax': faceted plots create "
-            "their own figure. Remove 'ax' parameter or set by=None."
-        )
+    check_by_ax(by, ax)
 
     if by is None:
         # Single plot (existing logic)
@@ -198,29 +166,23 @@ def _plot_timeseries_single(
                 alpha=0.7,
                 legend_max_entries=0,
             )
-            depth_legend = ax.legend(
-                loc="upper right",
-                fontsize="x-small",
-                title=f"{level_dim} levels",
+            add_level_and_run_legends(
+                ax,
+                level_dim,
+                source.base.name,
+                source.experiment.name,
+                "x-small",
             )
-            ax.add_artist(depth_legend)
-            run_handles = [
-                Line2D([0], [0], color="black", linestyle="--", label=source.base.name),
-                Line2D(
-                    [0], [0], color="black", linestyle="-", label=source.experiment.name
-                ),
-            ]
-            ax.legend(handles=run_handles, loc="upper left", fontsize="x-small")
         else:
             ax.plot(
-                _plot_time(da_base),
+                plot_times(da_base),
                 da_base.compute(),
                 color="gray",
                 label=source.base.name,
                 alpha=0.8,
             )
             ax.plot(
-                _plot_time(da_exp),
+                plot_times(da_exp),
                 da_exp.compute(),
                 color="tab:blue",
                 label=source.experiment.name,
@@ -234,7 +196,7 @@ def _plot_timeseries_single(
         if level_dim is not None:
             ax.legend(loc="best", fontsize="x-small", title=f"{level_dim} levels")
         else:
-            ax.plot(_plot_time(da), da.compute(), color="tab:blue")
+            ax.plot(plot_times(da), da.compute(), color="tab:blue")
 
             # Climatology envelope if multi-year
             _add_climatology_envelope(
@@ -248,13 +210,13 @@ def _plot_timeseries_single(
         units = da.attrs.get("units", "")
 
     ax.set_xlabel("Time")
-    ax.set_ylabel(_format_var_ylabel(varname, units))
+    ax.set_ylabel(format_var_ylabel(varname, units))
     title = varname
     if isinstance(source, Comparison):
         title += f" — {source.base.name} vs {source.experiment.name}"
     elif isinstance(source, Run):
         title += f" — {source.name}"
-    ax.set_title(_append_long_name_line(title, title_da))
+    ax.set_title(append_long_name_line(title, title_da))
     fig.tight_layout()
 
     return fig
@@ -267,37 +229,15 @@ def _plot_timeseries_faceted(
     config: Config,
 ) -> plt.Figure:
     """Plot faceted timeseries by sub-gridcell dimension."""
-    from elm_diagnostics.plots.subgrid_helpers import (
-        create_facet_figure,
-        format_subgrid_title,
-        get_subgrid_units,
-        validate_variable_for_subgrid,
+    da, da_base, units, fig, axes = prepare_facets(
+        source, varname, by, config.plots.style
     )
-
-    # Get data and validate
-    if isinstance(source, Comparison):
-        da_base = source.base.get(varname)
-        da_exp = source.experiment.get(varname)
-        # Validate using experiment structure
-        validate_variable_for_subgrid(da_exp, by, varname)
-    else:
-        da = source.get(varname)
-        validate_variable_for_subgrid(da, by, varname)
-
-    # Get subgrid units
-    if isinstance(source, Comparison):
-        units = get_subgrid_units(da_exp, by)
-    else:
-        units = get_subgrid_units(da, by)
-
-    # Create faceted figure
-    fig, axes = create_facet_figure(len(units), config.plots.style)
 
     # Plot each subgrid unit
     for unit_id, ax_i in zip(units, axes.flat):
         if isinstance(source, Comparison):
             da_base_unit = squeeze_spatial_dims(da_base.sel({by: unit_id}))
-            da_exp_unit = squeeze_spatial_dims(da_exp.sel({by: unit_id}))
+            da_exp_unit = squeeze_spatial_dims(da.sel({by: unit_id}))
 
             level_dim = _plot_multilevel_lines(
                 ax_i,
@@ -318,41 +258,23 @@ def _plot_timeseries_faceted(
                     legend_max_entries=0,
                 )
                 if unit_id == units[0]:
-                    depth_legend = ax_i.legend(
-                        loc="upper right",
-                        fontsize="xx-small",
-                        title=f"{level_dim} levels",
-                    )
-                    ax_i.add_artist(depth_legend)
-                    run_handles = [
-                        Line2D(
-                            [0],
-                            [0],
-                            color="black",
-                            linestyle="--",
-                            label=source.base.name,
-                        ),
-                        Line2D(
-                            [0],
-                            [0],
-                            color="black",
-                            linestyle="-",
-                            label=source.experiment.name,
-                        ),
-                    ]
-                    ax_i.legend(
-                        handles=run_handles, loc="upper left", fontsize="xx-small"
+                    add_level_and_run_legends(
+                        ax_i,
+                        level_dim,
+                        source.base.name,
+                        source.experiment.name,
+                        "xx-small",
                     )
             else:
                 ax_i.plot(
-                    _plot_time(da_base_unit),
+                    plot_times(da_base_unit),
                     da_base_unit.compute(),
                     color="gray",
                     label=source.base.name,
                     alpha=0.8,
                 )
                 ax_i.plot(
-                    _plot_time(da_exp_unit),
+                    plot_times(da_exp_unit),
                     da_exp_unit.compute(),
                     color="tab:blue",
                     label=source.experiment.name,
@@ -368,7 +290,7 @@ def _plot_timeseries_faceted(
                     loc="best", fontsize="xx-small", title=f"{level_dim} levels"
                 )
             if level_dim is None:
-                ax_i.plot(_plot_time(da_unit), da_unit.compute(), color="tab:blue")
+                ax_i.plot(plot_times(da_unit), da_unit.compute(), color="tab:blue")
 
                 # Climatology envelope
                 _add_climatology_envelope(
@@ -388,9 +310,7 @@ def _plot_timeseries_faceted(
         ax_i.set_title(format_subgrid_title(by, unit_id), fontsize="medium")
         ax_i.tick_params(labelsize="small")
 
-    # Hide unused subplots
-    for ax_i in axes.flat[len(units) :]:
-        ax_i.set_visible(False)
+    hide_unused_axes(axes, len(units))
 
     # Overall title
     if isinstance(source, Comparison):
@@ -431,7 +351,7 @@ def _add_climatology_envelope(
         return
 
     # Map climatology values to actual dates from the timeseries
-    plot_times = _plot_time(da)
+    envelope_times = plot_times(da)
     # Array of month numbers (1-12) for each time point
     months = da.time.dt.month.compute()
 
@@ -442,7 +362,7 @@ def _add_climatology_envelope(
     # Plot using actual dates (not month indices 1-12)
     ax_twin = ax.twinx()
     ax_twin.fill_between(
-        plot_times,
+        envelope_times,
         lo_mapped,
         hi_mapped,
         alpha=0.15,

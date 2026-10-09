@@ -66,7 +66,7 @@ class HovmullerConfig(BaseModel):
     color_limit_sigma: float = Field(default=2.0, gt=0.0)
 
     @model_validator(mode="after")
-    def validate_depth_limits(self):
+    def validate_depth_limits(self) -> HovmullerConfig:
         """Ensure max_levels and max_depth_m are mutually exclusive."""
         if self.max_levels is not None and self.max_depth_m is not None:
             raise ValueError("Cannot set both max_levels and max_depth_m")
@@ -307,6 +307,13 @@ class IOConfig(BaseModel):
     chunks: dict[str, int] = Field(default_factory=dict)
 
 
+_BALANCE_MODELS: dict[str, type[BaseModel]] = {
+    "water": WaterBalanceConfig,
+    "carbon": CarbonBalanceConfig,
+    "energy": EnergyBalanceConfig,
+}
+
+
 class Config(BaseModel):
     """Top-level configuration."""
 
@@ -430,44 +437,18 @@ def load_config(
                 "'balances' must be a mapping with optional keys: water, carbon, energy"
             )
 
-        allowed_balance_keys = {"water", "carbon", "energy"}
-        unknown_balance_keys = set(user_balances) - allowed_balance_keys
+        unknown_balance_keys = set(user_balances) - set(_BALANCE_MODELS)
         if unknown_balance_keys:
             unknown = ", ".join(sorted(unknown_balance_keys))
             raise ValueError(f"Unknown balances subblock(s): {unknown}")
 
-        required_subkeys = {
-            "water": {
-                "storages",
-                "inputs",
-                "outputs",
-                "et_components",
-                "residual_against",
-                "frame",
-            },
-            "carbon": {
-                "mode",
-                "pools",
-                "fluxes",
-                "ch4",
-                "residual_against",
-                "frame",
-            },
-            "energy": {
-                "radiation",
-                "turbulent",
-                "ground",
-                "storage",
-                "errors",
-                "frame",
-                "cumulative",
-            },
-        }
-
+        # An override replaces the whole balance definition, so every field of
+        # that balance's model must be given.
         for balance_name, block in user_balances.items():
             if not isinstance(block, dict):
                 raise ValueError(f"'balances.{balance_name}' must be a mapping")
-            missing_subkeys = required_subkeys[balance_name] - set(block)
+            required_subkeys = set(_BALANCE_MODELS[balance_name].model_fields)
+            missing_subkeys = required_subkeys - set(block)
             if missing_subkeys:
                 missing = ", ".join(sorted(missing_subkeys))
                 raise ValueError(

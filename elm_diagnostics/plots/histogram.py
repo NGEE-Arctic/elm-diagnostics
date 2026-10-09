@@ -19,18 +19,14 @@ import xarray as xr
 from elm_diagnostics.config.schema import Config, load_config
 from elm_diagnostics.io.run import Comparison, Run
 from elm_diagnostics.io.subgrid import SubgridLevel
-
-
-def _squeeze_spatial(da: xr.DataArray) -> xr.DataArray:
-    """Squeeze singleton spatial dims (lat/lon/lndgrid/gridcell).
-
-    Preserves dask chunks for lazy evaluation. Xarray's squeeze operation
-    works efficiently on chunked arrays without triggering computation.
-    """
-    for dim in ("lat", "lon", "lndgrid", "gridcell"):
-        if dim in da.dims and da.sizes[dim] == 1:
-            da = da.squeeze(dim, drop=True)
-    return da
+from elm_diagnostics.plots._common import (
+    append_long_name_line,
+    check_by_ax,
+    hide_unused_axes,
+    prepare_facets,
+)
+from elm_diagnostics.plots.dimension_helpers import squeeze_spatial_dims
+from elm_diagnostics.plots.subgrid_helpers import format_subgrid_title
 
 
 def _flatten_finite_values(da: xr.DataArray) -> np.ndarray:
@@ -46,13 +42,6 @@ def _flatten_finite_values(da: xr.DataArray) -> np.ndarray:
         stacked = stacked.compute()
     finite = stacked.where(np.isfinite(stacked), drop=True)
     return finite.values
-
-
-def _append_long_name_line(title: str, da: xr.DataArray | None) -> str:
-    if da is None:
-        return title
-    long_name = str(da.attrs.get("long_name", "")).strip()
-    return f"{title}\n{long_name}" if long_name else title
 
 
 def plot_histogram(
@@ -97,12 +86,7 @@ def plot_histogram(
     """
     cfg = config or load_config()
 
-    # Validate ax + by compatibility
-    if by is not None and ax is not None:
-        raise ValueError(
-            "Cannot specify both 'by' and 'ax': faceted plots create "
-            "their own figure. Remove 'ax' parameter or set by=None."
-        )
+    check_by_ax(by, ax)
 
     if by is None:
         # Single plot (existing logic)
@@ -129,8 +113,8 @@ def _plot_histogram_single(
         fig = ax.figure
 
     if isinstance(source, Comparison):
-        da_base = _squeeze_spatial(source.base.get(varname))
-        da_exp = _squeeze_spatial(source.experiment.get(varname))
+        da_base = squeeze_spatial_dims(source.base.get(varname))
+        da_exp = squeeze_spatial_dims(source.experiment.get(varname))
         title_da = da_exp
         vals_b = _flatten_finite_values(da_base)
         vals_e = _flatten_finite_values(da_exp)
@@ -158,7 +142,7 @@ def _plot_histogram_single(
         ax.legend(loc="best", fontsize="small")
         units = da_base.attrs.get("units", "")
     else:
-        da = _squeeze_spatial(source.get(varname))
+        da = squeeze_spatial_dims(source.get(varname))
         title_da = da
         vals = _flatten_finite_values(da)
         ax.hist(vals, bins=bins, density=density, alpha=0.7, color="tab:blue")
@@ -170,7 +154,7 @@ def _plot_histogram_single(
     title = f"{varname} — Distribution"
     if isinstance(source, Run):
         title += f" — {source.name}"
-    ax.set_title(_append_long_name_line(title, title_da))
+    ax.set_title(append_long_name_line(title, title_da))
     fig.tight_layout()
 
     return fig
@@ -185,41 +169,17 @@ def _plot_histogram_faceted(
     config: Config,
 ) -> plt.Figure:
     """Plot faceted histograms by sub-gridcell dimension."""
-    from elm_diagnostics.plots.subgrid_helpers import (
-        create_facet_figure,
-        format_subgrid_title,
-        get_subgrid_units,
-        validate_variable_for_subgrid,
-    )
-
     style = config.plots.style
 
-    # Get data and validate
-    if isinstance(source, Comparison):
-        da_base = source.base.get(varname)
-        da_exp = source.experiment.get(varname)
-        # Validate using experiment structure
-        validate_variable_for_subgrid(da_exp, by, varname)
-    else:
-        da = source.get(varname)
-        validate_variable_for_subgrid(da, by, varname)
-
-    # Get subgrid units
-    if isinstance(source, Comparison):
-        units = get_subgrid_units(da_exp, by)
-    else:
-        units = get_subgrid_units(da, by)
-
-    # Create faceted figure
-    fig, axes = create_facet_figure(len(units), style)
+    da, da_base, units, fig, axes = prepare_facets(source, varname, by, style)
 
     # Plot each subgrid unit
     for unit_id, ax_i in zip(units, axes.flat):
         if isinstance(source, Comparison):
             vals_b = _flatten_finite_values(
-                _squeeze_spatial(da_base.sel({by: unit_id}))
+                squeeze_spatial_dims(da_base.sel({by: unit_id}))
             )
-            vals_e = _flatten_finite_values(_squeeze_spatial(da_exp.sel({by: unit_id})))
+            vals_e = _flatten_finite_values(squeeze_spatial_dims(da.sel({by: unit_id})))
 
             # Shared bins
             all_vals = np.concatenate([vals_b, vals_e])
@@ -245,7 +205,7 @@ def _plot_histogram_faceted(
 
             units_str = da_base.attrs.get("units", "")
         else:
-            vals = _flatten_finite_values(_squeeze_spatial(da.sel({by: unit_id})))
+            vals = _flatten_finite_values(squeeze_spatial_dims(da.sel({by: unit_id})))
             ax_i.hist(vals, bins=bins, density=density, alpha=0.7, color="tab:blue")
 
             units_str = da.attrs.get("units", "")
@@ -256,9 +216,7 @@ def _plot_histogram_faceted(
         ax_i.set_title(format_subgrid_title(by, unit_id), fontsize="medium")
         ax_i.tick_params(labelsize="small")
 
-    # Hide unused subplots
-    for ax_i in axes.flat[len(units) :]:
-        ax_i.set_visible(False)
+    hide_unused_axes(axes, len(units))
 
     # Overall title
     if isinstance(source, Comparison):

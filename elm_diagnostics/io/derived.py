@@ -24,6 +24,8 @@ from typing import TYPE_CHECKING
 
 import xarray as xr
 
+from elm_diagnostics.io.units import convert_water_to_mm
+
 if TYPE_CHECKING:
     from elm_diagnostics.io.run import Run
 
@@ -113,8 +115,6 @@ def aggregate_vertical_storage(
     if vdim is None:
         # No vertical dimension - convert units and return
         if varname in ["SOILLIQ", "SOILICE"]:
-            from elm_diagnostics.io.units import convert_water_to_mm
-
             da = convert_water_to_mm(da)
         return da
 
@@ -125,8 +125,6 @@ def aggregate_vertical_storage(
 
     # Convert water storage to mm for consistency (kg/m² → mm)
     if varname in ["SOILLIQ", "SOILICE"]:
-        from elm_diagnostics.io.units import convert_water_to_mm
-
         total = convert_water_to_mm(total)
 
     return total

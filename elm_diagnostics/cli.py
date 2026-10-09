@@ -16,12 +16,18 @@ import logging
 import shlex
 import sys
 import time
+from collections.abc import Iterator
+from contextlib import contextmanager
 from pathlib import Path
+from typing import TYPE_CHECKING, Any
 
 import typer
 from rich.console import Console
 from rich.logging import RichHandler
 from rich.progress import Progress, SpinnerColumn, TextColumn
+
+if TYPE_CHECKING:
+    from elm_diagnostics.config.schema import Config
 
 console = Console()
 
@@ -126,21 +132,15 @@ def complete_plot_kind(incomplete: str) -> list[str]:
     return [k for k in kinds if k.startswith(incomplete)]
 
 
-def _get_run_strict_combine(config_path: str | None) -> bool:
-    """Resolve strict_combine from merged defaults/user config."""
+def _load_cli_config(config_path: str | None) -> Config:
+    """Load defaults merged with the --config file (or the user config)."""
     from elm_diagnostics.config.schema import load_config
 
-    cfg = load_config(path=config_path) if config_path else load_config()
-    return cfg.io.strict_combine
+    return load_config(path=config_path) if config_path else load_config()
 
 
-def _get_run_chunk_options(
-    config_path: str | None,
-) -> tuple[str, dict[str, int] | None, int]:
-    """Resolve chunking mode/settings from merged defaults/user config."""
-    from elm_diagnostics.config.schema import load_config
-
-    cfg = load_config(path=config_path) if config_path else load_config()
+def _chunk_options(cfg: Config) -> tuple[str, dict[str, int] | None, int]:
+    """Resolve (chunk_mode, manual_chunks, chunk_target_mb) from config."""
     mode = cfg.io.chunk_mode
     target_mb = cfg.io.chunk_target_mb
     manual_chunks = cfg.io.chunks or None
@@ -199,9 +199,17 @@ def _resolve_analysis_year_filter(
     tuple[int | None, int | None]
         (min_year, max_year) inclusive range.
     """
-    from elm_diagnostics.config.schema import load_config
+    return _analysis_year_filter(
+        _load_cli_config(config_path), last_n_years=last_n_years, elm_path=elm_path
+    )
 
-    cfg = load_config(path=config_path) if config_path else load_config()
+
+def _analysis_year_filter(
+    cfg: Config,
+    last_n_years: int | None = None,
+    elm_path: Path | None = None,
+) -> tuple[int | None, int | None]:
+    """Config-object form of :func:`_resolve_analysis_year_filter`."""
     lo = cfg.time.analysis_start_year
     hi = cfg.time.analysis_end_year
 
@@ -317,6 +325,64 @@ def _print_report_section_timings(
             )
 
 
+def _start_command(verbose: bool, debug: bool, quiet: bool) -> logging.Logger:
+    """Configure logging and reject --verbose together with --quiet."""
+    setup_logging(verbose=verbose, debug=debug)
+    logger = logging.getLogger(__name__)
+    if verbose and quiet:
+        console.print("[red]Error:[/red] Cannot specify both --verbose and --quiet")
+        raise typer.Exit(code=1)
+    return logger
+
+
+@contextmanager
+def _handle_errors(debug: bool) -> Iterator[None]:
+    """Turn failures into a one-line message and exit code 1 (unless --debug)."""
+    try:
+        yield
+    except KeyboardInterrupt:
+        console.print("\n[yellow]Operation cancelled by user[/yellow]")
+        raise typer.Exit(code=1)
+    except Exception as e:
+        if debug:
+            raise
+        console.print(f"\n[red]Error:[/red] {e!s}")
+        console.print("\nRun with --debug for full traceback")
+        raise typer.Exit(code=1)
+
+
+@contextmanager
+def _spinner(description: str, quiet: bool) -> Iterator[None]:
+    """Show a transient spinner while the block runs (nothing when quiet)."""
+    if quiet:
+        yield
+        return
+    with Progress(
+        SpinnerColumn(),
+        TextColumn("[progress.description]{task.description}"),
+        console=console,
+        transient=True,
+    ) as progress:
+        task = progress.add_task(description, total=None)
+        yield
+        progress.update(task, completed=True)
+
+
+def _run_kwargs(
+    cfg: Config, analysis_year_min: int | None, analysis_year_max: int | None
+) -> dict[str, Any]:
+    """Keyword arguments for ``Run`` derived from config and the year window."""
+    chunk_mode, manual_chunks, chunk_target_mb = _chunk_options(cfg)
+    return {
+        "strict_combine": cfg.io.strict_combine,
+        "chunk_mode": chunk_mode,
+        "chunks": manual_chunks,
+        "chunk_target_mb": chunk_target_mb,
+        "analysis_year_min": analysis_year_min,
+        "analysis_year_max": analysis_year_max,
+    }
+
+
 @app.command()
 def report(
     path: str = typer.Argument(..., help="Path to ELM history files directory."),
@@ -363,14 +429,9 @@ def report(
         # Custom output directory
         elm-diagnostics report /path/to/output --out my_report
     """
-    setup_logging(verbose=verbose, debug=debug)
-    logger = logging.getLogger(__name__)
+    logger = _start_command(verbose, debug, quiet)
 
-    if verbose and quiet:
-        console.print("[red]Error:[/red] Cannot specify both --verbose and --quiet")
-        raise typer.Exit(code=1)
-
-    try:
+    with _handle_errors(debug):
         # Validate paths
         elm_path = validate_path(path)
         if compare:
@@ -379,27 +440,21 @@ def report(
         if config:
             validate_config(config)
 
-        strict_combine = _get_run_strict_combine(config)
-        chunk_mode, manual_chunks, chunk_target_mb = _get_run_chunk_options(config)
-
-        # Extract original analysis window from config before file-narrowing transformation
-        from elm_diagnostics.config.schema import load_config
-
-        original_cfg = load_config(path=config) if config else load_config()
+        cfg = _load_cli_config(config)
 
         # Compute analysis year range (handles config + last_n_years)
-        analysis_year_min, analysis_year_max = _resolve_analysis_year_filter(
-            config, last_n_years=last_n_years, elm_path=elm_path
+        analysis_year_min, analysis_year_max = _analysis_year_filter(
+            cfg, last_n_years=last_n_years, elm_path=elm_path
         )
 
-        # For report metadata, use last_n_years computed range if provided,
-        # otherwise use config values
+        # For report metadata, use the --last-n-years range if given; otherwise
+        # the configured window, before the file-narrowing adjustments above.
         if last_n_years is not None:
             original_analysis_year_min = analysis_year_min
             original_analysis_year_max = analysis_year_max
         else:
-            original_analysis_year_min = original_cfg.time.analysis_start_year
-            original_analysis_year_max = original_cfg.time.analysis_end_year
+            original_analysis_year_min = cfg.time.analysis_start_year
+            original_analysis_year_max = cfg.time.analysis_end_year
 
         # Import here to avoid slow startup
         from elm_diagnostics.io.run import Comparison, Run
@@ -407,69 +462,19 @@ def report(
 
         # Load data with optional progress
         start_time = time.time()
-
-        if not quiet:
-            with Progress(
-                SpinnerColumn(),
-                TextColumn("[progress.description]{task.description}"),
-                console=console,
-                transient=True,
-            ) as progress:
-                task = progress.add_task("Loading ELM data...", total=None)
-                run = Run(
-                    str(elm_path),
-                    strict_combine=strict_combine,
-                    chunk_mode=chunk_mode,
-                    chunks=manual_chunks,
-                    chunk_target_mb=chunk_target_mb,
-                    analysis_year_min=analysis_year_min,
-                    analysis_year_max=analysis_year_max,
-                )
-                progress.update(task, completed=True)
-                elapsed = time.time() - start_time
-                if verbose:
-                    logger.info(f"Loaded data in {elapsed:.1f}s")
-        else:
+        with _spinner("Loading ELM data...", quiet):
             run = Run(
-                str(elm_path),
-                strict_combine=strict_combine,
-                chunk_mode=chunk_mode,
-                chunks=manual_chunks,
-                chunk_target_mb=chunk_target_mb,
-                analysis_year_min=analysis_year_min,
-                analysis_year_max=analysis_year_max,
+                str(elm_path), **_run_kwargs(cfg, analysis_year_min, analysis_year_max)
             )
+            if verbose:
+                logger.info("Loaded data in %.1fs", time.time() - start_time)
 
         # Load comparison run if specified
         if compare:
-            if not quiet:
-                with Progress(
-                    SpinnerColumn(),
-                    TextColumn("[progress.description]{task.description}"),
-                    console=console,
-                    transient=True,
-                ) as progress:
-                    task = progress.add_task("Loading comparison data...", total=None)
-                    compare_run = Run(
-                        str(compare_path),
-                        strict_combine=strict_combine,
-                        chunk_mode=chunk_mode,
-                        chunks=manual_chunks,
-                        chunk_target_mb=chunk_target_mb,
-                        analysis_year_min=analysis_year_min,
-                        analysis_year_max=analysis_year_max,
-                    )
-                    source = Comparison(run, compare_run)
-                    progress.update(task, completed=True)
-            else:
+            with _spinner("Loading comparison data...", quiet):
                 compare_run = Run(
                     str(compare_path),
-                    strict_combine=strict_combine,
-                    chunk_mode=chunk_mode,
-                    chunks=manual_chunks,
-                    chunk_target_mb=chunk_target_mb,
-                    analysis_year_min=analysis_year_min,
-                    analysis_year_max=analysis_year_max,
+                    **_run_kwargs(cfg, analysis_year_min, analysis_year_max),
                 )
                 source = Comparison(run, compare_run)
         else:
@@ -498,21 +503,11 @@ def report(
         _print_report_section_timings(rpt.section_timings, rpt.build_total_seconds)
 
         if verbose:
-            logger.info(f"Output directory: {Path(out).resolve()}")
-            logger.info(f"Figures: {Path(out) / 'figures'}")
-            logger.info(f"Data: {Path(out) / 'data'}")
+            logger.info("Output directory: %s", Path(out).resolve())
+            logger.info("Figures: %s", Path(out) / "figures")
+            logger.info("Data: %s", Path(out) / "data")
 
         run.close()
-
-    except KeyboardInterrupt:
-        console.print("\n[yellow]Operation cancelled by user[/yellow]")
-        raise typer.Exit(code=1)
-    except Exception as e:
-        if debug:
-            raise
-        console.print(f"\n[red]Error:[/red] {e!s}")
-        console.print("\nRun with --debug for full traceback")
-        raise typer.Exit(code=1)
 
 
 @app.command()
@@ -558,23 +553,17 @@ def balance(
         # Water balance, last 3 years only
         elm-diagnostics balance water /path/to/output --last-n-years 3
     """
-    setup_logging(verbose=verbose, debug=debug)
-    logger = logging.getLogger(__name__)
+    logger = _start_command(verbose, debug, quiet)
 
-    if verbose and quiet:
-        console.print("[red]Error:[/red] Cannot specify both --verbose and --quiet")
-        raise typer.Exit(code=1)
-
-    try:
+    with _handle_errors(debug):
         # Validate inputs
         elm_path = validate_path(path)
         if config:
             validate_config(config)
 
-        strict_combine = _get_run_strict_combine(config)
-        chunk_mode, manual_chunks, chunk_target_mb = _get_run_chunk_options(config)
-        analysis_year_min, analysis_year_max = _resolve_analysis_year_filter(
-            config, last_n_years=last_n_years, elm_path=elm_path
+        cfg = _load_cli_config(config)
+        analysis_year_min, analysis_year_max = _analysis_year_filter(
+            cfg, last_n_years=last_n_years, elm_path=elm_path
         )
 
         from elm_diagnostics.balances.carbon import CarbonBalance
@@ -596,54 +585,19 @@ def balance(
 
         # Load data
         start_time = time.time()
-        if not quiet:
-            with Progress(
-                SpinnerColumn(),
-                TextColumn("[progress.description]{task.description}"),
-                console=console,
-                transient=True,
-            ) as progress:
-                task = progress.add_task("Loading ELM data...", total=None)
-                run = Run(
-                    str(elm_path),
-                    strict_combine=strict_combine,
-                    chunk_mode=chunk_mode,
-                    chunks=manual_chunks,
-                    chunk_target_mb=chunk_target_mb,
-                    analysis_year_min=analysis_year_min,
-                    analysis_year_max=analysis_year_max,
-                )
-                progress.update(task, completed=True)
-                elapsed = time.time() - start_time
-                if verbose:
-                    logger.info(f"Loaded data in {elapsed:.1f}s")
-        else:
+        with _spinner("Loading ELM data...", quiet):
             run = Run(
-                str(elm_path),
-                strict_combine=strict_combine,
-                chunk_mode=chunk_mode,
-                chunks=manual_chunks,
-                chunk_target_mb=chunk_target_mb,
-                analysis_year_min=analysis_year_min,
-                analysis_year_max=analysis_year_max,
+                str(elm_path), **_run_kwargs(cfg, analysis_year_min, analysis_year_max)
             )
+            if verbose:
+                logger.info("Loaded data in %.1fs", time.time() - start_time)
 
         # Compute balance
-        if not quiet:
-            with Progress(
-                SpinnerColumn(),
-                TextColumn("[progress.description]{task.description}"),
-                console=console,
-                transient=True,
-            ) as progress:
-                task = progress.add_task(f"Computing {kind} balance...", total=None)
-                bal = balance_classes[kind](run, config=config)
-                progress.update(task, completed=True)
-        else:
-            bal = balance_classes[kind](run, config=config)
+        with _spinner(f"Computing {kind} balance...", quiet):
+            bal = balance_classes[kind](run, config=cfg)
 
         if verbose:
-            logger.info(f"Balance type: {kind}")
+            logger.info("Balance type: %s", kind)
 
         # Generate plots
         if not quiet:
@@ -663,8 +617,8 @@ def balance(
             console.print(f"[green]✓[/green] Saved to {outdir.resolve()}/")
             if verbose:
                 for i in range(1, len(figures) + 1):
-                    logger.info(f"  - {kind}_panel{i}.png")
-                logger.info(f"  - {kind}_balance.nc")
+                    logger.info("  - %s_panel%d.png", kind, i)
+                logger.info("  - %s_balance.nc", kind)
         else:
             import matplotlib.pyplot as plt
 
@@ -673,16 +627,6 @@ def balance(
             plt.show()
 
         run.close()
-
-    except KeyboardInterrupt:
-        console.print("\n[yellow]Operation cancelled by user[/yellow]")
-        raise typer.Exit(code=1)
-    except Exception as e:
-        if debug:
-            raise
-        console.print(f"\n[red]Error:[/red] {e!s}")
-        console.print("\nRun with --debug for full traceback")
-        raise typer.Exit(code=1)
 
 
 @app.command()
@@ -737,26 +681,19 @@ def plot(
         # Plot only the last 10 years
         elm-diagnostics plot GPP /path/to/output --last-n-years 10
     """
-    setup_logging(verbose=verbose, debug=debug)
-    logger = logging.getLogger(__name__)
+    logger = _start_command(verbose, debug, quiet)
 
-    if verbose and quiet:
-        console.print("[red]Error:[/red] Cannot specify both --verbose and --quiet")
-        raise typer.Exit(code=1)
-
-    try:
+    with _handle_errors(debug):
         # Validate inputs
         elm_path = validate_path(path)
         if config:
             validate_config(config)
 
-        strict_combine = _get_run_strict_combine(config)
-        chunk_mode, manual_chunks, chunk_target_mb = _get_run_chunk_options(config)
-        analysis_year_min, analysis_year_max = _resolve_analysis_year_filter(
-            config, last_n_years=last_n_years, elm_path=elm_path
+        cfg = _load_cli_config(config)
+        analysis_year_min, analysis_year_max = _analysis_year_filter(
+            cfg, last_n_years=last_n_years, elm_path=elm_path
         )
 
-        from elm_diagnostics.config.schema import load_config as load_config_obj
         from elm_diagnostics.io.run import Run
         from elm_diagnostics.plots import (
             plot_anomaly,
@@ -782,46 +719,18 @@ def plot(
             )
             raise typer.Exit(code=1)
 
-        # Load config object
-        cfg = load_config_obj(path=config) if config else load_config_obj()
-
         # Load data
         start_time = time.time()
-        if not quiet:
-            with Progress(
-                SpinnerColumn(),
-                TextColumn("[progress.description]{task.description}"),
-                console=console,
-                transient=True,
-            ) as progress:
-                task = progress.add_task("Loading ELM data...", total=None)
-                run = Run(
-                    str(elm_path),
-                    strict_combine=strict_combine,
-                    chunk_mode=chunk_mode,
-                    chunks=manual_chunks,
-                    chunk_target_mb=chunk_target_mb,
-                    analysis_year_min=analysis_year_min,
-                    analysis_year_max=analysis_year_max,
-                )
-                progress.update(task, completed=True)
-                elapsed = time.time() - start_time
-                if verbose:
-                    logger.info(f"Loaded data in {elapsed:.1f}s")
-        else:
+        with _spinner("Loading ELM data...", quiet):
             run = Run(
-                str(elm_path),
-                strict_combine=strict_combine,
-                chunk_mode=chunk_mode,
-                chunks=manual_chunks,
-                chunk_target_mb=chunk_target_mb,
-                analysis_year_min=analysis_year_min,
-                analysis_year_max=analysis_year_max,
+                str(elm_path), **_run_kwargs(cfg, analysis_year_min, analysis_year_max)
             )
+            if verbose:
+                logger.info("Loaded data in %.1fs", time.time() - start_time)
 
         if verbose:
-            logger.info(f"Variable: {varname}")
-            logger.info(f"Plot type: {kind}")
+            logger.info("Variable: %s", varname)
+            logger.info("Plot type: %s", kind)
 
         # Generate plot
         if not quiet:
@@ -839,16 +748,6 @@ def plot(
             plt.show()
 
         run.close()
-
-    except KeyboardInterrupt:
-        console.print("\n[yellow]Operation cancelled by user[/yellow]")
-        raise typer.Exit(code=1)
-    except Exception as e:
-        if debug:
-            raise
-        console.print(f"\n[red]Error:[/red] {e!s}")
-        console.print("\nRun with --debug for full traceback")
-        raise typer.Exit(code=1)
 
 
 if __name__ == "__main__":

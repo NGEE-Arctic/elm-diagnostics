@@ -12,26 +12,28 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 import cftime
 import numpy as np
 import xarray as xr
 
 
-def _get_month(time_val) -> int:
+def _get_month(time_val: Any) -> int:
     """Extract month from a cftime or numpy datetime."""
     if hasattr(time_val, "month"):
         return int(time_val.month)
     return int(np.datetime64(time_val, "M").astype(int) % 12 + 1)
 
 
-def _get_year(time_val) -> int:
+def _get_year(time_val: Any) -> int:
     """Extract year from a cftime or numpy datetime."""
     if hasattr(time_val, "year"):
         return int(time_val.year)
     return int(np.datetime64(time_val, "Y").astype(int) + 1970)
 
 
-def water_year(time_val, start_month: int = 10) -> int:
+def water_year(time_val: Any, start_month: int = 10) -> int:
     """Compute the water year for a given time value.
 
     A water year starting in October means that Oct 2014 - Sep 2015
@@ -75,6 +77,24 @@ def add_water_year_coord(
     return ds.assign_coords(water_year=(dim, wy))
 
 
+def year_window_mask(
+    times: np.ndarray,
+    year_min: int | None,
+    year_max: int | None,
+) -> np.ndarray:
+    """Boolean mask of time values whose calendar year is in ``[year_min, year_max]``.
+
+    ``None`` leaves that side of the window open.
+    """
+    years = np.array([_get_year(t) for t in times], dtype=int)
+    mask = np.ones(years.shape, dtype=bool)
+    if year_min is not None:
+        mask &= years >= year_min
+    if year_max is not None:
+        mask &= years <= year_max
+    return mask
+
+
 def select_year(
     ds: xr.Dataset,
     year: int,
@@ -113,7 +133,7 @@ def get_available_years(
     start_month: int = 10,
     dim: str = "time",
 ) -> list[int]:
-    """Return sorted list of complete years available in the dataset."""
+    """Return the sorted list of years present in the dataset (partial years included)."""
     times = ds[dim].values
 
     if frame == "water_year":
@@ -155,7 +175,7 @@ def subset_climo_years(
     return da.isel({dim: mask})
 
 
-def day_of_year(time_val, start_month: int = 1) -> int:
+def day_of_year(time_val: Any, start_month: int = 1) -> int:
     """Compute day-of-year, optionally offset by start_month.
 
     For water-year-relative DOY, pass start_month=10.

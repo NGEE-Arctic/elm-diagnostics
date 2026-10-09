@@ -19,15 +19,16 @@ import xarray as xr
 from elm_diagnostics.config.schema import Config, load_config
 from elm_diagnostics.io.run import Comparison, Run
 from elm_diagnostics.io.subgrid import SubgridLevel
+from elm_diagnostics.plots._common import (
+    append_long_name_line,
+    check_by_ax,
+    format_var_ylabel,
+    hide_unused_axes,
+    prepare_facets,
+)
 from elm_diagnostics.plots.climatology import compute_climo_stats
-
-
-def _squeeze_spatial(da: xr.DataArray) -> xr.DataArray:
-    """Squeeze singleton spatial dims."""
-    for dim in ("lat", "lon", "lndgrid", "gridcell"):
-        if dim in da.dims and da.sizes[dim] == 1:
-            da = da.squeeze(dim, drop=True)
-    return da
+from elm_diagnostics.plots.dimension_helpers import squeeze_spatial_dims
+from elm_diagnostics.plots.subgrid_helpers import format_subgrid_title
 
 
 def _diurnal_stats(
@@ -72,16 +73,12 @@ def _median_time_step_hours(da: xr.DataArray) -> float | None:
         return None
 
 
-def _format_var_ylabel(varname: str, units: str) -> str:
-    units = str(units).strip()
-    return f"{varname} ({units})" if units else varname
-
-
-def _append_long_name_line(title: str, da: xr.DataArray | None) -> str:
-    if da is None:
-        return title
-    long_name = str(da.attrs.get("long_name", "")).strip()
-    return f"{title}\n{long_name}" if long_name else title
+def _is_subdaily(da: xr.DataArray) -> bool:
+    """Check if data has sub-daily resolution."""
+    if len(da.time) < 24:
+        return False
+    median_hours = _median_time_step_hours(da)
+    return median_hours is not None and median_hours < 24
 
 
 def plot_diurnal(
@@ -119,22 +116,19 @@ def plot_diurnal(
     -------
     matplotlib Figure
 
+    Data that is not sub-daily produces a figure with an explanatory text
+    panel rather than an error.
+
     Raises
     ------
     ValueError
-        If data is not sub-daily (less than 24 time steps per day),
-        or if `by` is specified but variable doesn't have that dimension,
+        If `by` is specified but variable doesn't have that dimension,
         or if dataset uses gridcell-averaged output (dov2xy=.true.),
         or if both `by` and `ax` are specified.
     """
     cfg = config or load_config()
 
-    # Validate ax + by compatibility
-    if by is not None and ax is not None:
-        raise ValueError(
-            "Cannot specify both 'by' and 'ax': faceted plots create "
-            "their own figure. Remove 'ax' parameter or set by=None."
-        )
+    check_by_ax(by, ax)
 
     if by is None:
         # Single plot (existing logic)
@@ -160,20 +154,12 @@ def _plot_diurnal_single(
     else:
         fig = ax.figure
 
-    # Check if data is sub-daily
-    def _check_subdaily(da: xr.DataArray) -> bool:
-        """Check if data has sub-daily resolution."""
-        if len(da.time) < 24:
-            return False
-        median_hours = _median_time_step_hours(da)
-        return median_hours is not None and median_hours < 24
-
     if isinstance(source, Comparison):
-        da_base = _squeeze_spatial(source.base.get(varname))
-        da_exp = _squeeze_spatial(source.experiment.get(varname))
+        da_base = squeeze_spatial_dims(source.base.get(varname))
+        da_exp = squeeze_spatial_dims(source.experiment.get(varname))
         title_da = da_exp
 
-        if not _check_subdaily(da_base) or not _check_subdaily(da_exp):
+        if not _is_subdaily(da_base) or not _is_subdaily(da_exp):
             ax.text(
                 0.5,
                 0.5,
@@ -245,10 +231,10 @@ def _plot_diurnal_single(
         ax.legend(loc="best", fontsize="small")
         units = da_base.attrs.get("units", "")
     else:
-        da = _squeeze_spatial(source.get(varname))
+        da = squeeze_spatial_dims(source.get(varname))
         title_da = da
 
-        if not _check_subdaily(da):
+        if not _is_subdaily(da):
             ax.text(
                 0.5,
                 0.5,
@@ -292,12 +278,12 @@ def _plot_diurnal_single(
 
     ax.set_xticks(np.arange(0, 24, 3))
     ax.set_xlabel("Hour of Day (UTC)")
-    ax.set_ylabel(_format_var_ylabel(varname, units))
+    ax.set_ylabel(format_var_ylabel(varname, units))
 
     title = f"{varname} — Diurnal Cycle"
     if isinstance(source, Run):
         title += f" — {source.name}"
-    ax.set_title(_append_long_name_line(title, title_da))
+    ax.set_title(append_long_name_line(title, title_da))
 
     ax.grid(True, alpha=0.3)
     fig.tight_layout()
@@ -312,51 +298,19 @@ def _plot_diurnal_faceted(
     config: Config,
 ) -> plt.Figure:
     """Plot faceted diurnal cycles by sub-gridcell dimension."""
-    from elm_diagnostics.plots.subgrid_helpers import (
-        create_facet_figure,
-        format_subgrid_title,
-        get_subgrid_units,
-        validate_variable_for_subgrid,
-    )
-
     style = config.plots.style
     include_climos = config.plots.climatology.include_climos
     envelope = config.plots.climatology.envelope if include_climos else "none"
 
-    # Get data and validate
-    if isinstance(source, Comparison):
-        da_base = source.base.get(varname)
-        da_exp = source.experiment.get(varname)
-        # Validate using experiment structure
-        validate_variable_for_subgrid(da_exp, by, varname)
-    else:
-        da = source.get(varname)
-        validate_variable_for_subgrid(da, by, varname)
-
-    # Get subgrid units
-    if isinstance(source, Comparison):
-        units = get_subgrid_units(da_exp, by)
-    else:
-        units = get_subgrid_units(da, by)
-
-    # Create faceted figure
-    fig, axes = create_facet_figure(len(units), style)
-
-    # Check if data is sub-daily
-    def _check_subdaily(da: xr.DataArray) -> bool:
-        """Check if data has sub-daily resolution."""
-        if len(da.time) < 24:
-            return False
-        median_hours = _median_time_step_hours(da)
-        return median_hours is not None and median_hours < 24
+    da, da_base, units, fig, axes = prepare_facets(source, varname, by, style)
 
     # Plot each subgrid unit
     for unit_id, ax_i in zip(units, axes.flat):
         if isinstance(source, Comparison):
-            da_base_unit = _squeeze_spatial(da_base.sel({by: unit_id}))
-            da_exp_unit = _squeeze_spatial(da_exp.sel({by: unit_id}))
+            da_base_unit = squeeze_spatial_dims(da_base.sel({by: unit_id}))
+            da_exp_unit = squeeze_spatial_dims(da.sel({by: unit_id}))
 
-            if _check_subdaily(da_base_unit) and _check_subdaily(da_exp_unit):
+            if _is_subdaily(da_base_unit) and _is_subdaily(da_exp_unit):
                 mean_b, lo_b, hi_b = _diurnal_stats(
                     da_base_unit,
                     envelope,
@@ -408,9 +362,9 @@ def _plot_diurnal_faceted(
 
             units_str = da_base.attrs.get("units", "")
         else:
-            da_unit = _squeeze_spatial(da.sel({by: unit_id}))
+            da_unit = squeeze_spatial_dims(da.sel({by: unit_id}))
 
-            if _check_subdaily(da_unit):
+            if _is_subdaily(da_unit):
                 mean, lo, hi = _diurnal_stats(
                     da_unit,
                     envelope,
@@ -444,9 +398,7 @@ def _plot_diurnal_faceted(
         ax_i.tick_params(labelsize="small")
         ax_i.grid(True, alpha=0.3)
 
-    # Hide unused subplots
-    for ax_i in axes.flat[len(units) :]:
-        ax_i.set_visible(False)
+    hide_unused_axes(axes, len(units))
 
     # Overall title
     if isinstance(source, Comparison):
